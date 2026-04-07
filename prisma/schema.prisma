@@ -1,13 +1,201 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
+// pgvector: enable the extension in Postgres before VECTOR columns exist.
+// Declared on the datasource via `extensions = [vector]`; migrations also run
+// `CREATE EXTENSION IF NOT EXISTS vector;` for providers (e.g. Neon) that require it.
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../app/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector(schema: "public")]
+}
+
+enum BookStatus {
+  draft
+  published
+  unlisted
+}
+
+enum AgeRange {
+  EIGHTEEN_24
+  TWENTY5_34
+  THIRTY5_44
+  FORTY5_54
+  FIFTY5_PLUS
+}
+
+model Book {
+  id                 String     @id @default(cuid())
+  title              String
+  author             String
+  coverImageUrl      String?
+  description        String?
+  genre              String?
+  publishedYear      Int?
+  isPublicDomain     Boolean    @default(false)
+  status             BookStatus @default(draft)
+  scheduledPublishAt DateTime?
+
+  chapters        Chapter[]
+  chunks          Chunk[]
+  userBooks       UserBook[]
+  readingProgress ReadingProgress[]
+  queries         Query[]
+  generatedImages GeneratedImage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model Chapter {
+  id             String  @id @default(cuid())
+  bookId         String
+  sequenceNumber Int
+  title          String?
+  rawText        String  @db.Text
+
+  book   Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  chunks Chunk[]
+
+  readingProgressAsCurrent ReadingProgress[] @relation("ReadingProgressCurrentChapter")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookId, sequenceNumber])
+  @@index([bookId])
+}
+
+model Chunk {
+  id             String                      @id @default(cuid())
+  chapterId      String
+  bookId         String
+  sequenceNumber Int
+  content        String                      @db.Text
+  /// Embedding dimension 1536 (e.g. text-embedding-3-small / ada-002 class models). Query via raw SQL.
+  embedding      Unsupported("vector(1536)")
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  book    Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([chapterId, sequenceNumber])
+  @@index([bookId])
+  @@index([chapterId])
+}
+
+model User {
+  id               String    @id @default(cuid())
+  clerkId          String    @unique
+  email            String
+  name             String?
+  country          String?
+  ageRange         AgeRange?
+  genrePreferences String[]  @default([])
+
+  userBooks       UserBook[]
+  readingProgress ReadingProgress[]
+  queries         Query[]
+  generatedImages GeneratedImage[]
+  bookRequests    BookRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserBook {
+  id       String   @id @default(cuid())
+  userId   String
+  bookId   String
+  addedAt  DateTime @default(now())
+  isActive Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bookId])
+  @@index([bookId])
+}
+
+model ReadingProgress {
+  id                   String @id @default(cuid())
+  userId               String
+  bookId               String
+  currentChapterId     String
+  currentChapterNumber Int
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book           Book    @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  currentChapter Chapter @relation("ReadingProgressCurrentChapter", fields: [currentChapterId], references: [id], onDelete: Restrict)
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bookId])
+  @@index([currentChapterId])
+}
+
+model Query {
+  id                  String @id @default(cuid())
+  userId              String
+  bookId              String
+  chapterNumberAtTime Int
+  questionText        String @db.Text
+  responseText        String @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, bookId])
+}
+
+model GeneratedImage {
+  id                  String  @id @default(cuid())
+  userId              String
+  bookId              String
+  chapterNumberAtTime Int
+  userPrompt          String  @db.Text
+  fullPrompt          String  @db.Text
+  imageUrl            String
+  isPublic            Boolean @default(false)
+  likeCount           Int     @default(0)
+  model               String?
+  cfgScale            Float?
+  seed                BigInt?
+  steps               Int?
+  width               Int?
+  height              Int?
+  sampler             String?
+  negativePrompt      String? @db.Text
+  rawParameters       Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, bookId])
+  @@index([isPublic])
+}
+
+model BookRequest {
+  id         String @id @default(cuid())
+  userId     String
+  bookTitle  String
+  authorName String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

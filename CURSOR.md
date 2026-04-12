@@ -197,9 +197,10 @@ GET    /api/admin/users
 - Session 1: Next.js 16 scaffold, Prisma, Clerk, Neon connection, Tailwind,
   folder structure, .env.example, homepage placeholder
 - Session 2: Full database schema, pgvector enabled, initial migration run
+- Auth flow (sign up, login, user record created in DB)
 
 ## What is NOT Built Yet
-- Auth flow (sign up, login, user record created in DB)
+
 - Any pages beyond homepage placeholder
 - Any API routes
 - Book ingestion pipeline
@@ -208,7 +209,7 @@ GET    /api/admin/users
 ## Build Order
 1. ✅ Project scaffold
 2. ✅ Database schema and migration
-3. Auth (sign up, login, user record created in DB)
+3. ✅ Auth (sign up, login, user record created in DB)
 4. Catalogue pages (read only, public)
 5. Library (add/remove books, dashboard)
 6. Reading Progress (chapter selector, save and retrieve)

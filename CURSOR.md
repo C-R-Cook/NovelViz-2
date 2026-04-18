@@ -198,6 +198,12 @@ GET    /api/admin/users
   folder structure, .env.example, homepage placeholder
 - Session 2: Full database schema, pgvector enabled, initial migration run
 - Auth flow (sign up, login, user record created in DB)
+- Session 3: Dev auth helper (lib/auth.ts) with mock user for local development
+- Prisma seed script with 8 public domain books and dev user
+- Catalogue pages: /books grid with genre filter, /books/[id] detail page
+- Library pages: /library with add/remove functionality
+- API routes: POST and DELETE /api/library/[bookId]
+- Public layout with nav, reader layout with nav
 
 ## What is NOT Built Yet
 
@@ -210,8 +216,8 @@ GET    /api/admin/users
 1. ✅ Project scaffold
 2. ✅ Database schema and migration
 3. ✅ Auth (sign up, login, user record created in DB)
-4. Catalogue pages (read only, public)
-5. Library (add/remove books, dashboard)
+4. ✅ Catalogue pages (read only, public)
+5. ✅ Library (add/remove books, dashboard)
 6. Reading Progress (chapter selector, save and retrieve)
 7. Book ingestion (admin, chunking, embeddings)
 8. Q&A feature
@@ -221,3 +227,9 @@ GET    /api/admin/users
 ## Environment Variables
 See .env.example for all required keys.
 Never commit .env.local to Git.
+
+## Known Decisions
+- Prisma client uses `prisma-client` provider with output to `app/generated/prisma`, imported via `@db` path alias
+- Seeding uses `tsx prisma/seed.ts` (not ts-node) due to Prisma 7 ESM client
+- Auth uses mock dev user locally (NODE_ENV !== 'production'). Clerk to be wired in lib/auth.ts before go-live
+- DIRECT_URL must be set in .env.local for migrations and db push (Neon requirement)

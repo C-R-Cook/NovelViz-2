@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@db": ["./app/generated/prisma/client"]
     }
   },
   "include": [

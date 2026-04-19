@@ -1,0 +1,493 @@
+"use client";
+
+import { ChapterManagerClient } from "./chapter-manager-client";
+import { StatusBadge } from "@/app/admin/books/admin-books-client";
+import type { BookStatus } from "@db";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+
+export type AdminBookDetailModel = {
+  id: string;
+  title: string;
+  author: string;
+  genre: string | null;
+  publishedYear: number | null;
+  description: string | null;
+  coverImageUrl: string | null;
+  status: BookStatus;
+  chapterCount: number;
+};
+
+/** Manual status changes only — `processing` is set by ingest, not selectable here. */
+const STATUS_OPTIONS: BookStatus[] = [
+  "draft",
+  "ready_for_review",
+  "published",
+  "unlisted",
+];
+
+/** Human-readable labels: underscores → spaces; first letter capitalised. */
+function formatStatusOptionLabel(status: BookStatus): string {
+  const spaced = status.replace(/_/g, " ");
+  if (spaced.length === 0) return spaced;
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+/** Muted, on-theme tints for the closed select (matches each lifecycle state). */
+function statusSelectClassName(status: BookStatus): string {
+  const base =
+    "w-full cursor-pointer rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50";
+
+  switch (status) {
+    case "draft":
+      return `${base} border-sky-600/40 bg-sky-950/60 text-sky-100 focus:border-sky-500/55 focus:ring-sky-500/25`;
+    case "processing":
+      return `${base} border-violet-600/45 bg-violet-950/55 text-violet-100 focus:border-violet-500/50 focus:ring-violet-500/25`;
+    case "ready_for_review":
+      return `${base} border-amber-600/45 bg-amber-950/50 text-amber-100 focus:border-amber-500/50 focus:ring-amber-500/25`;
+    case "published":
+      return `${base} border-emerald-600/45 bg-emerald-950/55 text-emerald-100 focus:border-emerald-500/50 focus:ring-emerald-500/25`;
+    case "unlisted":
+      return `${base} border-rose-700/40 bg-rose-950/50 text-rose-100 focus:border-rose-600/45 focus:ring-rose-500/22`;
+    default:
+      return `${base} border-zinc-700 bg-zinc-950 text-zinc-100 focus:ring-zinc-500/20`;
+  }
+}
+
+export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetailModel }) {
+  const router = useRouter();
+  const draftFileRef = useRef<HTMLInputElement>(null);
+  const reingestFileRef = useRef<HTMLInputElement>(null);
+  const [book, setBook] = useState(initial);
+
+  useEffect(() => {
+    setBook(initial);
+  }, [initial]);
+
+  const [title, setTitle] = useState(initial.title);
+  const [author, setAuthor] = useState(initial.author);
+  const [genre, setGenre] = useState(initial.genre ?? "");
+  const [publishedYear, setPublishedYear] = useState(
+    initial.publishedYear != null ? String(initial.publishedYear) : "",
+  );
+  const [description, setDescription] = useState(initial.description ?? "");
+
+  useEffect(() => {
+    setTitle(book.title);
+    setAuthor(book.author);
+    setGenre(book.genre ?? "");
+    setPublishedYear(book.publishedYear != null ? String(book.publishedYear) : "");
+    setDescription(book.description ?? "");
+  }, [book]);
+
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [statusErr, setStatusErr] = useState<string | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+
+  const [ingestErr, setIngestErr] = useState<string | null>(null);
+  const [ingestBusy, setIngestBusy] = useState(false);
+
+  const [publishErr, setPublishErr] = useState<string | null>(null);
+  const [publishBusy, setPublishBusy] = useState(false);
+
+  useEffect(() => {
+    if (book.status !== "processing") return;
+    const id = setInterval(() => {
+      router.refresh();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [book.status, router]);
+
+  async function saveMetadata(e: React.FormEvent) {
+    e.preventDefault();
+    setSaveErr(null);
+    setSaveMsg(null);
+    setSaving(true);
+    try {
+      const py =
+        publishedYear.trim() === "" ? null : parseInt(publishedYear, 10);
+      if (py !== null && Number.isNaN(py)) {
+        throw new Error("Published year must be a number");
+      }
+      const res = await fetch(`/api/admin/books/${book.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          author,
+          genre: genre.trim() === "" ? null : genre,
+          publishedYear: py,
+          description: description.trim() === "" ? null : description,
+        }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { book: AdminBookDetailModel };
+      setBook((prev) => ({
+        ...prev,
+        ...data.book,
+        chapterCount: prev.chapterCount,
+      }));
+      setSaveMsg("Saved");
+      setTimeout(() => setSaveMsg(null), 3000);
+      router.refresh();
+    } catch (err) {
+      setSaveErr(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onStatusChange(next: BookStatus) {
+    setStatusErr(null);
+    setStatusBusy(true);
+    try {
+      const res = await fetch(`/api/admin/books/${book.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: next }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { book: AdminBookDetailModel };
+      setBook((prev) => ({
+        ...prev,
+        ...data.book,
+        chapterCount: prev.chapterCount,
+      }));
+      router.refresh();
+    } catch (err) {
+      setStatusErr(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setStatusBusy(false);
+    }
+  }
+
+  async function uploadIngest(file: File) {
+    setIngestErr(null);
+    setIngestBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/admin/books/${book.id}/ingest`, {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      router.refresh();
+    } catch (err) {
+      setIngestErr(err instanceof Error ? err.message : "Ingest failed");
+    } finally {
+      setIngestBusy(false);
+    }
+  }
+
+  async function publish() {
+    setPublishErr(null);
+    setPublishBusy(true);
+    try {
+      const res = await fetch(`/api/admin/books/${book.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      router.refresh();
+    } catch (err) {
+      setPublishErr(err instanceof Error ? err.message : "Publish failed");
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-10">
+      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
+        <div className="mb-6 border-b border-zinc-800/60 pb-6">
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-amber-100/95">
+            {title}
+          </h1>
+          <p className="mt-1 text-sm text-zinc-500">{author}</p>
+        </div>
+        <form onSubmit={saveMetadata} className="space-y-4">
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-x-6">
+            <div className="shrink-0 space-y-2">
+              {/* TODO: Admin cover image upload (store URL in coverImageUrl; reuse asset pipeline). */}
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                Cover preview
+              </span>
+              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+                {book.coverImageUrl ? (
+                  <Image
+                    src={book.coverImageUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="144px"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-600">
+                    No cover image
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Title
+                  </span>
+                  <input
+                    required
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-amber-400/0 transition focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Author
+                  </span>
+                  <input
+                    required
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Genre
+                  </span>
+                  <input
+                    value={genre}
+                    onChange={(e) => setGenre(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                  />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    Published year
+                  </span>
+                  <input
+                    type="number"
+                    value={publishedYear}
+                    onChange={(e) => setPublishedYear(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                  />
+                </label>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
+                <div className="space-y-1">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                      Status
+                    </span>
+                    <select
+                      value={book.status}
+                      disabled={statusBusy || book.status === "processing"}
+                      onChange={(e) =>
+                        onStatusChange(e.target.value as BookStatus)
+                      }
+                      className={statusSelectClassName(book.status)}
+                    >
+                      {book.status === "processing" ? (
+                        <option value="processing">
+                          {formatStatusOptionLabel("processing")}
+                        </option>
+                      ) : null}
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s}>
+                          {formatStatusOptionLabel(s)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {statusErr ? (
+                    <p className="text-sm text-red-400">{statusErr}</p>
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full rounded-lg bg-amber-200/15 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/35 transition hover:bg-amber-200/20 disabled:opacity-50 sm:w-auto sm:self-start"
+                  >
+                    {saving ? "Saving…" : "Save metadata"}
+                  </button>
+                  {saveMsg ? (
+                    <span className="text-sm text-emerald-400/90">{saveMsg}</span>
+                  ) : null}
+                  {saveErr ? (
+                    <span className="text-sm text-red-400">{saveErr}</span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Description
+            </span>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={4}
+              className="w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+            />
+          </label>
+        </form>
+      </section>
+
+      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
+        <h2 className="mb-4 font-serif text-lg font-semibold text-amber-100/90">
+          Ingestion
+        </h2>
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-zinc-500">Current status</span>
+          <StatusBadge status={book.status} />
+        </div>
+
+        {book.status === "draft" ? (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-400">
+              Upload a plain-text file (.txt) to split into chapters, embed, and
+              prepare for review.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={draftFileRef}
+                type="file"
+                accept=".txt,text/plain"
+                className="hidden"
+                disabled={ingestBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadIngest(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                disabled={ingestBusy}
+                onClick={() => draftFileRef.current?.click()}
+                className="rounded-lg bg-amber-200/10 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/30 transition hover:bg-amber-200/15 disabled:opacity-50"
+              >
+                {ingestBusy ? "Uploading…" : "Upload & Ingest"}
+              </button>
+              <span className="text-xs text-zinc-500">.txt only</span>
+            </div>
+          </div>
+        ) : null}
+
+        {book.status === "processing" ? (
+          <div className="flex items-center gap-3 text-sm text-blue-300/90">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-400 ring-2 ring-blue-500/40" />
+            Processing text and embeddings… This page refreshes every 5 seconds.
+          </div>
+        ) : null}
+
+        {book.status === "ready_for_review" ? (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              <span className="font-medium text-zinc-300">
+                {book.chapterCount}
+              </span>{" "}
+              chapters ingested. Ready to publish to the catalogue.
+            </p>
+            <button
+              type="button"
+              disabled={publishBusy}
+              onClick={publish}
+              className="rounded-lg bg-emerald-700/85 px-4 py-2 text-sm font-medium text-emerald-50 ring-1 ring-emerald-500/40 transition hover:bg-emerald-600 disabled:opacity-50"
+            >
+              {publishBusy
+                ? "Publishing…"
+                : "Looks good — mark as ready"}
+            </button>
+            {publishErr ? (
+              <p className="text-sm text-red-400">{publishErr}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {(book.status === "published" || book.status === "unlisted") && (
+          <div className="space-y-4">
+            <p className="text-sm text-zinc-400">
+              <span className="font-medium text-zinc-300">
+                {book.chapterCount}
+              </span>{" "}
+              chapters in the database.
+            </p>
+            <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
+              <strong className="text-amber-200">Warning:</strong> Re-ingest
+              replaces all existing chapters and vector chunks for this book. The
+              book will move to <code className="text-amber-50">ready_for_review</code>{" "}
+              when complete.
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={reingestFileRef}
+                type="file"
+                accept=".txt,text/plain"
+                className="hidden"
+                disabled={ingestBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadIngest(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                disabled={ingestBusy}
+                onClick={() => reingestFileRef.current?.click()}
+                className="rounded-lg bg-amber-200/10 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/30 transition hover:bg-amber-200/15 disabled:opacity-50"
+              >
+                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest"}
+              </button>
+              <span className="text-xs text-zinc-500">.txt only</span>
+            </div>
+          </div>
+        )}
+
+        {ingestErr ? (
+          <p className="mt-3 text-sm text-red-400">{ingestErr}</p>
+        ) : null}
+      </section>
+
+      <ChapterManagerClient bookId={book.id} status={book.status} />
+
+      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
+        <h2 className="mb-3 font-serif text-lg font-semibold text-amber-100/90">
+          Stats
+        </h2>
+        <p className="text-sm text-zinc-400">
+          Chapters:{" "}
+          <span className="font-medium text-zinc-200">{book.chapterCount}</span>
+        </p>
+        <p className="mt-2 text-sm italic text-zinc-500">
+          Usage stats coming soon
+        </p>
+      </section>
+    </div>
+  );
+}

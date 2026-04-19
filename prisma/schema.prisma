@@ -17,6 +17,8 @@ enum BookStatus {
   draft
   published
   unlisted
+  processing
+  ready_for_review
 }
 
 enum AgeRange {

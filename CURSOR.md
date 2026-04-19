@@ -45,7 +45,9 @@ All models are defined in prisma/schema.prisma. Migration has been run successfu
 ### Models
 
 **Book**
-- status enum: draft | published | unlisted
+- status enum: draft | published | unlisted | processing | ready_for_review
+  - `processing` — ingestion in progress (chunking, embeddings)
+  - `ready_for_review` — ingestion finished; awaiting admin before catalogue changes
 - scheduledPublishAt (nullable datetime)
 - isPublicDomain (boolean)
 - Standard metadata: title, author, coverImageUrl, description, genre, publishedYear
@@ -132,7 +134,7 @@ Books are ingested by an admin only. The pipeline:
 2. System splits into chapters
 3. Chapters split into chunks (~500 tokens with overlap)
 4. Each chunk is embedded and stored with its vector
-5. Book status set to draft for admin review before publishing
+5. Book status set to `processing` during ingest, then `ready_for_review` or `draft` for admin review before publishing
 
 This is a background process, not an inline API call.
 

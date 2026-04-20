@@ -41,23 +41,24 @@ function statusSelectClassName(status: BookStatus): string {
 
   switch (status) {
     case "draft":
-      return `${base} border-sky-600/40 bg-sky-950/60 text-sky-100 focus:border-sky-500/55 focus:ring-sky-500/25`;
+      return `${base} border-sky-400/80 bg-sky-100 text-sky-950 focus:border-sky-500/70 focus:ring-sky-400/25 dark:border-sky-600/40 dark:bg-sky-950/60 dark:text-sky-100 dark:focus:border-sky-500/55 dark:focus:ring-sky-500/25`;
     case "processing":
-      return `${base} border-violet-600/45 bg-violet-950/55 text-violet-100 focus:border-violet-500/50 focus:ring-violet-500/25`;
+      return `${base} border-violet-400/80 bg-violet-100 text-violet-950 focus:border-violet-500/70 focus:ring-violet-400/25 dark:border-violet-600/45 dark:bg-violet-950/55 dark:text-violet-100 dark:focus:border-violet-500/50 dark:focus:ring-violet-500/25`;
     case "ready_for_review":
-      return `${base} border-amber-600/45 bg-amber-950/50 text-amber-100 focus:border-amber-500/50 focus:ring-amber-500/25`;
+      return `${base} border-amber-500/70 bg-amber-100 text-amber-950 focus:border-amber-600/70 focus:ring-amber-400/25 dark:border-amber-600/45 dark:bg-amber-950/50 dark:text-amber-100 dark:focus:border-amber-500/50 dark:focus:ring-amber-500/25`;
     case "published":
-      return `${base} border-emerald-600/45 bg-emerald-950/55 text-emerald-100 focus:border-emerald-500/50 focus:ring-emerald-500/25`;
+      return `${base} border-emerald-500/70 bg-emerald-100 text-emerald-950 focus:border-emerald-600/70 focus:ring-emerald-400/25 dark:border-emerald-600/45 dark:bg-emerald-950/55 dark:text-emerald-100 dark:focus:border-emerald-500/50 dark:focus:ring-emerald-500/25`;
     case "unlisted":
-      return `${base} border-rose-700/40 bg-rose-950/50 text-rose-100 focus:border-rose-600/45 focus:ring-rose-500/22`;
+      return `${base} border-rose-500/70 bg-rose-100 text-rose-950 focus:border-rose-600/70 focus:ring-rose-400/25 dark:border-rose-700/40 dark:bg-rose-950/50 dark:text-rose-100 dark:focus:border-rose-600/45 dark:focus:ring-rose-500/22`;
     default:
-      return `${base} border-zinc-700 bg-zinc-950 text-zinc-100 focus:ring-zinc-500/20`;
+      return `${base} border-zinc-300 bg-white text-zinc-900 focus:ring-zinc-400/25 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:ring-zinc-500/20`;
   }
 }
 
 export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetailModel }) {
   const router = useRouter();
-  const draftFileRef = useRef<HTMLInputElement>(null);
+  /** Draft + ready_for_review: upload/re-upload before publishing. */
+  const prePublishIngestRef = useRef<HTMLInputElement>(null);
   const reingestFileRef = useRef<HTMLInputElement>(null);
   const [book, setBook] = useState(initial);
 
@@ -216,21 +217,21 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
   return (
     <div className="space-y-10">
-      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
-        <div className="mb-6 border-b border-zinc-800/60 pb-6">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-amber-100/95">
+      <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
+        <div className="mb-6 border-b border-zinc-200/80 pb-6 dark:border-zinc-800/60">
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-amber-900 dark:text-amber-100/95">
             {title}
           </h1>
-          <p className="mt-1 text-sm text-zinc-500">{author}</p>
+          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">{author}</p>
         </div>
         <form onSubmit={saveMetadata} className="space-y-4">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-x-6">
             <div className="shrink-0 space-y-2">
               {/* TODO: Admin cover image upload (store URL in coverImageUrl; reuse asset pipeline). */}
-              <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                 Cover preview
               </span>
-              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950">
+              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
                 {book.coverImageUrl ? (
                   <Image
                     src={book.coverImageUrl}
@@ -240,7 +241,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     sizes="144px"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-600">
+                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
                     No cover image
                   </div>
                 )}
@@ -250,46 +251,46 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
             <div className="min-w-0 flex-1 space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                     Title
                   </span>
                   <input
                     required
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-amber-400/0 transition focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none ring-amber-400/0 transition focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                     Author
                   </span>
                   <input
                     required
                     value={author}
                     onChange={(e) => setAuthor(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                     Genre
                   </span>
                   <input
                     value={genre}
                     onChange={(e) => setGenre(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
                   />
                 </label>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                     Published year
                   </span>
                   <input
                     type="number"
                     value={publishedYear}
                     onChange={(e) => setPublishedYear(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
                   />
                 </label>
               </div>
@@ -297,7 +298,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-end">
                 <div className="space-y-1">
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                       Status
                     </span>
                     <select
@@ -321,22 +322,22 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     </select>
                   </label>
                   {statusErr ? (
-                    <p className="text-sm text-red-400">{statusErr}</p>
+                    <p className="text-sm text-red-600 dark:text-red-400">{statusErr}</p>
                   ) : null}
                 </div>
                 <div className="flex flex-col gap-2">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full rounded-lg bg-amber-200/15 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/35 transition hover:bg-amber-200/20 disabled:opacity-50 sm:w-auto sm:self-start"
+                    className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/40 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/35 dark:hover:bg-amber-200/20 sm:w-auto sm:self-start"
                   >
                     {saving ? "Saving…" : "Save metadata"}
                   </button>
                   {saveMsg ? (
-                    <span className="text-sm text-emerald-400/90">{saveMsg}</span>
+                    <span className="text-sm text-emerald-700 dark:text-emerald-400/90">{saveMsg}</span>
                   ) : null}
                   {saveErr ? (
-                    <span className="text-sm text-red-400">{saveErr}</span>
+                    <span className="text-sm text-red-600 dark:text-red-400">{saveErr}</span>
                   ) : null}
                 </div>
               </div>
@@ -344,39 +345,39 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           </div>
 
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
               Description
             </span>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="w-full resize-y rounded-lg border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/40 focus:ring-2 focus:ring-amber-400/20"
+              className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
             />
           </label>
         </form>
       </section>
 
-      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
-        <h2 className="mb-4 font-serif text-lg font-semibold text-amber-100/90">
+      <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
+        <h2 className="mb-4 font-serif text-lg font-semibold text-amber-900 dark:text-amber-100/90">
           Ingestion
         </h2>
         <div className="mb-4 flex items-center gap-3">
-          <span className="text-sm text-zinc-500">Current status</span>
+          <span className="text-sm text-zinc-600 dark:text-zinc-500">Current status</span>
           <StatusBadge status={book.status} />
         </div>
 
         {book.status === "draft" ? (
           <div className="space-y-3">
-            <p className="text-sm text-zinc-400">
-              Upload a plain-text file (.txt) to split into chapters, embed, and
-              prepare for review.
+            <p className="text-sm text-zinc-700 dark:text-zinc-400">
+              Upload an EPUB or plain-text file (.epub, .txt) to split into chapters,
+              embed, and prepare for review.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <input
-                ref={draftFileRef}
+                ref={prePublishIngestRef}
                 type="file"
-                accept=".txt,text/plain"
+                accept=".epub,.txt,application/epub+zip,text/plain"
                 className="hidden"
                 disabled={ingestBusy}
                 onChange={(e) => {
@@ -388,66 +389,96 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <button
                 type="button"
                 disabled={ingestBusy}
-                onClick={() => draftFileRef.current?.click()}
-                className="rounded-lg bg-amber-200/10 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/30 transition hover:bg-amber-200/15 disabled:opacity-50"
+                onClick={() => prePublishIngestRef.current?.click()}
+                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
               >
-                {ingestBusy ? "Uploading…" : "Upload & Ingest"}
+                {ingestBusy ? "Uploading…" : "Upload & Ingest (.epub, .txt)"}
               </button>
-              <span className="text-xs text-zinc-500">.txt only</span>
+              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
             </div>
           </div>
         ) : null}
 
         {book.status === "processing" ? (
-          <div className="flex items-center gap-3 text-sm text-blue-300/90">
-            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-400 ring-2 ring-blue-500/40" />
+          <div className="flex items-center gap-3 text-sm text-blue-800 dark:text-blue-300/90">
+            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-blue-500 ring-2 ring-blue-400/50 dark:bg-blue-400 dark:ring-blue-500/40" />
             Processing text and embeddings… This page refreshes every 5 seconds.
           </div>
         ) : null}
 
         {book.status === "ready_for_review" ? (
           <div className="space-y-4">
-            <p className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-300">
+            <p className="text-sm text-zinc-700 dark:text-zinc-400">
+              <span className="font-medium text-zinc-900 dark:text-zinc-300">
                 {book.chapterCount}
               </span>{" "}
-              chapters ingested. Ready to publish to the catalogue.
+              chapters ingested. You can replace the source file and re-ingest, or
+              publish when satisfied.
             </p>
+            <div className="rounded-lg border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-100/90">
+              <strong className="text-amber-900 dark:text-amber-200">Re-ingest:</strong> Uploading a
+              new .epub or .txt replaces all chapters and embeddings. Status stays{" "}
+              <code className="text-amber-900 dark:text-amber-50">ready_for_review</code> when
+              processing finishes.
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                ref={prePublishIngestRef}
+                type="file"
+                accept=".epub,.txt,application/epub+zip,text/plain"
+                className="hidden"
+                disabled={ingestBusy || publishBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadIngest(f);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                disabled={ingestBusy || publishBusy}
+                onClick={() => prePublishIngestRef.current?.click()}
+                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
+              >
+                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
+              </button>
+              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
+            </div>
             <button
               type="button"
-              disabled={publishBusy}
+              disabled={publishBusy || ingestBusy}
               onClick={publish}
-              className="rounded-lg bg-emerald-700/85 px-4 py-2 text-sm font-medium text-emerald-50 ring-1 ring-emerald-500/40 transition hover:bg-emerald-600 disabled:opacity-50"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white ring-1 ring-emerald-500/50 transition hover:bg-emerald-700 disabled:opacity-50 dark:bg-emerald-700/85 dark:text-emerald-50 dark:ring-emerald-500/40 dark:hover:bg-emerald-600"
             >
               {publishBusy
                 ? "Publishing…"
-                : "Looks good — mark as ready"}
+                : "Looks good — publish to catalogue"}
             </button>
             {publishErr ? (
-              <p className="text-sm text-red-400">{publishErr}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{publishErr}</p>
             ) : null}
           </div>
         ) : null}
 
         {(book.status === "published" || book.status === "unlisted") && (
           <div className="space-y-4">
-            <p className="text-sm text-zinc-400">
-              <span className="font-medium text-zinc-300">
+            <p className="text-sm text-zinc-700 dark:text-zinc-400">
+              <span className="font-medium text-zinc-900 dark:text-zinc-300">
                 {book.chapterCount}
               </span>{" "}
               chapters in the database.
             </p>
-            <div className="rounded-lg border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
-              <strong className="text-amber-200">Warning:</strong> Re-ingest
+            <div className="rounded-lg border border-amber-600/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-500/35 dark:bg-amber-500/10 dark:text-amber-100/90">
+              <strong className="text-amber-900 dark:text-amber-200">Warning:</strong> Re-ingest
               replaces all existing chapters and vector chunks for this book. The
-              book will move to <code className="text-amber-50">ready_for_review</code>{" "}
+              book will move to <code className="text-amber-900 dark:text-amber-50">ready_for_review</code>{" "}
               when complete.
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <input
                 ref={reingestFileRef}
                 type="file"
-                accept=".txt,text/plain"
+                accept=".epub,.txt,application/epub+zip,text/plain"
                 className="hidden"
                 disabled={ingestBusy}
                 onChange={(e) => {
@@ -460,31 +491,31 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                 type="button"
                 disabled={ingestBusy}
                 onClick={() => reingestFileRef.current?.click()}
-                className="rounded-lg bg-amber-200/10 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-400/30 transition hover:bg-amber-200/15 disabled:opacity-50"
+                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
               >
-                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest"}
+                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
               </button>
-              <span className="text-xs text-zinc-500">.txt only</span>
+              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
             </div>
           </div>
         )}
 
         {ingestErr ? (
-          <p className="mt-3 text-sm text-red-400">{ingestErr}</p>
+          <p className="mt-3 text-sm text-red-600 dark:text-red-400">{ingestErr}</p>
         ) : null}
       </section>
 
       <ChapterManagerClient bookId={book.id} status={book.status} />
 
-      <section className="rounded-xl border border-zinc-800/80 bg-zinc-900/35 p-6 shadow-sm shadow-black/20">
-        <h2 className="mb-3 font-serif text-lg font-semibold text-amber-100/90">
+      <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
+        <h2 className="mb-3 font-serif text-lg font-semibold text-amber-900 dark:text-amber-100/90">
           Stats
         </h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-700 dark:text-zinc-400">
           Chapters:{" "}
-          <span className="font-medium text-zinc-200">{book.chapterCount}</span>
+          <span className="font-medium text-zinc-900 dark:text-zinc-200">{book.chapterCount}</span>
         </p>
-        <p className="mt-2 text-sm italic text-zinc-500">
+        <p className="mt-2 text-sm italic text-zinc-600 dark:text-zinc-500">
           Usage stats coming soon
         </p>
       </section>

@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { chunkText, detectChapters, embedChunks } from "@/lib/ingestion";
+import { chunkText, embedChunks, processBook } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import type { BookStatus } from "@db";
 import { Prisma } from "@db";
@@ -28,7 +28,13 @@ type ChunkRow = {
   vector: string;
 };
 
-const INGEST_ALLOWED: BookStatus[] = ["draft", "published", "unlisted"];
+/** Ingest allowed before catalogue publish; `ready_for_review` can re-upload before publishing. */
+const INGEST_ALLOWED: BookStatus[] = [
+  "draft",
+  "ready_for_review",
+  "published",
+  "unlisted",
+];
 
 export async function POST(request: Request, context: RouteContext) {
   const user = await getCurrentUser();
@@ -47,7 +53,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "Ingest is only allowed when status is draft, published, or unlisted",
+          "Ingest is only allowed when status is draft, ready_for_review, published, or unlisted",
       },
       { status: 400 },
     );
@@ -55,17 +61,23 @@ export async function POST(request: Request, context: RouteContext) {
 
   const previousStatus = book.status;
 
-  let text: string;
+  let buffer: Buffer;
+  let filename: string;
   try {
     const formData = await request.formData();
     const file = formData.get("file");
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "Missing file field" }, { status: 400 });
     }
-    if (!file.name.toLowerCase().endsWith(".txt")) {
-      return NextResponse.json({ error: "Only .txt files are accepted" }, { status: 400 });
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".txt") && !lower.endsWith(".epub")) {
+      return NextResponse.json(
+        { error: "Only .epub and .txt files are accepted" },
+        { status: 400 },
+      );
     }
-    text = await file.text();
+    buffer = Buffer.from(await file.arrayBuffer());
+    filename = file.name;
   } catch {
     return NextResponse.json({ error: "Invalid multipart body" }, { status: 400 });
   }
@@ -76,7 +88,13 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   try {
-    const chaptersIn = detectChapters(text);
+    const chaptersIn = await processBook(buffer, filename);
+
+    if (chaptersIn.length === 0) {
+      throw new Error(
+        "No chapters were extracted from this file. For EPUB, try another export or confirm the archive is not corrupt; for .txt, ensure the file has body text.",
+      );
+    }
 
     await prisma.$transaction(
       async (tx) => {

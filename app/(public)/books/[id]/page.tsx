@@ -47,13 +47,13 @@ export default async function BookDetailPage({ params }: PageProps) {
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <Link
         href="/books"
-        className="inline-flex text-sm font-medium text-zinc-500 transition hover:text-amber-200/90"
+        className="inline-flex text-sm font-medium text-zinc-600 transition hover:text-amber-800 dark:text-zinc-500 dark:hover:text-amber-200/90"
       >
         ← Back to catalogue
       </Link>
 
       <div className="mt-8 flex flex-col gap-10 lg:flex-row lg:items-start">
-        <div className="relative mx-auto w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-xl shadow-black/30 lg:mx-0">
+        <div className="relative mx-auto w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 shadow-xl shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/30 lg:mx-0">
           <div className="relative aspect-[2/3] w-full">
             {book.coverImageUrl ? (
               <Image
@@ -65,7 +65,7 @@ export default async function BookDetailPage({ params }: PageProps) {
                 sizes="280px"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-zinc-600">
+              <div className="flex h-full items-center justify-center text-sm text-zinc-500 dark:text-zinc-600">
                 No cover
               </div>
             )}
@@ -74,43 +74,43 @@ export default async function BookDetailPage({ params }: PageProps) {
 
         <div className="min-w-0 flex-1 space-y-6">
           {book.genre ? (
-            <span className="inline-block rounded-full border border-amber-900/50 bg-amber-950/40 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-200/90">
+            <span className="inline-block rounded-full border border-amber-700/45 bg-amber-100/95 px-3 py-1 text-xs font-medium uppercase tracking-wide text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-200/90">
               {book.genre}
             </span>
           ) : null}
 
           <div>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
+            <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
               {book.title}
             </h1>
-            <p className="mt-2 text-lg text-zinc-400">{book.author}</p>
+            <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">{book.author}</p>
           </div>
 
-          <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm text-zinc-500">
+          <dl className="flex flex-wrap gap-x-8 gap-y-2 text-sm text-zinc-600 dark:text-zinc-500">
             {book.publishedYear != null ? (
               <div>
-                <dt className="text-zinc-600">First published</dt>
-                <dd className="font-medium text-zinc-300">{book.publishedYear}</dd>
+                <dt className="text-zinc-500 dark:text-zinc-600">First published</dt>
+                <dd className="font-medium text-zinc-800 dark:text-zinc-300">{book.publishedYear}</dd>
               </div>
             ) : null}
             <div>
-              <dt className="text-zinc-600">Chapters</dt>
-              <dd className="font-medium text-zinc-300">{chapterCount}</dd>
+              <dt className="text-zinc-500 dark:text-zinc-600">Chapters</dt>
+              <dd className="font-medium text-zinc-800 dark:text-zinc-300">{chapterCount}</dd>
             </div>
             {book.isPublicDomain ? (
               <div>
-                <dt className="text-zinc-600">Rights</dt>
-                <dd className="font-medium text-zinc-300">Public domain</dd>
+                <dt className="text-zinc-500 dark:text-zinc-600">Rights</dt>
+                <dd className="font-medium text-zinc-800 dark:text-zinc-300">Public domain</dd>
               </div>
             ) : null}
           </dl>
 
           {book.description ? (
-            <div className="border-t border-zinc-800/80 pt-6">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            <div className="border-t border-zinc-200/90 pt-6 dark:border-zinc-800/80">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-600 dark:text-zinc-500">
                 About
               </h2>
-              <p className="mt-3 text-base leading-relaxed text-zinc-300">
+              <p className="mt-3 text-base leading-relaxed text-zinc-700 dark:text-zinc-300">
                 {book.description}
               </p>
             </div>

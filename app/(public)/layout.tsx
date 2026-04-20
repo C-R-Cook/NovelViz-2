@@ -1,3 +1,4 @@
+import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 
 export default function PublicLayout({
@@ -6,21 +7,24 @@ export default function PublicLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-      <header className="border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur-sm">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-4 py-4 sm:px-6">
+    <div className="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
+      <header className="border-b border-zinc-200/90 bg-white/90 backdrop-blur-sm dark:border-zinc-800/80 dark:bg-zinc-950/90">
+        <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:gap-6 sm:px-6">
           <Link
             href="/"
-            className="font-serif text-xl font-semibold tracking-tight text-amber-100/95"
+            className="font-serif text-xl font-semibold tracking-tight text-amber-900 dark:text-amber-100/95"
           >
             NovelViz
           </Link>
-          <Link
-            href="/books"
-            className="text-sm font-medium text-zinc-400 transition-colors hover:text-amber-200/90"
-          >
-            Books
-          </Link>
+          <div className="flex items-center gap-3 sm:gap-6">
+            <Link
+              href="/books"
+              className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
+            >
+              Books
+            </Link>
+            <ThemeToggle />
+          </div>
         </nav>
       </header>
       <main>{children}</main>

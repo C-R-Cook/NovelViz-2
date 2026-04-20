@@ -1,13 +1,13 @@
-import { SignIn } from "@clerk/nextjs";
+import { ClerkThemedSignIn } from "@/components/clerk-themed-auth";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <SignIn
-        path="/login"
-        routing="path"
-        signUpUrl="/register"
-      />
+    <div className="relative flex min-h-screen items-center justify-center bg-zinc-50 p-6 dark:bg-zinc-950">
+      <div className="absolute right-4 top-4 z-10 sm:right-6 sm:top-6">
+        <ThemeToggle />
+      </div>
+      <ClerkThemedSignIn path="/login" routing="path" signUpUrl="/register" />
     </div>
   );
 }

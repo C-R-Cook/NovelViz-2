@@ -25,7 +25,7 @@ export function BookLibraryActions({
       <div className="pt-2">
         <Link
           href="/sign-in"
-          className="inline-flex rounded-lg border border-amber-800/50 bg-amber-950/30 px-5 py-2.5 text-sm font-medium text-amber-100/95 transition hover:border-amber-600/60 hover:bg-amber-950/50"
+          className="inline-flex rounded-lg border border-amber-700/50 bg-amber-100/90 px-5 py-2.5 text-sm font-medium text-amber-950 transition hover:border-amber-600/70 hover:bg-amber-100 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:border-amber-600/60 dark:hover:bg-amber-950/50"
         >
           Sign in to add to library
         </Link>
@@ -57,7 +57,7 @@ export function BookLibraryActions({
         type="button"
         onClick={handleClick}
         disabled={pending}
-        className="rounded-lg border border-zinc-600 bg-zinc-800/80 px-5 py-2.5 text-sm font-medium text-zinc-100 transition hover:border-amber-800/50 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+        className="rounded-lg border border-zinc-400 bg-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-900 transition hover:border-amber-700/60 hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-100 dark:hover:border-amber-800/50 dark:hover:bg-zinc-800"
       >
         {pending
           ? "…"
@@ -66,7 +66,7 @@ export function BookLibraryActions({
             : "Add to Library"}
       </button>
       {error ? (
-        <p className="mt-2 text-xs text-red-400/90">{error}</p>
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400/90">{error}</p>
       ) : null}
     </div>
   );

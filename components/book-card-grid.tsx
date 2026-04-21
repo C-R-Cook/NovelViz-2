@@ -38,7 +38,7 @@ export function BookCardGrid({ books }: Props) {
                     src={book.coverImageUrl}
                     alt={book.title}
                     fill
-                    className="object-cover object-top"
+                    className="object-contain object-center"
                     sizes="(max-width: 639px) 100vw, (max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
                   />
                 ) : (

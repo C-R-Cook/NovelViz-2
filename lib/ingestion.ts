@@ -348,6 +348,53 @@ async function readZipText(zip: JSZip, zipPath: string): Promise<string | null> 
   }
 }
 
+/** Same path resolution as {@link readZipText}; returns raw bytes or null. */
+export async function readZipBuffer(zip: JSZip, zipPath: string): Promise<Buffer | null> {
+  const norm = zipPath.replace(/\\/g, "/");
+  let f = zip.file(norm);
+  if (!f) {
+    const lower = norm.toLowerCase();
+    for (const name of Object.keys(zip.files)) {
+      if (!zip.files[name]!.dir && name.replace(/\\/g, "/").toLowerCase() === lower) {
+        f = zip.file(name);
+        break;
+      }
+    }
+  }
+  if (!f) return null;
+  try {
+    const raw = await f.async("nodebuffer");
+    return Buffer.isBuffer(raw) ? raw : Buffer.from(raw as Uint8Array);
+  } catch {
+    return null;
+  }
+}
+
+/** Load EPUB archive and OPF package document (same steps as {@link parseEpub} start). */
+export async function openEpubPackage(
+  buffer: Buffer,
+): Promise<{ zip: JSZip; opfXml: string; opfDir: string }> {
+  const zip = await JSZip.loadAsync(buffer);
+
+  const containerXml = await readZipText(zip, "META-INF/container.xml");
+  if (!containerXml) {
+    throw new Error("Invalid EPUB: missing META-INF/container.xml");
+  }
+
+  const opfPath = parseContainerXml(containerXml);
+  if (!opfPath) {
+    throw new Error("Invalid EPUB: could not find OPF path in container.xml");
+  }
+
+  const opfXml = await readZipText(zip, opfPath);
+  if (!opfXml) {
+    throw new Error(`Invalid EPUB: could not read OPF at ${opfPath}`);
+  }
+
+  const opfDir = posixDir(opfPath);
+  return { zip, opfXml, opfDir };
+}
+
 function parseContainerXml(xml: string): string | null {
   const m = xml.match(/full-path\s*=\s*["']([^"']+)["']/i);
   return m?.[1]?.trim() ?? null;
@@ -579,30 +626,64 @@ function isHtmlManifestItem(m: ManifestItem): boolean {
   return h.endsWith(".xhtml") || h.endsWith(".html") || h.endsWith(".htm");
 }
 
+const COVER_FALLBACK_IMAGE_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+]);
+
+/**
+ * Find cover image bytes from EPUB manifest (cover-image property, else id contains "cover").
+ */
+export async function extractEpubCover(
+  zip: JSZip,
+  opfXml: string,
+  opfDir: string,
+): Promise<Buffer | null> {
+  let manifestById: Map<string, ManifestItem>;
+  try {
+    ({ manifestById } = parseOpfManifestAndSpine(opfXml));
+  } catch {
+    return null;
+  }
+
+  let href: string | null = null;
+
+  for (const m of manifestById.values()) {
+    const props = (m.properties ?? "").toLowerCase();
+    const tokens = props.split(/\s+/).filter(Boolean);
+    if (tokens.includes("cover-image")) {
+      href = m.href;
+      break;
+    }
+  }
+
+  if (!href) {
+    for (const m of manifestById.values()) {
+      if (!/cover/i.test(m.id)) continue;
+      const mt = (m.mediaType ?? "").toLowerCase();
+      if (COVER_FALLBACK_IMAGE_TYPES.has(mt)) {
+        href = m.href;
+        break;
+      }
+    }
+  }
+
+  if (!href) return null;
+
+  const zipPath = epubRootPath(opfDir, href);
+  const buf = await readZipBuffer(zip, zipPath);
+  return buf && buf.length > 0 ? buf : null;
+}
+
 /**
  * Parse an EPUB buffer: spine order, HTML stripped to plain text, short sections dropped.
  */
 export async function parseEpub(
   buffer: Buffer,
 ): Promise<{ chapters: { title: string; content: string }[] }> {
-  const zip = await JSZip.loadAsync(buffer);
-
-  const containerXml = await readZipText(zip, "META-INF/container.xml");
-  if (!containerXml) {
-    throw new Error("Invalid EPUB: missing META-INF/container.xml");
-  }
-
-  const opfPath = parseContainerXml(containerXml);
-  if (!opfPath) {
-    throw new Error("Invalid EPUB: could not find OPF path in container.xml");
-  }
-
-  const opfXml = await readZipText(zip, opfPath);
-  if (!opfXml) {
-    throw new Error(`Invalid EPUB: could not read OPF at ${opfPath}`);
-  }
-
-  const opfDir = posixDir(opfPath);
+  const { zip, opfXml, opfDir } = await openEpubPackage(buffer);
   const { manifestById, spineIdrefs, spineTocIdref } = parseOpfManifestAndSpine(opfXml);
   const opfBookTitle = getOpfTitle(opfXml);
 

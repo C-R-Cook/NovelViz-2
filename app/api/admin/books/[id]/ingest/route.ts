@@ -1,5 +1,12 @@
 import { getCurrentUser } from "@/lib/auth";
-import { chunkText, embedChunks, processBook } from "@/lib/ingestion";
+import cloudinary from "@/lib/cloudinary";
+import {
+  chunkText,
+  embedChunks,
+  extractEpubCover,
+  openEpubPackage,
+  processBook,
+} from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import type { BookStatus } from "@db";
 import { Prisma } from "@db";
@@ -17,6 +24,29 @@ const CHUNK_TX = { maxWait: 10_000, timeout: 300_000 } as const;
 
 /** Rows per INSERT — fewer round trips than one INSERT per chunk. */
 const CHUNK_INSERT_BATCH = 40;
+
+function sniffImageMimeType(buf: Buffer): string {
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    buf.length >= 8 &&
+    buf[0] === 0x89 &&
+    buf[1] === 0x50 &&
+    buf[2] === 0x4e &&
+    buf[3] === 0x47
+  ) {
+    return "image/png";
+  }
+  if (
+    buf.length >= 12 &&
+    buf.slice(0, 4).toString("ascii") === "RIFF" &&
+    buf.slice(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  return "image/jpeg";
+}
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -98,6 +128,8 @@ export async function POST(request: Request, context: RouteContext) {
 
     await prisma.$transaction(
       async (tx) => {
+        // ReadingProgress.currentChapterId uses onDelete: Restrict — clear before chapters go away.
+        await tx.readingProgress.deleteMany({ where: { bookId } });
         await tx.chapter.deleteMany({ where: { bookId } });
 
         for (let i = 0; i < chaptersIn.length; i++) {
@@ -114,6 +146,30 @@ export async function POST(request: Request, context: RouteContext) {
       },
       CHAPTER_TX,
     );
+
+    if (filename.toLowerCase().endsWith(".epub")) {
+      try {
+        const { zip, opfXml, opfDir } = await openEpubPackage(buffer);
+        const coverBuf = await extractEpubCover(zip, opfXml, opfDir);
+        if (coverBuf && coverBuf.length > 0) {
+          const mime = sniffImageMimeType(coverBuf);
+          const dataUri = `data:${mime};base64,${coverBuf.toString("base64")}`;
+          const result = await cloudinary.uploader.upload(dataUri, {
+            folder: "novelviz/covers",
+            public_id: bookId,
+            overwrite: true,
+            transformation: [{ width: 400, height: 600, crop: "fit" }],
+            resource_type: "image",
+          });
+          await prisma.book.update({
+            where: { id: bookId },
+            data: { coverImageUrl: result.secure_url },
+          });
+        }
+      } catch (e) {
+        console.warn("[ingest] EPUB cover extraction or upload skipped:", e);
+      }
+    }
 
     const createdChapters = await prisma.chapter.findMany({
       where: { bookId },

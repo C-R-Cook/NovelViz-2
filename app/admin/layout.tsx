@@ -1,3 +1,4 @@
+import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 
@@ -24,10 +25,11 @@ export default function AdminLayout({
               Books
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500">
               Admin
             </span>
+            <DevRoleSwitcher />
             <ThemeToggle />
           </div>
         </nav>

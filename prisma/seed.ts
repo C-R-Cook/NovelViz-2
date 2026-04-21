@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { BookStatus, PrismaClient } from "@db";
+import { BookStatus, PrismaClient, UserRole } from "@db";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -94,10 +94,12 @@ async function seedDevUser() {
       clerkId: "user_dev_clerk_local",
       email: "dev@novelviz.local",
       name: "Dev Reader",
+      role: UserRole.admin,
     },
     update: {
       email: "dev@novelviz.local",
       name: "Dev Reader",
+      role: UserRole.admin,
     },
   });
 }

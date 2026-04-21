@@ -213,13 +213,23 @@ GET    /api/admin/users
 - Library pages: /library with add/remove functionality
 - API routes: POST and DELETE /api/library/[bookId]
 - Public layout with nav, reader layout with nav
+- Session 4:
+  - Dev role switcher (floating widget, cookie-based role override for local dev)
+  - Reading progress: `/reader/[bookId]` page, chapter selector, save/retrieve via `/api/progress/[bookId]`
+  - Cloudinary integration (`lib/cloudinary.ts`) for cover image storage
+  - Cover image upload on admin book detail page
+  - Automatic EPUB cover extraction and Cloudinary upload during ingestion
+  - `UserBook` record auto-created when user visits reader page
 
 ## What is NOT Built Yet
 
-- Any pages beyond homepage placeholder
-- Any API routes
-- Book ingestion pipeline
-- All AI features
+- Partner portal
+- Full Clerk auth for production
+- Book moderation workflow
+- Retailer links
+- Community features
+- Q&A and image generation (chapter-gated AI)
+- Public gallery and likes
 
 ## Build Order
 1. ✅ Project scaffold
@@ -227,8 +237,8 @@ GET    /api/admin/users
 3. ✅ Auth (sign up, login, user record created in DB)
 4. ✅ Catalogue pages (read only, public)
 5. ✅ Library (add/remove books, dashboard)
-6. Reading Progress (chapter selector, save and retrieve)
-7. Book ingestion (admin, chunking, embeddings)
+6. ✅ Reading Progress (chapter selector, save and retrieve)
+7. ✅ Book ingestion (admin, chunking, embeddings)
 8. Q&A feature
 9. Image generation feature
 10. Gallery (public images, likes, public/private toggle)
@@ -242,3 +252,8 @@ Never commit .env.local to Git.
 - Seeding uses `tsx prisma/seed.ts` (not ts-node) due to Prisma 7 ESM client
 - Auth uses mock dev user locally (NODE_ENV !== 'production'). Clerk to be wired in lib/auth.ts before go-live
 - DIRECT_URL must be set in .env.local for migrations and db push (Neon requirement)
+- Cloudinary used for image storage (`CLOUDINARY_URL` in `.env.local`). `crop: "fit"` transformation enforces consistent cover dimensions
+- EPUB cover auto-extracted from manifest `properties="cover-image"` during ingestion, falls back to manifest item whose `id` contains `"cover"`
+- Visiting `/reader/[bookId]` auto-creates `UserBook` and `ReadingProgress` at Chapter 1 if they do not exist
+- `UserRole` enum added: `reader`, `partner`, `admin`. Dev user is `admin` role
+- **Partner** is the term used for authors/publishers/resellers (replaces “publisher” from the original brief)

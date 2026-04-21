@@ -1,3 +1,6 @@
+import { UserRole } from "@db";
+import { cookies } from "next/headers";
+
 /**
  * Current user for server components and route handlers.
  *
@@ -11,6 +14,7 @@ export type CurrentUser = {
   clerkId: string;
   email: string;
   name: string | null;
+  role: UserRole;
 };
 
 const DEV_USER: CurrentUser = {
@@ -18,11 +22,22 @@ const DEV_USER: CurrentUser = {
   clerkId: "user_dev_clerk_local",
   email: "dev@novelviz.local",
   name: "Dev Reader",
+  role: UserRole.admin,
 };
+
+function devRoleFromCookieValue(raw: string | undefined): UserRole | null {
+  if (raw === UserRole.reader || raw === UserRole.partner || raw === UserRole.admin) {
+    return raw;
+  }
+  return null;
+}
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
-    return DEV_USER;
+    const store = await cookies();
+    const raw = store.get("dev_role")?.value;
+    const role = devRoleFromCookieValue(raw) ?? DEV_USER.role;
+    return { ...DEV_USER, role };
   }
 
   // TODO: const { userId } = await auth(); … fetch User by clerkId

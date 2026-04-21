@@ -1,3 +1,4 @@
+import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 
@@ -16,13 +17,14 @@ export default function PublicLayout({
           >
             NovelViz
           </Link>
-          <div className="flex items-center gap-3 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Link
               href="/books"
               className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
             >
               Books
             </Link>
+            <DevRoleSwitcher />
             <ThemeToggle />
           </div>
         </nav>

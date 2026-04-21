@@ -27,6 +27,7 @@ export default async function BookDetailPage({ params }: PageProps) {
 
   const session = await getCurrentUser();
   let initialInLibrary = false;
+  let readerCta: "continue" | "start" | null = null;
   if (session) {
     const dbUser = await prisma.user.findUnique({
       where: { clerkId: session.clerkId },
@@ -40,6 +41,13 @@ export default async function BookDetailPage({ params }: PageProps) {
         },
       });
       initialInLibrary = !!ub;
+
+      const progress = await prisma.readingProgress.findUnique({
+        where: {
+          userId_bookId: { userId: dbUser.id, bookId: book.id },
+        },
+      });
+      readerCta = progress ? "continue" : "start";
     }
   }
 
@@ -121,6 +129,17 @@ export default async function BookDetailPage({ params }: PageProps) {
             initialInLibrary={initialInLibrary}
             isLoggedIn={!!session}
           />
+
+          {session && readerCta ? (
+            <div className="pt-2">
+              <Link
+                href={`/reader/${book.id}`}
+                className="inline-flex rounded-lg border border-amber-700/50 bg-amber-100/90 px-5 py-2.5 text-sm font-medium text-amber-950 transition hover:border-amber-600/70 hover:bg-amber-200/90 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:border-amber-600/60 dark:hover:bg-amber-950/50"
+              >
+                {readerCta === "continue" ? "Continue Reading" : "Start Reading"}
+              </Link>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

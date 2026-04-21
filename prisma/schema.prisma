@@ -29,6 +29,12 @@ enum AgeRange {
   FIFTY5_PLUS
 }
 
+enum UserRole {
+  reader
+  partner
+  admin
+}
+
 model Book {
   id                 String     @id @default(cuid())
   title              String
@@ -98,6 +104,7 @@ model User {
   clerkId          String    @unique
   email            String
   name             String?
+  role             UserRole  @default(reader)
   country          String?
   ageRange         AgeRange?
   genrePreferences String[]  @default([])

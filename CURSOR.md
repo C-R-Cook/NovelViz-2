@@ -65,9 +65,15 @@ All models are defined in prisma/schema.prisma. Migration has been run successfu
 - content (text segment)
 - embedding (vector) — pgvector field for semantic search
 
+**UserRole** (enum)
+- `reader` — standard catalogue and library access
+- `partner` — publisher-style access (the original brief “publisher” role is represented as **partner**)
+- `admin` — catalogue ingestion, book management, and other admin surfaces
+
 **User**
 - clerkId — Clerk user ID, used to link Clerk auth to our DB record
 - email, name, country
+- **role** — `UserRole`, default `reader`
 - ageRange enum: EIGHTEEN_24 | TWENTY5_34 | THIRTY5_44 | FORTY5_54 | FIFTY5_PLUS
 - genrePreferences (string array)
 
@@ -139,9 +145,10 @@ Books are ingested by an admin only. The pipeline:
 This is a background process, not an inline API call.
 
 ### User Roles
-- **Reader** — standard authenticated user
+Roles are stored on `User.role` as the `UserRole` enum (`reader` | `partner` | `admin`).
+- **Reader** — standard authenticated user (default)
+- **Partner** — publisher-style capabilities when implemented (replaces the earlier brief name “publisher”)
 - **Admin** — full catalogue and user management
-- **Publisher** — future role, not yet implemented
 
 ## Naming Conventions
 - Files and folders: kebab-case

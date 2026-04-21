@@ -27,6 +27,16 @@ export default async function LibraryPage() {
     orderBy: { addedAt: "desc" },
   });
 
+  const bookIds = userBooks.map((ub) => ub.book.id);
+  const progressRows =
+    bookIds.length > 0
+      ? await prisma.readingProgress.findMany({
+          where: { userId: dbUser.id, bookId: { in: bookIds } },
+          select: { bookId: true },
+        })
+      : [];
+  const booksWithProgress = new Set(progressRows.map((p) => p.bookId));
+
   const books = userBooks.map((ub) => ({
     id: ub.book.id,
     title: ub.book.title,
@@ -34,6 +44,8 @@ export default async function LibraryPage() {
     description: ub.book.description,
     genre: ub.book.genre,
     coverImageUrl: ub.book.coverImageUrl,
+    readerAction: (booksWithProgress.has(ub.book.id) ? "continue" : "start") as
+      "continue" | "start",
   }));
 
   return (

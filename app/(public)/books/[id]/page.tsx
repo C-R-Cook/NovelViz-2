@@ -68,7 +68,7 @@ export default async function BookDetailPage({ params }: PageProps) {
                 src={book.coverImageUrl}
                 alt={book.title}
                 fill
-                className="object-cover"
+                className="object-contain object-center"
                 priority
                 sizes="280px"
               />

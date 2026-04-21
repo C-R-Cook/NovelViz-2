@@ -60,6 +60,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   /** Draft + ready_for_review: upload/re-upload before publishing. */
   const prePublishIngestRef = useRef<HTMLInputElement>(null);
   const reingestFileRef = useRef<HTMLInputElement>(null);
+  const coverUploadRef = useRef<HTMLInputElement>(null);
   const [book, setBook] = useState(initial);
 
   useEffect(() => {
@@ -94,6 +95,10 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
   const [publishErr, setPublishErr] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
+
+  const [coverUploadBusy, setCoverUploadBusy] = useState(false);
+  const [coverUploadErr, setCoverUploadErr] = useState<string | null>(null);
+  const [coverUploadMsg, setCoverUploadMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (book.status !== "processing") return;
@@ -194,6 +199,42 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
     }
   }
 
+  async function uploadCover(file: File) {
+    setCoverUploadErr(null);
+    setCoverUploadMsg(null);
+    setCoverUploadBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/admin/books/${book.id}/cover`, {
+        method: "POST",
+        body: fd,
+      });
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        book?: AdminBookDetailModel;
+      };
+      if (!res.ok) {
+        throw new Error(j.error || res.statusText);
+      }
+      if (j.book) {
+        setBook((prev) => ({
+          ...prev,
+          ...j.book,
+          chapterCount: prev.chapterCount,
+        }));
+      }
+      setCoverUploadMsg("Cover updated");
+      setTimeout(() => setCoverUploadMsg(null), 4000);
+      router.refresh();
+    } catch (err) {
+      setCoverUploadErr(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setCoverUploadBusy(false);
+      if (coverUploadRef.current) coverUploadRef.current.value = "";
+    }
+  }
+
   async function publish() {
     setPublishErr(null);
     setPublishBusy(true);
@@ -227,7 +268,6 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
         <form onSubmit={saveMetadata} className="space-y-4">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-x-6">
             <div className="shrink-0 space-y-2">
-              {/* TODO: Admin cover image upload (store URL in coverImageUrl; reuse asset pipeline). */}
               <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                 Cover preview
               </span>
@@ -246,6 +286,31 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                   </div>
                 )}
               </div>
+              <input
+                ref={coverUploadRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                className="hidden"
+                disabled={coverUploadBusy}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void uploadCover(f);
+                }}
+              />
+              <button
+                type="button"
+                disabled={coverUploadBusy}
+                onClick={() => coverUploadRef.current?.click()}
+                className="w-36 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-800 transition hover:border-amber-600/50 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:border-amber-500/40 dark:hover:bg-zinc-800/90"
+              >
+                {coverUploadBusy ? "Uploading…" : "Upload New Cover"}
+              </button>
+              {coverUploadMsg ? (
+                <p className="text-xs text-emerald-700 dark:text-emerald-400/90">{coverUploadMsg}</p>
+              ) : null}
+              {coverUploadErr ? (
+                <p className="text-xs text-red-600 dark:text-red-400">{coverUploadErr}</p>
+              ) : null}
             </div>
 
             <div className="min-w-0 flex-1 space-y-4">

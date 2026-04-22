@@ -184,7 +184,7 @@ GET  /api/query?bookId=:bookId
 
 **AI — Image Generation**
 POST /api/imagine
-GET  /api/imagine/:bookId
+GET  /api/imagine?bookId=:bookId
 
 **Gallery**
 GET   /api/gallery
@@ -215,7 +215,7 @@ GET    /api/admin/users
 - API routes: POST and DELETE /api/library/[bookId]
 - Public layout with nav, reader layout with nav
 - Session 4:
-  - Dev role switcher (layout nav control, cookie-based role override for local dev)
+  - Dev role switcher (layout nav control, cookie-based role override for local dev; server passes `initialRole` from `getCurrentUser()` so SSR/hydration match the cookie)
   - Reading progress: `/reader/[bookId]` page, chapter selector, save/retrieve via `/api/progress/[bookId]`
   - Cloudinary integration (`lib/cloudinary.ts`) for cover image storage
   - Cover image upload on admin book detail page
@@ -225,6 +225,7 @@ GET    /api/admin/users
   - `getRoleHomeUrl(role)` helper added to `lib/auth.ts`; dev role switcher redirects to role home
   - Partner dashboard placeholder page at `/partner/dashboard`
   - Q&A feature: reader page ask flow + history panel backed by `/api/query`
+  - Image generation: reader page “Generate Image” tab + history, backed by `/api/imagine` (Anthropic prompt enrichment + fal.ai `fal-ai/flux/schnell`)
 
 ## What is NOT Built Yet
 
@@ -233,7 +234,6 @@ GET    /api/admin/users
 - Book moderation workflow
 - Retailer links
 - Community features
-- image generation (chapter-gated AI)
 - Public gallery and likes
 
 ## Build Order
@@ -245,7 +245,7 @@ GET    /api/admin/users
 6. ✅ Reading Progress (chapter selector, save and retrieve)
 7. ✅ Book ingestion (admin, chunking, embeddings)
 8. ✅ Q&A feature
-9. Image generation feature
+9. ✅ Image generation feature
 10. Gallery (public images, likes, public/private toggle)
 
 ## Environment Variables
@@ -264,3 +264,4 @@ Never commit .env.local to Git.
 - **Partner** is the term used for authors/publishers/resellers (replaces “publisher” from the original brief)
 - Q&A retrieval is chapter-gated: question is embedded with `text-embedding-3-small`, top relevant chunks are selected via pgvector constrained to chapter sequence <= current reader progress, and response is stored in `Query`
 - Q&A uses Anthropic models with fallback support via `ANTHROPIC_MODEL` env var (comma-separated candidates supported)
+- Image generation uses the same chapter-gated chunk retrieval as Q&A, then Anthropic (`ANTHROPIC_MODEL`) to produce an enriched prompt, then fal.ai (`FAL_API_KEY`, `lib/fal.ts`, model id `fal-ai/flux/schnell`); results are stored in `GeneratedImage`

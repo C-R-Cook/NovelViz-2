@@ -176,10 +176,11 @@ DELETE /api/library/:bookId
 
 **Reading Progress**
 GET  /api/progress/:bookId
-PUT  /api/progress/:bookId
+POST /api/progress/:bookId
 
 **AI — Q&A**
 POST /api/query
+GET  /api/query?bookId=:bookId
 
 **AI — Image Generation**
 POST /api/imagine
@@ -214,21 +215,25 @@ GET    /api/admin/users
 - API routes: POST and DELETE /api/library/[bookId]
 - Public layout with nav, reader layout with nav
 - Session 4:
-  - Dev role switcher (floating widget, cookie-based role override for local dev)
+  - Dev role switcher (layout nav control, cookie-based role override for local dev)
   - Reading progress: `/reader/[bookId]` page, chapter selector, save/retrieve via `/api/progress/[bookId]`
   - Cloudinary integration (`lib/cloudinary.ts`) for cover image storage
   - Cover image upload on admin book detail page
   - Automatic EPUB cover extraction and Cloudinary upload during ingestion
   - `UserBook` record auto-created when user visits reader page
+  - Role-based navigation and route protection in `(public)`, `(reader)`, `(partner)`, and `admin` layouts
+  - `getRoleHomeUrl(role)` helper added to `lib/auth.ts`; dev role switcher redirects to role home
+  - Partner dashboard placeholder page at `/partner/dashboard`
+  - Q&A feature: reader page ask flow + history panel backed by `/api/query`
 
 ## What is NOT Built Yet
 
-- Partner portal
+- Partner feature set beyond dashboard placeholder
 - Full Clerk auth for production
 - Book moderation workflow
 - Retailer links
 - Community features
-- Q&A and image generation (chapter-gated AI)
+- image generation (chapter-gated AI)
 - Public gallery and likes
 
 ## Build Order
@@ -239,7 +244,7 @@ GET    /api/admin/users
 5. ✅ Library (add/remove books, dashboard)
 6. ✅ Reading Progress (chapter selector, save and retrieve)
 7. ✅ Book ingestion (admin, chunking, embeddings)
-8. Q&A feature
+8. ✅ Q&A feature
 9. Image generation feature
 10. Gallery (public images, likes, public/private toggle)
 
@@ -257,3 +262,5 @@ Never commit .env.local to Git.
 - Visiting `/reader/[bookId]` auto-creates `UserBook` and `ReadingProgress` at Chapter 1 if they do not exist
 - `UserRole` enum added: `reader`, `partner`, `admin`. Dev user is `admin` role
 - **Partner** is the term used for authors/publishers/resellers (replaces “publisher” from the original brief)
+- Q&A retrieval is chapter-gated: question is embedded with `text-embedding-3-small`, top relevant chunks are selected via pgvector constrained to chapter sequence <= current reader progress, and response is stored in `Query`
+- Q&A uses Anthropic models with fallback support via `ANTHROPIC_MODEL` env var (comma-separated candidates supported)

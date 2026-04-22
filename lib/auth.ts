@@ -43,3 +43,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   // TODO: const { userId } = await auth(); … fetch User by clerkId
   return null;
 }
+
+export function getRoleHomeUrl(role: UserRole): string {
+  if (role === UserRole.partner) return "/partner/dashboard";
+  if (role === UserRole.admin) return "/admin/books";
+  return "/library";
+}

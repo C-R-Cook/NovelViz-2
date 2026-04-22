@@ -173,7 +173,7 @@ ${excerptsJoined}
 
 My question: ${questionText}`;
 
-  let responseText: string;
+  let responseText = "";
   try {
     const candidates = getAnthropicModelCandidates();
     let lastErr: unknown = null;
@@ -208,6 +208,16 @@ My question: ${questionText}`;
     }
   } catch (e) {
     console.error("[api/query POST] Anthropic error", e);
+    return NextResponse.json(
+      {
+        error:
+          "Failed to get model response. Configure a valid model with ANTHROPIC_MODEL if needed.",
+      },
+      { status: 502 },
+    );
+  }
+
+  if (responseText === "") {
     return NextResponse.json(
       {
         error:

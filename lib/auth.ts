@@ -17,27 +17,35 @@ export type CurrentUser = {
   role: UserRole;
 };
 
-const DEV_USER: CurrentUser = {
-  id: "dev_user_local",
-  clerkId: "user_dev_clerk_local",
-  email: "dev@novelviz.local",
-  name: "Dev Reader",
-  role: UserRole.admin,
+const DEV_USERS: Record<string, CurrentUser> = {
+  reader: {
+    id: "dev_user_reader",
+    clerkId: "user_dev_clerk_reader",
+    email: "dev_reader@novelviz.local",
+    name: "Dev Reader",
+    role: UserRole.reader,
+  },
+  partner: {
+    id: "dev_user_partner",
+    clerkId: "user_dev_clerk_partner",
+    email: "dev_partner@novelviz.local",
+    name: "Dev Partner",
+    role: UserRole.partner,
+  },
+  admin: {
+    id: "dev_user_admin",
+    clerkId: "user_dev_clerk_admin",
+    email: "dev_admin@novelviz.local",
+    name: "Dev Admin",
+    role: UserRole.admin,
+  },
 };
-
-function devRoleFromCookieValue(raw: string | undefined): UserRole | null {
-  if (raw === UserRole.reader || raw === UserRole.partner || raw === UserRole.admin) {
-    return raw;
-  }
-  return null;
-}
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
     const store = await cookies();
-    const raw = store.get("dev_role")?.value;
-    const role = devRoleFromCookieValue(raw) ?? DEV_USER.role;
-    return { ...DEV_USER, role };
+    const cookieValue = store.get("dev_role")?.value;
+    return DEV_USERS[cookieValue ?? ""] ?? DEV_USERS.admin;
   }
 
   // TODO: const { userId } = await auth(); … fetch User by clerkId

@@ -92,6 +92,8 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
   const [ingestErr, setIngestErr] = useState<string | null>(null);
   const [ingestBusy, setIngestBusy] = useState(false);
+  /** When true, ingest applies Dublin Core from the EPUB OPF to this book (ignored for .txt). */
+  const [applyEpubMetadata, setApplyEpubMetadata] = useState(false);
 
   const [publishErr, setPublishErr] = useState<string | null>(null);
   const [publishBusy, setPublishBusy] = useState(false);
@@ -183,6 +185,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("applyEpubMetadata", applyEpubMetadata ? "true" : "false");
       const res = await fetch(`/api/admin/books/${book.id}/ingest`, {
         method: "POST",
         body: fd,
@@ -259,11 +262,122 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   return (
     <div className="space-y-10">
       <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
-        <div className="mb-6 border-b border-zinc-200/80 pb-6 dark:border-zinc-800/60">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-amber-900 dark:text-amber-100/95">
-            {title}
-          </h1>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">{author}</p>
+        <div className="mb-6 flex flex-col gap-4 border-b border-zinc-200/80 pb-6 sm:flex-row sm:items-stretch sm:justify-between sm:gap-6 dark:border-zinc-800/60">
+          <div className="min-w-0 flex-1">
+            <h1 className="font-serif text-2xl font-semibold tracking-tight text-amber-900 dark:text-amber-100/95">
+              {title}
+            </h1>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">{author}</p>
+          </div>
+          <div className="flex shrink-0 flex-col justify-center gap-2 sm:max-w-[min(100%,18rem)] sm:items-end">
+            {book.status !== "processing" &&
+            (book.status === "draft" ||
+              book.status === "ready_for_review" ||
+              book.status === "published" ||
+              book.status === "unlisted") ? (
+              <label className="flex w-full cursor-pointer items-start gap-2 rounded-md border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-2 text-left text-[11px] leading-snug text-zinc-600 dark:border-zinc-700/80 dark:bg-zinc-950/40 dark:text-zinc-400 sm:max-w-none">
+                <input
+                  type="checkbox"
+                  checked={applyEpubMetadata}
+                  onChange={(e) => setApplyEpubMetadata(e.target.checked)}
+                  disabled={ingestBusy || (book.status === "ready_for_review" && publishBusy)}
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded border-zinc-400 text-amber-600 focus:ring-amber-500/30 dark:border-zinc-600"
+                />
+                <span>
+                  Fill book metadata from EPUB{" "}
+                  <span className="text-zinc-500 dark:text-zinc-500">
+                    (title, author, description, genre, published year). No effect on .txt files.
+                  </span>
+                </span>
+              </label>
+            ) : null}
+            {book.status === "draft" ? (
+              <>
+                <input
+                  ref={prePublishIngestRef}
+                  type="file"
+                  accept=".epub,.txt,application/epub+zip,text/plain"
+                  className="hidden"
+                  disabled={ingestBusy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void uploadIngest(f);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={ingestBusy}
+                  onClick={() => prePublishIngestRef.current?.click()}
+                  className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-center text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15 sm:w-auto"
+                >
+                  {ingestBusy ? "Uploading…" : "Upload & Ingest (.epub, .txt)"}
+                </button>
+                <span className="text-center text-xs text-zinc-600 dark:text-zinc-500 sm:text-right">
+                  .epub or .txt
+                </span>
+              </>
+            ) : null}
+            {book.status === "ready_for_review" ? (
+              <>
+                <input
+                  ref={prePublishIngestRef}
+                  type="file"
+                  accept=".epub,.txt,application/epub+zip,text/plain"
+                  className="hidden"
+                  disabled={ingestBusy || publishBusy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void uploadIngest(f);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={ingestBusy || publishBusy}
+                  onClick={() => prePublishIngestRef.current?.click()}
+                  className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-center text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15 sm:w-auto"
+                >
+                  {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
+                </button>
+                <span className="text-center text-xs text-zinc-600 dark:text-zinc-500 sm:text-right">
+                  .epub or .txt
+                </span>
+              </>
+            ) : null}
+            {(book.status === "published" || book.status === "unlisted") && (
+              <>
+                <input
+                  ref={reingestFileRef}
+                  type="file"
+                  accept=".epub,.txt,application/epub+zip,text/plain"
+                  className="hidden"
+                  disabled={ingestBusy}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void uploadIngest(f);
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={ingestBusy}
+                  onClick={() => reingestFileRef.current?.click()}
+                  className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-center text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15 sm:w-auto"
+                >
+                  {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
+                </button>
+                <span className="text-center text-xs text-zinc-600 dark:text-zinc-500 sm:text-right">
+                  .epub or .txt
+                </span>
+              </>
+            )}
+            {book.status === "processing" ? (
+              <p className="max-w-xs text-right text-xs text-blue-800 dark:text-blue-300/90">
+                Ingest running — this page refreshes every 5s.
+              </p>
+            ) : null}
+          </div>
         </div>
         <form onSubmit={saveMetadata} className="space-y-4">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:gap-x-6">
@@ -271,21 +385,6 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
                 Cover preview
               </span>
-              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
-                {book.coverImageUrl ? (
-                  <Image
-                    src={book.coverImageUrl}
-                    alt=""
-                    fill
-                    className="object-cover"
-                    sizes="144px"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
-                    No cover image
-                  </div>
-                )}
-              </div>
               <input
                 ref={coverUploadRef}
                 type="file"
@@ -300,10 +399,28 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <button
                 type="button"
                 disabled={coverUploadBusy}
-                onClick={() => coverUploadRef.current?.click()}
-                className="w-36 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-800 transition hover:border-amber-600/50 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:border-amber-500/40 dark:hover:bg-zinc-800/90"
+                onClick={() => !coverUploadBusy && coverUploadRef.current?.click()}
+                className="group relative block h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 p-0 text-left outline-none ring-amber-500/0 transition hover:ring-2 hover:ring-amber-500/40 focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:ring-amber-400/35 dark:focus-visible:ring-amber-400/40"
+                aria-label={coverUploadBusy ? "Uploading cover" : "Change cover image"}
               >
-                {coverUploadBusy ? "Uploading…" : "Upload New Cover"}
+                {book.coverImageUrl ? (
+                  <Image
+                    src={book.coverImageUrl}
+                    alt=""
+                    fill
+                    className="object-cover"
+                    sizes="144px"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
+                    No cover image
+                  </div>
+                )}
+                <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-black/65 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                  <span className="mb-3 rounded-md bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-white/20 backdrop-blur-[2px]">
+                    {coverUploadBusy ? "Uploading…" : "Change cover"}
+                  </span>
+                </span>
               </button>
               {coverUploadMsg ? (
                 <p className="text-xs text-emerald-700 dark:text-emerald-400/90">{coverUploadMsg}</p>
@@ -435,32 +552,12 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
         {book.status === "draft" ? (
           <div className="space-y-3">
             <p className="text-sm text-zinc-700 dark:text-zinc-400">
-              Upload an EPUB or plain-text file (.epub, .txt) to split into chapters,
-              embed, and prepare for review.
+              Use <strong className="font-medium text-zinc-900 dark:text-zinc-200">Upload &amp; Ingest</strong>{" "}
+              at the top to add an EPUB or plain-text file (.epub, .txt). It will be split into chapters,
+              embedded, and prepared for review. Optionally tick{" "}
+              <strong className="font-medium text-zinc-900 dark:text-zinc-200">Fill book metadata from EPUB</strong>{" "}
+              before uploading an EPUB to overwrite title, author, and related fields from the file.
             </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={prePublishIngestRef}
-                type="file"
-                accept=".epub,.txt,application/epub+zip,text/plain"
-                className="hidden"
-                disabled={ingestBusy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadIngest(f);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                disabled={ingestBusy}
-                onClick={() => prePublishIngestRef.current?.click()}
-                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
-              >
-                {ingestBusy ? "Uploading…" : "Upload & Ingest (.epub, .txt)"}
-              </button>
-              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
-            </div>
           </div>
         ) : null}
 
@@ -486,29 +583,10 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <code className="text-amber-900 dark:text-amber-50">ready_for_review</code> when
               processing finishes.
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={prePublishIngestRef}
-                type="file"
-                accept=".epub,.txt,application/epub+zip,text/plain"
-                className="hidden"
-                disabled={ingestBusy || publishBusy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadIngest(f);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                disabled={ingestBusy || publishBusy}
-                onClick={() => prePublishIngestRef.current?.click()}
-                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
-              >
-                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
-              </button>
-              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
-            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-500">
+              Replace the source file with <strong className="font-medium text-zinc-900 dark:text-zinc-200">Upload &amp; Re-ingest</strong>{" "}
+              at the top (.epub or .txt).
+            </p>
             <button
               type="button"
               disabled={publishBusy || ingestBusy}
@@ -539,29 +617,10 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               book will move to <code className="text-amber-900 dark:text-amber-50">ready_for_review</code>{" "}
               when complete.
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                ref={reingestFileRef}
-                type="file"
-                accept=".epub,.txt,application/epub+zip,text/plain"
-                className="hidden"
-                disabled={ingestBusy}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) uploadIngest(f);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                disabled={ingestBusy}
-                onClick={() => reingestFileRef.current?.click()}
-                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
-              >
-                {ingestBusy ? "Re-ingesting…" : "Upload & Re-ingest (.epub, .txt)"}
-              </button>
-              <span className="text-xs text-zinc-600 dark:text-zinc-500">.epub or .txt</span>
-            </div>
+            <p className="text-sm text-zinc-600 dark:text-zinc-500">
+              Use <strong className="font-medium text-zinc-900 dark:text-zinc-200">Upload &amp; Re-ingest</strong>{" "}
+              at the top to replace chapters and embeddings (.epub or .txt).
+            </p>
           </div>
         )}
 

@@ -55,8 +55,8 @@ export default async function LibraryPage() {
           My Library
         </h1>
         <p className="mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-500">
-          Books you have added. Open a title to read details or adjust your
-          progress later.
+          Books you have added. Open a title to set your chapter, ask questions, or
+          generate images.
         </p>
       </div>
 

@@ -4,6 +4,7 @@ import {
   chunkText,
   embedChunks,
   extractEpubCover,
+  extractEpubMetadataFromOpf,
   openEpubPackage,
   processBook,
 } from "@/lib/ingestion";
@@ -93,6 +94,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   let buffer: Buffer;
   let filename: string;
+  let applyEpubMetadata = false;
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -106,6 +108,7 @@ export async function POST(request: Request, context: RouteContext) {
         { status: 400 },
       );
     }
+    applyEpubMetadata = formData.get("applyEpubMetadata") === "true";
     buffer = Buffer.from(await file.arrayBuffer());
     filename = file.name;
   } catch {
@@ -118,6 +121,26 @@ export async function POST(request: Request, context: RouteContext) {
   });
 
   try {
+    if (filename.toLowerCase().endsWith(".epub") && applyEpubMetadata) {
+      try {
+        const { opfXml } = await openEpubPackage(buffer);
+        const m = extractEpubMetadataFromOpf(opfXml);
+        const data: Prisma.BookUpdateInput = {};
+        if (m.title) data.title = m.title.slice(0, 500);
+        if (m.author) data.author = m.author.slice(0, 500);
+        if (m.description != null && m.description.length > 0) {
+          data.description = m.description;
+        }
+        if (m.genre) data.genre = m.genre;
+        if (m.publishedYear != null) data.publishedYear = m.publishedYear;
+        if (Object.keys(data).length > 0) {
+          await prisma.book.update({ where: { id: bookId }, data });
+        }
+      } catch (e) {
+        console.warn("[ingest] EPUB metadata from OPF skipped:", e);
+      }
+    }
+
     const chaptersIn = await processBook(buffer, filename);
 
     if (chaptersIn.length === 0) {

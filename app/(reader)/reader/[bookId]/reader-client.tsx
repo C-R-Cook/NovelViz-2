@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -43,6 +42,45 @@ export type ImageHistoryItem = {
 
 type ReaderAiTab = "ask" | "imagine";
 
+type PromptCopyKind = "original" | "generated";
+
+function CopyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 type Props = {
   book: ReaderBook;
   chapters: ReaderChapter[];
@@ -83,20 +121,37 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const historyDetailsRef = useRef<HTMLDetailsElement>(null);
 
-  const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("ask");
+  const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("imagine");
 
   const [imgPrompt, setImgPrompt] = useState("");
   const [imgLoading, setImgLoading] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
-  const [lastImageUrl, setLastImageUrl] = useState<string | null>(null);
-  const [lastFullPrompt, setLastFullPrompt] = useState<string | null>(null);
 
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
   const [imageHistoryLoading, setImageHistoryLoading] = useState(false);
   const [imageHistoryError, setImageHistoryError] = useState<string | null>(null);
   const imageDetailsRef = useRef<HTMLDetailsElement>(null);
+  const [selectedHistoryImage, setSelectedHistoryImage] = useState<ImageHistoryItem | null>(null);
+  const [promptCopied, setPromptCopied] = useState<PromptCopyKind | null>(null);
+  const promptCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const selectedChapter = chapters.find((c) => c.id === selectedChapterId);
+
+  const copyPromptText = useCallback(async (kind: PromptCopyKind, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      if (promptCopyTimeoutRef.current) {
+        clearTimeout(promptCopyTimeoutRef.current);
+      }
+      setPromptCopied(kind);
+      promptCopyTimeoutRef.current = setTimeout(() => {
+        setPromptCopied(null);
+        promptCopyTimeoutRef.current = null;
+      }, 2000);
+    } catch {
+      setPromptCopied(null);
+    }
+  }, []);
 
   const saveProgress = useCallback(async () => {
     if (!selectedChapterId || !selectedChapter) {
@@ -224,8 +279,6 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     if (!trimmed) return;
     setImgLoading(true);
     setImgError(null);
-    setLastImageUrl(null);
-    setLastFullPrompt(null);
     try {
       const res = await fetch("/api/imagine", {
         method: "POST",
@@ -236,14 +289,30 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
         error?: string;
         imageUrl?: string;
         fullPrompt?: string;
+        image?: ImageHistoryItem;
       };
       if (!res.ok) {
         setImgError(data.error || "Something went wrong");
         return;
       }
-      if (typeof data.imageUrl === "string") {
-        setLastImageUrl(data.imageUrl);
-        setLastFullPrompt(typeof data.fullPrompt === "string" ? data.fullPrompt : null);
+      if (data.image && typeof data.image.id === "string") {
+        const item = data.image as ImageHistoryItem;
+        setSelectedHistoryImage(item);
+        setImgPrompt("");
+        setImageHistory((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
+        if (imageDetailsRef.current?.open) {
+          void loadImageHistory();
+        }
+      } else if (typeof data.imageUrl === "string") {
+        const fullPrompt = typeof data.fullPrompt === "string" ? data.fullPrompt : "";
+        setSelectedHistoryImage({
+          id: `temp-${Date.now()}`,
+          userPrompt: trimmed,
+          fullPrompt,
+          imageUrl: data.imageUrl,
+          chapterNumberAtTime: savedProgress?.currentChapterNumber ?? 1,
+          createdAt: new Date().toISOString(),
+        });
         setImgPrompt("");
         if (imageDetailsRef.current?.open) {
           void loadImageHistory();
@@ -256,133 +325,128 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     } finally {
       setImgLoading(false);
     }
-  }, [book.id, imgPrompt, loadImageHistory]);
+  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber]);
+
+  useEffect(() => {
+    if (!selectedHistoryImage) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setSelectedHistoryImage(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedHistoryImage]);
+
+  useEffect(() => {
+    setPromptCopied(null);
+    if (promptCopyTimeoutRef.current) {
+      clearTimeout(promptCopyTimeoutRef.current);
+      promptCopyTimeoutRef.current = null;
+    }
+  }, [selectedHistoryImage?.id]);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-      <Link
-        href="/library"
-        className="inline-flex text-sm font-medium text-zinc-600 transition hover:text-amber-800 dark:text-zinc-500 dark:hover:text-amber-200/90"
-      >
-        ← Back to library
-      </Link>
-
-      <div className="mt-8 flex flex-col gap-10 lg:flex-row lg:items-start">
-        <div className="relative mx-auto w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 shadow-xl shadow-zinc-900/10 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/30 lg:mx-0">
-          <div className="relative aspect-[2/3] w-full">
-            {book.coverImageUrl ? (
-              <Image
-                src={book.coverImageUrl}
-                alt={book.title}
-                fill
-                className="object-cover"
-                priority
-                sizes="280px"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-zinc-500 dark:text-zinc-600">
-                No cover
-              </div>
-            )}
-          </div>
+    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 sm:py-6">
+      <header className="space-y-3 sm:space-y-4">
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
+          <h1 className="font-serif text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+            {book.title}
+          </h1>
+          <span className="hidden text-zinc-300 sm:inline dark:text-zinc-600" aria-hidden>
+            ·
+          </span>
+          <p className="min-w-0 text-sm text-zinc-600 dark:text-zinc-400">{book.author}</p>
         </div>
 
-        <div className="min-w-0 flex-1 space-y-6">
-          <div>
-            <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
-              {book.title}
-            </h1>
-            <p className="mt-2 text-lg text-zinc-600 dark:text-zinc-400">{book.author}</p>
-          </div>
-
-          {total === 0 ? (
-            <p className="rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
-              This book hasn&apos;t been ingested yet, check back soon
-            </p>
-          ) : (
-            <>
-              <section className="space-y-4 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
-                <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
-                  Your Progress
-                </h2>
-
-                {savedProgress && total > 0 ? (
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    You are reading Chapter {savedProgress.currentChapterNumber} of {total}
-                  </p>
-                ) : (
-                  <p className="text-sm text-zinc-600 dark:text-zinc-500">
-                    Set your current chapter below, then save.
-                  </p>
-                )}
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <label className="min-w-0 flex-1 space-y-1.5">
-                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
-                      Current chapter
-                    </span>
-                    <select
-                      value={selectedChapterId}
-                      onChange={(e) => setSelectedChapterId(e.target.value)}
-                      className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100"
-                    >
-                      {chapters.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={saveProgress}
-                    disabled={saving || !selectedChapterId}
-                    className="shrink-0 rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50"
-                  >
-                    {saving ? "Saving…" : "Save Progress"}
-                  </button>
+        {total > 0 ? (
+          <div className="flex gap-3 sm:gap-4">
+            <div className="relative h-[5.5rem] w-[3.67rem] shrink-0 self-start overflow-hidden rounded-md border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 sm:h-[6.25rem] sm:w-[4.17rem]">
+              {book.coverImageUrl ? (
+                <Image
+                  src={book.coverImageUrl}
+                  alt={`Cover: ${book.title}`}
+                  fill
+                  className="object-cover"
+                  sizes="72px"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center px-1 text-center text-[10px] leading-tight text-zinc-500 dark:text-zinc-600">
+                  No cover
                 </div>
-
-                {message ? (
-                  <p
-                    className={
-                      message.type === "ok"
-                        ? "text-sm text-emerald-700 dark:text-emerald-400/90"
-                        : "text-sm text-red-600 dark:text-red-400"
-                    }
+              )}
+            </div>
+            <div className="min-w-0 flex-1 space-y-2 rounded-lg border border-zinc-200/90 bg-white/70 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/40 sm:p-3.5">
+              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                {savedProgress ? (
+                  <>
+                    Reading · Chapter {savedProgress.currentChapterNumber} of {total}
+                  </>
+                ) : (
+                  <>Set chapter, then save</>
+                )}
+              </p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <label className="min-w-0 flex-1">
+                  <span className="sr-only">Current chapter</span>
+                  <select
+                    value={selectedChapterId}
+                    onChange={(e) => setSelectedChapterId(e.target.value)}
+                    className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100"
                   >
-                    {message.text}
-                  </p>
-                ) : null}
-              </section>
-
-              <section className="space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
-                <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
-                  Ask &amp; imagine
-                </h2>
-                <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
-                  Both tools only use what you&apos;ve read up to your saved chapter. Save progress above
-                  first.
+                    {chapters.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={saveProgress}
+                  disabled={saving || !selectedChapterId}
+                  className="shrink-0 rounded-lg border border-amber-700/50 bg-amber-100/90 px-3 py-1.5 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50 sm:px-4 sm:py-2"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+              {message ? (
+                <p
+                  className={
+                    message.type === "ok"
+                      ? "text-xs text-emerald-700 dark:text-emerald-400/90 sm:text-sm"
+                      : "text-xs text-red-600 dark:text-red-400 sm:text-sm"
+                  }
+                >
+                  {message.text}
                 </p>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+      </header>
+
+      {total === 0 ? (
+        <p className="mt-6 rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+          This book hasn&apos;t been ingested yet, check back soon
+        </p>
+      ) : (
+        <>
+          <section className="mt-4 space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
+            <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
+              Ask &amp; imagine
+            </h2>
+            <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
+              AI only uses text through your saved chapter. Change chapter above and save if needed.
+            </p>
 
                 <div
                   className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
                   role="tablist"
                   aria-label="Reader AI tools"
                 >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeAiTab === "ask"}
-                    onClick={() => setActiveAiTab("ask")}
-                    className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-                      activeAiTab === "ask"
-                        ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-                    }`}
-                  >
-                    Ask a Question
-                  </button>
                   <button
                     type="button"
                     role="tab"
@@ -396,9 +460,115 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                   >
                     Generate Image
                   </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeAiTab === "ask"}
+                    onClick={() => setActiveAiTab("ask")}
+                    className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+                      activeAiTab === "ask"
+                        ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
+                        : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                    }`}
+                  >
+                    Ask a Question
+                  </button>
                 </div>
 
-                {activeAiTab === "ask" ? (
+                {activeAiTab === "imagine" ? (
+                  <div className="space-y-3 pt-1" role="tabpanel">
+                    <textarea
+                      value={imgPrompt}
+                      onChange={(e) => setImgPrompt(e.target.value)}
+                      placeholder="Describe a scene, character, or moment from what you've read..."
+                      rows={4}
+                      disabled={imgLoading}
+                      className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void submitImage()}
+                        disabled={imgLoading || !imgPrompt.trim()}
+                        className="rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50"
+                      >
+                        {imgLoading ? "Generating…" : "Generate Image"}
+                      </button>
+                    </div>
+                    {imgError ? (
+                      <p className="text-sm text-red-600 dark:text-red-400">{imgError}</p>
+                    ) : null}
+                    {imgLoading ? (
+                      <div className="flex flex-col items-center gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 py-8 dark:border-zinc-800/70 dark:bg-zinc-950/30">
+                        <div
+                          className="h-9 w-9 animate-spin rounded-full border-2 border-zinc-300 border-t-amber-600 dark:border-zinc-700 dark:border-t-amber-400"
+                          aria-hidden
+                        />
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                          Generating your image...
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <details
+                      ref={imageDetailsRef}
+                      className="group border-t border-zinc-200/80 pt-3 dark:border-zinc-800/70"
+                      onToggle={(e) => {
+                        if ((e.target as HTMLDetailsElement).open) {
+                          void loadImageHistory();
+                        }
+                      }}
+                    >
+                      <summary className="cursor-pointer list-none text-xs font-medium text-zinc-500 marker:content-none dark:text-zinc-500 [&::-webkit-details-marker]:hidden">
+                        <span className="underline decoration-zinc-300 decoration-dotted underline-offset-2 group-open:text-zinc-600 dark:decoration-zinc-600 dark:group-open:text-zinc-400">
+                          Previous Images
+                        </span>
+                      </summary>
+                      <div className="mt-3 space-y-1">
+                        {imageHistoryLoading ? (
+                          <p className="text-xs text-zinc-500">Loading…</p>
+                        ) : imageHistoryError ? (
+                          <p className="text-xs text-red-600 dark:text-red-400/90">{imageHistoryError}</p>
+                        ) : imageHistory.length === 0 ? (
+                          <p className="text-xs text-zinc-500 dark:text-zinc-500">No images yet.</p>
+                        ) : (
+                          <ul className="flex gap-3 overflow-x-auto pb-1">
+                            {imageHistory.map((item) => (
+                              <li
+                                key={item.id}
+                                className="w-36 shrink-0 overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/70 dark:bg-zinc-950/30 sm:w-40"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedHistoryImage(item)}
+                                  className="w-full text-left"
+                                  aria-label={`Open generated image for prompt: ${item.userPrompt}`}
+                                >
+                                  <Image
+                                    src={item.imageUrl}
+                                    alt={item.userPrompt}
+                                    width={800}
+                                    height={600}
+                                    unoptimized
+                                    className="aspect-[4/3] w-full object-cover"
+                                  />
+                                  <div className="space-y-1 p-2">
+                                    <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
+                                      {item.userPrompt}
+                                    </p>
+                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
+                                      Chapter {item.chapterNumberAtTime}
+                                    </p>
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </details>
+                  </div>
+                ) : (
                   <div className="space-y-3 pt-1" role="tabpanel">
                     <textarea
                       value={question}
@@ -474,113 +644,114 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                       </div>
                     </details>
                   </div>
-                ) : (
-                  <div className="space-y-3 pt-1" role="tabpanel">
-                    <textarea
-                      value={imgPrompt}
-                      onChange={(e) => setImgPrompt(e.target.value)}
-                      placeholder="Describe a scene, character, or moment from what you've read..."
-                      rows={4}
-                      disabled={imgLoading}
-                      className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void submitImage()}
-                        disabled={imgLoading || !imgPrompt.trim()}
-                        className="rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50"
-                      >
-                        {imgLoading ? "Generating…" : "Generate Image"}
-                      </button>
-                    </div>
-                    {imgError ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">{imgError}</p>
-                    ) : null}
-                    {imgLoading ? (
-                      <div className="flex flex-col items-center gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 py-8 dark:border-zinc-800/70 dark:bg-zinc-950/30">
-                        <div
-                          className="h-9 w-9 animate-spin rounded-full border-2 border-zinc-300 border-t-amber-600 dark:border-zinc-700 dark:border-t-amber-400"
-                          aria-hidden
-                        />
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          Generating your image...
-                        </p>
-                      </div>
-                    ) : null}
-                    {lastImageUrl && !imgLoading ? (
-                      <div className="space-y-2">
-                        <Image
-                          src={lastImageUrl}
-                          alt="Generated from your prompt"
-                          width={1024}
-                          height={768}
-                          unoptimized
-                          className="h-auto w-full rounded-lg border border-zinc-200/90 object-cover dark:border-zinc-800/80"
-                        />
-                        {lastFullPrompt ? (
-                          <p className="text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-500">
-                            {lastFullPrompt}
-                          </p>
-                        ) : null}
-                      </div>
-                    ) : null}
-
-                    <details
-                      ref={imageDetailsRef}
-                      className="group border-t border-zinc-200/80 pt-3 dark:border-zinc-800/70"
-                      onToggle={(e) => {
-                        if ((e.target as HTMLDetailsElement).open) {
-                          void loadImageHistory();
-                        }
-                      }}
-                    >
-                      <summary className="cursor-pointer list-none text-xs font-medium text-zinc-500 marker:content-none dark:text-zinc-500 [&::-webkit-details-marker]:hidden">
-                        <span className="underline decoration-zinc-300 decoration-dotted underline-offset-2 group-open:text-zinc-600 dark:decoration-zinc-600 dark:group-open:text-zinc-400">
-                          Previous Images
-                        </span>
-                      </summary>
-                      <div className="mt-3 space-y-1">
-                        {imageHistoryLoading ? (
-                          <p className="text-xs text-zinc-500">Loading…</p>
-                        ) : imageHistoryError ? (
-                          <p className="text-xs text-red-600 dark:text-red-400/90">{imageHistoryError}</p>
-                        ) : imageHistory.length === 0 ? (
-                          <p className="text-xs text-zinc-500 dark:text-zinc-500">No images yet.</p>
-                        ) : (
-                          <ul className="grid max-h-[32rem] grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2">
-                            {imageHistory.map((item) => (
-                              <li
-                                key={item.id}
-                                className="overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/70 dark:bg-zinc-950/30"
-                              >
-                                <Image
-                                  src={item.imageUrl}
-                                  alt={item.userPrompt}
-                                  width={800}
-                                  height={600}
-                                  unoptimized
-                                  className="aspect-[4/3] w-full object-cover"
-                                />
-                                <div className="space-y-1 p-2">
-                                  <p className="text-xs text-zinc-700 dark:text-zinc-300">{item.userPrompt}</p>
-                                  <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
-                                    Chapter {item.chapterNumberAtTime}
-                                  </p>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </details>
-                  </div>
                 )}
               </section>
-            </>
-          )}
+        </>
+      )}
+
+      {selectedHistoryImage ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Generated image details"
+          onClick={() => setSelectedHistoryImage(null)}
+        >
+          <div
+            className="flex h-[min(92vh,48rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white p-3 shadow-2xl dark:border-zinc-800/80 dark:bg-zinc-900 sm:p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex shrink-0 items-center justify-between">
+              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                Chapter {selectedHistoryImage.chapterNumberAtTime} ·{" "}
+                {new Date(selectedHistoryImage.createdAt).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSelectedHistoryImage(null)}
+                className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:text-xs"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1">
+              <Image
+                src={selectedHistoryImage.imageUrl}
+                alt={selectedHistoryImage.userPrompt}
+                width={1200}
+                height={900}
+                unoptimized
+                className="h-full w-full rounded-lg border border-zinc-200/90 object-contain dark:border-zinc-800/80"
+              />
+            </div>
+
+            <div className="mt-3 shrink-0">
+              <div className="space-y-4">
+                <details className="rounded-md border border-zinc-200/90 bg-zinc-50/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-950/30">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                      Original Prompt
+                    </span>
+                    <button
+                      type="button"
+                      title="Copy original prompt"
+                      aria-label="Copy original prompt"
+                      className="shrink-0 rounded p-1 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700/80 dark:hover:text-zinc-100"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void copyPromptText("original", selectedHistoryImage.userPrompt);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      {promptCopied === "original" ? (
+                        <CheckIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <CopyIcon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </summary>
+                  <p className="mt-2 text-xs text-zinc-800 dark:text-zinc-200 sm:text-sm">
+                    {selectedHistoryImage.userPrompt}
+                  </p>
+                </details>
+                <details className="rounded-md border border-zinc-200/90 bg-zinc-50/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-950/30">
+                  <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                      Generated Prompt
+                    </span>
+                    <button
+                      type="button"
+                      title="Copy generated prompt"
+                      aria-label="Copy generated prompt"
+                      className="shrink-0 rounded p-1 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700/80 dark:hover:text-zinc-100"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void copyPromptText("generated", selectedHistoryImage.fullPrompt);
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      {promptCopied === "generated" ? (
+                        <CheckIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      ) : (
+                        <CopyIcon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </summary>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 sm:text-sm">
+                    {selectedHistoryImage.fullPrompt}
+                  </p>
+                </details>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

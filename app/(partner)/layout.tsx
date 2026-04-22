@@ -3,13 +3,20 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { getCurrentUser } from "@/lib/auth";
 import { UserRole } from "@db";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-export default async function PublicLayout({
+export default async function PartnerLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const user = await getCurrentUser();
+  if (!user) {
+    redirect("/sign-in");
+  }
+  if (user.role === UserRole.reader) {
+    redirect("/library");
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100">
@@ -21,37 +28,25 @@ export default async function PublicLayout({
           >
             NovelViz
           </Link>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-4">
             <Link
               href="/books"
               className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
             >
               Books
             </Link>
-            {user ? (
-              <Link
-                href="/library"
-                className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
-              >
-                My Library
-              </Link>
-            ) : null}
-            {user?.role === UserRole.admin ? (
-              <Link
-                href="/admin/books"
-                className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
-              >
-                Admin
-              </Link>
-            ) : null}
-            {user && (user.role === UserRole.partner || user.role === UserRole.admin) ? (
-              <Link
-                href="/partner/dashboard"
-                className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
-              >
-                Partner
-              </Link>
-            ) : null}
+            <Link
+              href="/library"
+              className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
+            >
+              My Library
+            </Link>
+            <Link
+              href="/partner/dashboard"
+              className="text-sm font-semibold text-amber-900 dark:text-amber-200"
+            >
+              Partner Dashboard
+            </Link>
             <DevRoleSwitcher />
             <ThemeToggle />
           </div>

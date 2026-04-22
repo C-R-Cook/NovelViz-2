@@ -39,21 +39,21 @@ export function BookCatalogue({ books }: Props) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-9">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-4xl">
+          <h1 className="font-serif text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
             Catalogue
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-500">
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-500 sm:text-sm">
             Public-domain works ready for your library. Filter by genre or browse
             the full list.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:items-end">
+        <div className="flex flex-col gap-1 sm:items-end">
           <label
             htmlFor="genre-filter"
-            className="text-xs font-medium uppercase tracking-wider text-zinc-600 dark:text-zinc-500"
+            className="text-[11px] font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-500"
           >
             Genre
           </label>
@@ -61,7 +61,7 @@ export function BookCatalogue({ books }: Props) {
             id="genre-filter"
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
-            className="w-full min-w-[12rem] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-inner outline-none ring-amber-500/20 transition focus:border-amber-600/50 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:ring-amber-500/30 sm:w-auto"
+            className="w-full min-w-[10rem] rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 shadow-inner outline-none ring-amber-500/20 transition focus:border-amber-600/50 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:ring-amber-500/30 sm:w-auto"
           >
             <option value="all">All genres</option>
             {genres.map((g) => (
@@ -74,11 +74,11 @@ export function BookCatalogue({ books }: Props) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="py-16 text-center text-sm text-zinc-600 dark:text-zinc-500">
+        <p className="py-12 text-center text-sm text-zinc-600 dark:text-zinc-500">
           No books in this genre. Try another filter.
         </p>
       ) : (
-        <BookCardGrid books={filtered} />
+        <BookCardGrid books={filtered} layout="row" />
       )}
     </div>
   );

@@ -104,25 +104,73 @@ async function seedDevUser() {
   });
 }
 
+async function seedDevRoleUsers() {
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_reader" },
+    create: {
+      id: "dev_user_reader",
+      clerkId: "user_dev_clerk_reader",
+      email: "dev_reader@novelviz.local",
+      name: "Dev Reader",
+      role: UserRole.reader,
+    },
+    update: { role: UserRole.reader, name: "Dev Reader" },
+  });
+
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_partner" },
+    create: {
+      id: "dev_user_partner",
+      clerkId: "user_dev_clerk_partner",
+      email: "dev_partner@novelviz.local",
+      name: "Dev Partner",
+      role: UserRole.partner,
+    },
+    update: { role: UserRole.partner, name: "Dev Partner" },
+  });
+
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_admin" },
+    create: {
+      id: "dev_user_admin",
+      clerkId: "user_dev_clerk_admin",
+      email: "dev_admin@novelviz.local",
+      name: "Dev Admin",
+      role: UserRole.admin,
+    },
+    update: { role: UserRole.admin, name: "Dev Admin" },
+  });
+}
+
 async function seed() {
   await seedDevUser();
+  await seedDevRoleUsers();
 
   for (const book of books) {
     const existing = await prisma.book.findFirst({
       where: { title: book.title },
     });
-    const data = {
-      ...book,
-      isPublicDomain: true,
+    const safeUpdateFields = {
       status: BookStatus.published,
+      isPublicDomain: true,
+      genre: book.genre,
+      description: book.description,
+      publishedYear: book.publishedYear,
     };
     if (existing) {
       await prisma.book.update({
         where: { id: existing.id },
-        data,
+        data: safeUpdateFields,
       });
     } else {
-      await prisma.book.create({ data });
+      await prisma.book.create({
+        data: {
+          title: book.title,
+          author: book.author,
+          coverImageUrl: book.coverImageUrl,
+          ...safeUpdateFields,
+        },
+      });
     }
   }
 }

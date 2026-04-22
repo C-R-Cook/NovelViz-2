@@ -199,7 +199,7 @@ POST /api/requests
 GET    /api/admin/books
 POST   /api/admin/books
 PUT    /api/admin/books/:id
-POST   /api/admin/books/:id/ingest
+POST   /api/admin/books/:id/ingest  (multipart `file`; optional `applyEpubMetadata=true` for EPUB OPF → book metadata)
 GET    /api/admin/requests
 GET    /api/admin/users
 
@@ -209,7 +209,7 @@ GET    /api/admin/users
 - Session 2: Full database schema, pgvector enabled, initial migration run
 - Auth flow (sign up, login, user record created in DB)
 - Session 3: Dev auth helper (lib/auth.ts) with mock user for local development
-- Prisma seed script with 8 public domain books and dev user
+- Prisma seed script with 8 public domain books and dev users (see Session 5 / Known Decisions)
 - Catalogue pages: /books grid with genre filter, /books/[id] detail page
 - Library pages: /library with add/remove functionality
 - API routes: POST and DELETE /api/library/[bookId]
@@ -226,6 +226,12 @@ GET    /api/admin/users
   - Partner dashboard placeholder page at `/partner/dashboard`
   - Q&A feature: reader page ask flow + history panel backed by `/api/query`
   - Image generation: reader page “Generate Image” tab + history, backed by `/api/imagine` (Anthropic prompt enrichment + fal.ai `fal-ai/flux/schnell`)
+- Session 5 (recent):
+  - **Dev users:** seed creates `dev_user_reader`, `dev_user_partner`, `dev_user_admin` (distinct `clerkId`s) plus legacy `dev_user_local`; `getCurrentUser()` maps `dev_role` cookie → `DEV_USERS[...]` (default admin). See Known Decisions.
+  - **Imagine:** Anthropic subject extraction before embed; dual pgvector retrieval (prompt + subject), merged/deduped chunks; subject-focused enrichment prompt; optional `IMAGINE_DEBUG` logs; `POST /api/imagine` returns `image` row for UI.
+  - **Reader UI:** compact book header + reading bar; Ask & Imagine with Generate first; My Library cards link to `/reader/[bookId]`; new generation opens same modal as history; horizontal image carousel, modal with expandable prompts + copy icons; nav primary links left-aligned across shells.
+  - **Admin book detail:** ingest CTA top-right of title; cover change via hover/click on cover; EPUB ingest optional `applyEpubMetadata` (OPF Dublin Core → book fields via `extractEpubMetadataFromOpf` in `lib/ingestion.ts`).
+  - **Seed:** book re-seed updates metadata/status only — never `coverImageUrl` (Cloudinary covers preserved).
 
 ## What is NOT Built Yet
 
@@ -255,13 +261,14 @@ Never commit .env.local to Git.
 ## Known Decisions
 - Prisma client uses `prisma-client` provider with output to `app/generated/prisma`, imported via `@db` path alias
 - Seeding uses `tsx prisma/seed.ts` (not ts-node) due to Prisma 7 ESM client
-- Auth uses mock dev user locally (NODE_ENV !== 'production'). Clerk to be wired in lib/auth.ts before go-live
+- Auth locally (`NODE_ENV !== 'production'`): `getCurrentUser()` reads `dev_role` cookie and returns the matching entry from `DEV_USERS` (`reader` | `partner` | `admin` DB-aligned ids/clerkIds); missing/invalid cookie → admin. Legacy `dev_user_local` remains in seed for compatibility. Clerk to be wired in `lib/auth.ts` before go-live
 - DIRECT_URL must be set in .env.local for migrations and db push (Neon requirement)
 - Cloudinary used for image storage (`CLOUDINARY_URL` in `.env.local`). `crop: "fit"` transformation enforces consistent cover dimensions
 - EPUB cover auto-extracted from manifest `properties="cover-image"` during ingestion, falls back to manifest item whose `id` contains `"cover"`
 - Visiting `/reader/[bookId]` auto-creates `UserBook` and `ReadingProgress` at Chapter 1 if they do not exist
-- `UserRole` enum added: `reader`, `partner`, `admin`. Dev user is `admin` role
+- `UserRole` enum: `reader`, `partner`, `admin`. Local dev uses per-role seeded users (see Session 5); default dev role when cookie absent is **admin**
 - **Partner** is the term used for authors/publishers/resellers (replaces “publisher” from the original brief)
 - Q&A retrieval is chapter-gated: question is embedded with `text-embedding-3-small`, top relevant chunks are selected via pgvector constrained to chapter sequence <= current reader progress, and response is stored in `Query`
 - Q&A uses Anthropic models with fallback support via `ANTHROPIC_MODEL` env var (comma-separated candidates supported)
-- Image generation uses the same chapter-gated chunk retrieval as Q&A, then Anthropic (`ANTHROPIC_MODEL`) to produce an enriched prompt, then fal.ai (`FAL_API_KEY`, `lib/fal.ts`, model id `fal-ai/flux/schnell`); results are stored in `GeneratedImage`
+- Image generation: chapter-gated **dual** retrieval (embeddings for user prompt + Anthropic-extracted primary subject), merged chunks; Anthropic (`ANTHROPIC_MODEL`) enrichment with subject-focused system prompt; fal.ai (`FAL_API_KEY`, `lib/fal.ts`, `fal-ai/flux/schnell`); `GeneratedImage` persisted; optional `IMAGINE_DEBUG=true` in `.env.local` for retrieval/subject diagnostic logs
+- Re-running **prisma seed** for catalogue books updates `status`, `isPublicDomain`, `genre`, `description`, `publishedYear` only — **not** `coverImageUrl` (uploaded Cloudinary covers kept)

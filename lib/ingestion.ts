@@ -266,6 +266,61 @@ function getOpfTitle(opfXml: string): string {
   return m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+/** All `<dc:{localName}>` values as plain text (regex; works for typical OPF namespaces). */
+function getOpfDcElements(opfXml: string, localName: string): string[] {
+  const re = new RegExp(`<dc:${localName}\\b[^>]*>([\\s\\S]*?)<\\/dc:${localName}>`, "gi");
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(opfXml)) !== null) {
+    const raw = m[1] ?? "";
+    const t = raw.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (t) out.push(t);
+  }
+  return out;
+}
+
+function getOpfPublishedYear(opfXml: string): number | null {
+  const dates = getOpfDcElements(opfXml, "date");
+  for (const t of dates) {
+    const y = parseInt(t.slice(0, 4), 10);
+    if (Number.isFinite(y) && y >= 1000 && y <= 3000) return y;
+    const m = t.match(/\b(1[0-9]{3}|20[0-9]{2})\b/);
+    if (m) {
+      const y2 = parseInt(m[1]!, 10);
+      if (Number.isFinite(y2) && y2 >= 1000 && y2 <= 3000) return y2;
+    }
+  }
+  return null;
+}
+
+export type EpubOpfMetadata = {
+  title: string;
+  author: string;
+  description: string | null;
+  genre: string | null;
+  publishedYear: number | null;
+};
+
+/** Best-effort Dublin Core metadata from package OPF XML (for admin ingest). */
+export function extractEpubMetadataFromOpf(opfXml: string): EpubOpfMetadata {
+  const title = getOpfTitle(opfXml);
+  const creators = getOpfDcElements(opfXml, "creator");
+  const author = creators.join(", ");
+  const descriptions = getOpfDcElements(opfXml, "description");
+  const description =
+    descriptions.length > 0 ? descriptions.join("\n\n").slice(0, 50_000) : null;
+  const subjects = getOpfDcElements(opfXml, "subject");
+  const genre = subjects.length > 0 ? subjects[0]!.slice(0, 500) : null;
+  const publishedYear = getOpfPublishedYear(opfXml);
+  return {
+    title,
+    author,
+    description,
+    genre,
+    publishedYear,
+  };
+}
+
 function filterChapterAnchorsByTitle(anchors: ChapterAnchor[], opfBookTitle: string): ChapterAnchor[] {
   const bookLower = opfBookTitle.trim().toLowerCase();
   return anchors.filter((a) => {

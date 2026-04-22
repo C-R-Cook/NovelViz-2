@@ -58,7 +58,7 @@ export default async function AdminLayout({
             <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500">
               Admin
             </span>
-            <DevRoleSwitcher />
+            <DevRoleSwitcher initialRole={user.role} />
             <ThemeToggle />
           </div>
         </nav>

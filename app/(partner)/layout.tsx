@@ -47,7 +47,7 @@ export default async function PartnerLayout({
             >
               Partner Dashboard
             </Link>
-            <DevRoleSwitcher />
+            <DevRoleSwitcher initialRole={user.role} />
             <ThemeToggle />
           </div>
         </nav>

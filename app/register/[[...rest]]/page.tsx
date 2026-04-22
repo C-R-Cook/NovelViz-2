@@ -1,12 +1,15 @@
 import { ClerkThemedSignUp } from "@/components/clerk-themed-auth";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const user = await getCurrentUser();
+
   return (
     <div className="relative flex min-h-screen items-center justify-center bg-zinc-50 p-6 dark:bg-zinc-950">
       <div className="absolute right-4 top-4 z-10 flex items-center gap-2 sm:right-6 sm:top-6 sm:gap-3">
-        <DevRoleSwitcher />
+        <DevRoleSwitcher initialRole={user?.role} />
         <ThemeToggle />
       </div>
       <ClerkThemedSignUp path="/register" routing="path" signInUrl="/login" />

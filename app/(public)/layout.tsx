@@ -52,7 +52,7 @@ export default async function PublicLayout({
                 Partner
               </Link>
             ) : null}
-            <DevRoleSwitcher />
+            <DevRoleSwitcher initialRole={user?.role} />
             <ThemeToggle />
           </div>
         </nav>

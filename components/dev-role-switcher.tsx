@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 const STORAGE_KEY = "dev_role";
 type UserRole = "reader" | "partner" | "admin";
@@ -9,6 +9,8 @@ const USER_ROLE = {
   partner: "partner" as UserRole,
   admin: "admin" as UserRole,
 };
+
+export type DevRoleSwitcherInitialRole = UserRole;
 
 function isUserRole(s: string | null): s is UserRole {
   return s === USER_ROLE.reader || s === USER_ROLE.partner || s === USER_ROLE.admin;
@@ -35,20 +37,27 @@ function getRoleHomeUrl(role: UserRole): string {
   return "/library";
 }
 
-export function DevRoleSwitcher() {
+type Props = {
+  /** Server-read dev role so the control matches `getCurrentUser()` after SSR/hydration. */
+  initialRole?: DevRoleSwitcherInitialRole;
+};
+
+export function DevRoleSwitcher({ initialRole }: Props) {
   if (process.env.NODE_ENV === "production") {
     return null;
   }
-  return <DevRoleSwitcherInner />;
+  return <DevRoleSwitcherInner initialRole={initialRole} />;
 }
 
-function DevRoleSwitcherInner() {
+function DevRoleSwitcherInner({ initialRole }: Props) {
   const [role, setRole] = useState<UserRole>(() => {
-    if (typeof window === "undefined") return USER_ROLE.admin;
-    const fromCk = readCookie("dev_role");
-    if (isUserRole(fromCk)) return fromCk;
-    const fromLs = localStorage.getItem(STORAGE_KEY);
-    if (isUserRole(fromLs)) return fromLs;
+    if (initialRole && isUserRole(initialRole)) return initialRole;
+    if (typeof window !== "undefined") {
+      const fromCk = readCookie("dev_role");
+      if (isUserRole(fromCk)) return fromCk;
+      const fromLs = localStorage.getItem(STORAGE_KEY);
+      if (isUserRole(fromLs)) return fromLs;
+    }
     return USER_ROLE.admin;
   });
 
@@ -66,14 +75,6 @@ function DevRoleSwitcherInner() {
     },
     [],
   );
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, role);
-    if (readCookie("dev_role") !== role) {
-      writeDevRoleCookie(role);
-    }
-  }, [role]);
 
   return (
     <label className="flex shrink-0 items-center gap-2">

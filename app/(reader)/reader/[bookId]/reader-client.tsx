@@ -119,7 +119,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [historyQueries, setHistoryQueries] = useState<QueryHistoryItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const historyDetailsRef = useRef<HTMLDetailsElement>(null);
+  const [historyInitialized, setHistoryInitialized] = useState(false);
 
   const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("imagine");
 
@@ -130,7 +130,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [imageHistory, setImageHistory] = useState<ImageHistoryItem[]>([]);
   const [imageHistoryLoading, setImageHistoryLoading] = useState(false);
   const [imageHistoryError, setImageHistoryError] = useState<string | null>(null);
-  const imageDetailsRef = useRef<HTMLDetailsElement>(null);
+  const [imageHistoryInitialized, setImageHistoryInitialized] = useState(false);
   const [selectedHistoryImage, setSelectedHistoryImage] = useState<ImageHistoryItem | null>(null);
   const [promptCopied, setPromptCopied] = useState<PromptCopyKind | null>(null);
   const promptCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,6 +212,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       setHistoryQueries([]);
     } finally {
       setHistoryLoading(false);
+      setHistoryInitialized(true);
     }
   }, [book.id]);
 
@@ -238,9 +239,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       if (typeof data.responseText === "string") {
         setLastAnswer(data.responseText);
         setQuestion("");
-        if (historyDetailsRef.current?.open) {
-          void loadQueryHistory();
-        }
+        void loadQueryHistory();
       } else {
         setQaError("Invalid response from server");
       }
@@ -271,7 +270,13 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       setImageHistory([]);
     } finally {
       setImageHistoryLoading(false);
+      setImageHistoryInitialized(true);
     }
+  }, [book.id]);
+
+  useEffect(() => {
+    setHistoryInitialized(false);
+    setImageHistoryInitialized(false);
   }, [book.id]);
 
   const submitImage = useCallback(async () => {
@@ -300,9 +305,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
         setSelectedHistoryImage(item);
         setImgPrompt("");
         setImageHistory((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
-        if (imageDetailsRef.current?.open) {
-          void loadImageHistory();
-        }
+        void loadImageHistory();
       } else if (typeof data.imageUrl === "string") {
         const fullPrompt = typeof data.fullPrompt === "string" ? data.fullPrompt : "";
         setSelectedHistoryImage({
@@ -314,9 +317,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
           createdAt: new Date().toISOString(),
         });
         setImgPrompt("");
-        if (imageDetailsRef.current?.open) {
-          void loadImageHistory();
-        }
+        void loadImageHistory();
       } else {
         setImgError("Invalid response from server");
       }
@@ -348,8 +349,29 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     }
   }, [selectedHistoryImage?.id]);
 
+  useEffect(() => {
+    if (activeAiTab === "imagine") {
+      if (!imageHistoryInitialized && !imageHistoryLoading) {
+        void loadImageHistory();
+      }
+      return;
+    }
+
+    if (!historyInitialized && !historyLoading) {
+      void loadQueryHistory();
+    }
+  }, [
+    activeAiTab,
+    historyInitialized,
+    historyLoading,
+    imageHistoryInitialized,
+    imageHistoryLoading,
+    loadImageHistory,
+    loadQueryHistory,
+  ]);
+
   return (
-    <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 sm:py-6">
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
       <header className="space-y-3 sm:space-y-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
           <h1 className="font-serif text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
@@ -361,71 +383,6 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
           <p className="min-w-0 text-sm text-zinc-600 dark:text-zinc-400">{book.author}</p>
         </div>
 
-        {total > 0 ? (
-          <div className="flex gap-3 sm:gap-4">
-            <div className="relative h-[5.5rem] w-[3.67rem] shrink-0 self-start overflow-hidden rounded-md border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 sm:h-[6.25rem] sm:w-[4.17rem]">
-              {book.coverImageUrl ? (
-                <Image
-                  src={book.coverImageUrl}
-                  alt={`Cover: ${book.title}`}
-                  fill
-                  className="object-cover"
-                  sizes="72px"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center px-1 text-center text-[10px] leading-tight text-zinc-500 dark:text-zinc-600">
-                  No cover
-                </div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1 space-y-2 rounded-lg border border-zinc-200/90 bg-white/70 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/40 sm:p-3.5">
-              <p className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
-                {savedProgress ? (
-                  <>
-                    Reading · Chapter {savedProgress.currentChapterNumber} of {total}
-                  </>
-                ) : (
-                  <>Set chapter, then save</>
-                )}
-              </p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label className="min-w-0 flex-1">
-                  <span className="sr-only">Current chapter</span>
-                  <select
-                    value={selectedChapterId}
-                    onChange={(e) => setSelectedChapterId(e.target.value)}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100"
-                  >
-                    {chapters.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  onClick={saveProgress}
-                  disabled={saving || !selectedChapterId}
-                  className="shrink-0 rounded-lg border border-amber-700/50 bg-amber-100/90 px-3 py-1.5 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50 sm:px-4 sm:py-2"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </div>
-              {message ? (
-                <p
-                  className={
-                    message.type === "ok"
-                      ? "text-xs text-emerald-700 dark:text-emerald-400/90 sm:text-sm"
-                      : "text-xs text-red-600 dark:text-red-400 sm:text-sm"
-                  }
-                >
-                  {message.text}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
       </header>
 
       {total === 0 ? (
@@ -434,49 +391,106 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
         </p>
       ) : (
         <>
-          <section className="mt-4 space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
-            <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
-              Ask &amp; imagine
-            </h2>
-            <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
-              AI only uses text through your saved chapter. Change chapter above and save if needed.
-            </p>
+          <section className="mt-4 grid gap-4 lg:grid-cols-4">
+            <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1">
+              <div className="relative aspect-[2/3] w-full">
+                {book.coverImageUrl ? (
+                  <Image
+                    src={book.coverImageUrl}
+                    alt={`Cover: ${book.title}`}
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 22vw, (min-width: 640px) 40vw, 75vw"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-4 text-center text-sm leading-tight text-zinc-500 dark:text-zinc-600">
+                    No cover available
+                  </div>
+                )}
+              </div>
+            </div>
 
-                <div
-                  className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
-                  role="tablist"
-                  aria-label="Reader AI tools"
-                >
+            <div className="space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5 lg:col-span-3">
+              <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
+                Ask &amp; imagine
+              </h2>
+              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
+                We use only information and descriptions up to your current chapter to avoid spoilers.
+              </p>
+
+              <section className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 px-3 py-3 dark:border-zinc-800/70 dark:bg-zinc-900/20 sm:px-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label className="min-w-0 sm:min-w-72">
+                    <span className="sr-only">Current chapter</span>
+                    <select
+                      value={selectedChapterId}
+                      onChange={(e) => setSelectedChapterId(e.target.value)}
+                      className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100"
+                    >
+                      {chapters.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     type="button"
-                    role="tab"
-                    aria-selected={activeAiTab === "imagine"}
-                    onClick={() => setActiveAiTab("imagine")}
-                    className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-                      activeAiTab === "imagine"
-                        ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-                    }`}
+                    onClick={saveProgress}
+                    disabled={saving || !selectedChapterId}
+                    className="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-200 dark:hover:bg-zinc-800"
                   >
-                    Generate Image
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={activeAiTab === "ask"}
-                    onClick={() => setActiveAiTab("ask")}
-                    className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-                      activeAiTab === "ask"
-                        ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                        : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-                    }`}
-                  >
-                    Ask a Question
+                    {saving ? "Saving…" : "Save chapter"}
                   </button>
                 </div>
+                {message ? (
+                  <p
+                    className={
+                      message.type === "ok"
+                        ? "mt-2 text-xs text-emerald-700 dark:text-emerald-400/90"
+                        : "mt-2 text-xs text-red-600 dark:text-red-400"
+                    }
+                  >
+                    {message.text}
+                  </p>
+                ) : null}
+              </section>
 
-                {activeAiTab === "imagine" ? (
-                  <div className="space-y-3 pt-1" role="tabpanel">
+              <div
+                className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
+                role="tablist"
+                aria-label="Reader AI tools"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeAiTab === "imagine"}
+                  onClick={() => setActiveAiTab("imagine")}
+                  className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+                    activeAiTab === "imagine"
+                      ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
+                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                  }`}
+                >
+                  Generate Image
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeAiTab === "ask"}
+                  onClick={() => setActiveAiTab("ask")}
+                  className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+                    activeAiTab === "ask"
+                      ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
+                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                  }`}
+                >
+                  Ask a Question
+                </button>
+              </div>
+
+              {activeAiTab === "imagine" ? (
+                <div className="space-y-3 pt-1" role="tabpanel">
                     <textarea
                       value={imgPrompt}
                       onChange={(e) => setImgPrompt(e.target.value)}
@@ -509,64 +523,6 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                         </p>
                       </div>
                     ) : null}
-
-                    <details
-                      ref={imageDetailsRef}
-                      className="group border-t border-zinc-200/80 pt-3 dark:border-zinc-800/70"
-                      onToggle={(e) => {
-                        if ((e.target as HTMLDetailsElement).open) {
-                          void loadImageHistory();
-                        }
-                      }}
-                    >
-                      <summary className="cursor-pointer list-none text-xs font-medium text-zinc-500 marker:content-none dark:text-zinc-500 [&::-webkit-details-marker]:hidden">
-                        <span className="underline decoration-zinc-300 decoration-dotted underline-offset-2 group-open:text-zinc-600 dark:decoration-zinc-600 dark:group-open:text-zinc-400">
-                          Previous Images
-                        </span>
-                      </summary>
-                      <div className="mt-3 space-y-1">
-                        {imageHistoryLoading ? (
-                          <p className="text-xs text-zinc-500">Loading…</p>
-                        ) : imageHistoryError ? (
-                          <p className="text-xs text-red-600 dark:text-red-400/90">{imageHistoryError}</p>
-                        ) : imageHistory.length === 0 ? (
-                          <p className="text-xs text-zinc-500 dark:text-zinc-500">No images yet.</p>
-                        ) : (
-                          <ul className="flex gap-3 overflow-x-auto pb-1">
-                            {imageHistory.map((item) => (
-                              <li
-                                key={item.id}
-                                className="w-36 shrink-0 overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/70 dark:bg-zinc-950/30 sm:w-40"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => setSelectedHistoryImage(item)}
-                                  className="w-full text-left"
-                                  aria-label={`Open generated image for prompt: ${item.userPrompt}`}
-                                >
-                                  <Image
-                                    src={item.imageUrl}
-                                    alt={item.userPrompt}
-                                    width={800}
-                                    height={600}
-                                    unoptimized
-                                    className="aspect-[4/3] w-full object-cover"
-                                  />
-                                  <div className="space-y-1 p-2">
-                                    <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
-                                      {item.userPrompt}
-                                    </p>
-                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
-                                      Chapter {item.chapterNumberAtTime}
-                                    </p>
-                                  </div>
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </details>
                   </div>
                 ) : (
                   <div className="space-y-3 pt-1" role="tabpanel">
@@ -598,54 +554,85 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                         </div>
                       </div>
                     ) : null}
-
-                    <details
-                      ref={historyDetailsRef}
-                      className="group border-t border-zinc-200/80 pt-3 dark:border-zinc-800/70"
-                      onToggle={(e) => {
-                        if ((e.target as HTMLDetailsElement).open) {
-                          void loadQueryHistory();
-                        }
-                      }}
-                    >
-                      <summary className="cursor-pointer list-none text-xs font-medium text-zinc-500 marker:content-none dark:text-zinc-500 [&::-webkit-details-marker]:hidden">
-                        <span className="underline decoration-zinc-300 decoration-dotted underline-offset-2 group-open:text-zinc-600 dark:decoration-zinc-600 dark:group-open:text-zinc-400">
-                          Previous questions
-                        </span>
-                      </summary>
-                      <div className="mt-3 space-y-1">
-                        {historyLoading ? (
-                          <p className="text-xs text-zinc-500">Loading…</p>
-                        ) : historyError ? (
-                          <p className="text-xs text-red-600 dark:text-red-400/90">{historyError}</p>
-                        ) : historyQueries.length === 0 ? (
-                          <p className="text-xs text-zinc-500 dark:text-zinc-500">No questions yet.</p>
-                        ) : (
-                          <ul className="max-h-80 space-y-0 divide-y divide-zinc-200/80 overflow-y-auto dark:divide-zinc-800/80">
-                            {historyQueries.map((q) => (
-                              <li key={q.id} className="py-3 first:pt-0">
-                                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-                                  {q.questionText}
-                                </p>
-                                <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
-                                  {q.responseText}
-                                </p>
-                                <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-600">
-                                  Chapter {q.chapterNumberAtTime} ·{" "}
-                                  {new Date(q.createdAt).toLocaleString(undefined, {
-                                    dateStyle: "short",
-                                    timeStyle: "short",
-                                  })}
-                                </p>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    </details>
                   </div>
                 )}
-              </section>
+            </div>
+          </section>
+
+          <section className="mt-4 space-y-2 rounded-xl border border-zinc-200/90 bg-white/50 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/20">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+              {activeAiTab === "imagine" ? "Previous image generations" : "Previous questions"}
+            </p>
+            {activeAiTab === "imagine" ? (
+              imageHistoryLoading ? (
+                <p className="text-xs text-zinc-500">Loading…</p>
+              ) : imageHistoryError ? (
+                <p className="text-xs text-red-600 dark:text-red-400/90">{imageHistoryError}</p>
+              ) : imageHistory.length === 0 ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-500">No images yet.</p>
+              ) : (
+                <ul className="flex gap-3 overflow-x-auto pb-1">
+                  {imageHistory.map((item) => (
+                    <li
+                      key={item.id}
+                      className="w-36 shrink-0 overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/70 dark:bg-zinc-950/30 sm:w-40"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedHistoryImage(item)}
+                        className="w-full text-left"
+                        aria-label={`Open generated image for prompt: ${item.userPrompt}`}
+                      >
+                        <Image
+                          src={item.imageUrl}
+                          alt={item.userPrompt}
+                          width={800}
+                          height={600}
+                          unoptimized
+                          className="aspect-[4/3] w-full object-cover"
+                        />
+                        <div className="space-y-1 p-2">
+                          <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
+                            {item.userPrompt}
+                          </p>
+                          <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
+                            Chapter {item.chapterNumberAtTime}
+                          </p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : historyLoading ? (
+              <p className="text-xs text-zinc-500">Loading…</p>
+            ) : historyError ? (
+              <p className="text-xs text-red-600 dark:text-red-400/90">{historyError}</p>
+            ) : historyQueries.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-500">No questions yet.</p>
+            ) : (
+              <ul className="max-h-80 space-y-0 divide-y divide-zinc-200/80 overflow-y-auto dark:divide-zinc-800/80">
+                {historyQueries.map((q) => (
+                  <li key={q.id} className="py-3 first:pt-0">
+                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                      {q.questionText}
+                    </p>
+                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                      {q.responseText}
+                    </p>
+                    <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-600">
+                      Chapter {q.chapterNumberAtTime} ·{" "}
+                      {new Date(q.createdAt).toLocaleString(undefined, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
         </>
       )}
 

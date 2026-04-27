@@ -36,6 +36,7 @@ export type ImageHistoryItem = {
   userPrompt: string;
   fullPrompt: string;
   imageUrl: string;
+  isPublic: boolean;
   chapterNumberAtTime: number;
   createdAt: string;
 };
@@ -132,6 +133,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [imageHistoryError, setImageHistoryError] = useState<string | null>(null);
   const [imageHistoryInitialized, setImageHistoryInitialized] = useState(false);
   const [selectedHistoryImage, setSelectedHistoryImage] = useState<ImageHistoryItem | null>(null);
+  const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
   const [promptCopied, setPromptCopied] = useState<PromptCopyKind | null>(null);
   const promptCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -313,6 +315,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
           userPrompt: trimmed,
           fullPrompt,
           imageUrl: data.imageUrl,
+          isPublic: false,
           chapterNumberAtTime: savedProgress?.currentChapterNumber ?? 1,
           createdAt: new Date().toISOString(),
         });
@@ -327,6 +330,65 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       setImgLoading(false);
     }
   }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber]);
+
+  const setImagePublicState = useCallback(
+    async (imageId: string, isPublic: boolean) => {
+      if (!imageId || imageId.startsWith("temp-") || shareUpdatingIds[imageId]) {
+        return;
+      }
+
+      const previous = imageHistory.find((item) => item.id === imageId)?.isPublic;
+      const previousSelected =
+        selectedHistoryImage?.id === imageId ? selectedHistoryImage.isPublic : null;
+
+      setShareUpdatingIds((prev) => ({ ...prev, [imageId]: true }));
+      setImageHistory((prev) =>
+        prev.map((item) => (item.id === imageId ? { ...item, isPublic } : item)),
+      );
+      setSelectedHistoryImage((prev) =>
+        prev && prev.id === imageId ? { ...prev, isPublic } : prev,
+      );
+
+      try {
+        const res = await fetch(`/api/gallery/${imageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isPublic }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          image?: { isPublic?: boolean };
+          error?: string;
+        };
+        if (!res.ok || typeof data.image?.isPublic !== "boolean") {
+          throw new Error(data.error || "Failed to update sharing");
+        }
+
+        const resolved = data.image.isPublic;
+        setImageHistory((prev) =>
+          prev.map((item) => (item.id === imageId ? { ...item, isPublic: resolved } : item)),
+        );
+        setSelectedHistoryImage((prev) =>
+          prev && prev.id === imageId ? { ...prev, isPublic: resolved } : prev,
+        );
+      } catch {
+        if (typeof previous === "boolean") {
+          setImageHistory((prev) =>
+            prev.map((item) =>
+              item.id === imageId ? { ...item, isPublic: previous } : item,
+            ),
+          );
+        }
+        if (typeof previousSelected === "boolean") {
+          setSelectedHistoryImage((prev) =>
+            prev && prev.id === imageId ? { ...prev, isPublic: previousSelected } : prev,
+          );
+        }
+      } finally {
+        setShareUpdatingIds((prev) => ({ ...prev, [imageId]: false }));
+      }
+    },
+    [imageHistory, selectedHistoryImage, shareUpdatingIds],
+  );
 
   useEffect(() => {
     if (!selectedHistoryImage) return;
@@ -391,8 +453,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
         </p>
       ) : (
         <>
-          <section className="mt-4 grid gap-4 lg:grid-cols-4">
-            <div className="overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-1">
+          <section className="mt-4 grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,11rem)_1fr]">
+            <div className="mx-auto w-full max-w-[11rem] shrink-0 justify-self-center self-start overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 md:mx-0 md:max-w-none md:justify-self-stretch">
               <div className="relative aspect-[2/3] w-full">
                 {book.coverImageUrl ? (
                   <Image
@@ -400,7 +462,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     alt={`Cover: ${book.title}`}
                     fill
                     className="object-cover"
-                    sizes="(min-width: 1024px) 22vw, (min-width: 640px) 40vw, 75vw"
+                    sizes="(min-width: 768px) 176px, (min-width: 640px) 40vw, 75vw"
                   />
                 ) : (
                   <div className="flex h-full items-center justify-center px-4 text-center text-sm leading-tight text-zinc-500 dark:text-zinc-600">
@@ -410,7 +472,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
               </div>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5 lg:col-span-3">
+            <div className="min-w-0 space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
               <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
                 Ask &amp; imagine
               </h2>
@@ -591,15 +653,33 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                           unoptimized
                           className="aspect-[4/3] w-full object-cover"
                         />
-                        <div className="space-y-1 p-2">
-                          <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
-                            {item.userPrompt}
-                          </p>
-                          <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
-                            Chapter {item.chapterNumberAtTime}
-                          </p>
-                        </div>
                       </button>
+                      <div className="space-y-1 p-2">
+                        <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
+                          {item.userPrompt}
+                        </p>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
+                          Chapter {item.chapterNumberAtTime}
+                        </p>
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            onClick={() => void setImagePublicState(item.id, !item.isPublic)}
+                            disabled={!!shareUpdatingIds[item.id] || item.id.startsWith("temp-")}
+                            className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                              item.isPublic
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                : "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                            }`}
+                          >
+                            {shareUpdatingIds[item.id]
+                              ? "Saving…"
+                              : item.isPublic
+                                ? "Public"
+                                : "Private"}
+                          </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -649,13 +729,39 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex shrink-0 items-center justify-between">
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 sm:text-xs">
-                Chapter {selectedHistoryImage.chapterNumberAtTime} ·{" "}
-                {new Date(selectedHistoryImage.createdAt).toLocaleString(undefined, {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                })}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                  Chapter {selectedHistoryImage.chapterNumberAtTime} ·{" "}
+                  {new Date(selectedHistoryImage.createdAt).toLocaleString(undefined, {
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  })}
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void setImagePublicState(
+                      selectedHistoryImage.id,
+                      !selectedHistoryImage.isPublic,
+                    )
+                  }
+                  disabled={
+                    !!shareUpdatingIds[selectedHistoryImage.id] ||
+                    selectedHistoryImage.id.startsWith("temp-")
+                  }
+                  className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    selectedHistoryImage.isPublic
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+                      : "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                  }`}
+                >
+                  {shareUpdatingIds[selectedHistoryImage.id]
+                    ? "Saving…"
+                    : selectedHistoryImage.isPublic
+                      ? "Public"
+                      : "Private"}
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={() => setSelectedHistoryImage(null)}

@@ -114,7 +114,43 @@ async function seedDevRoleUsers() {
       name: "Dev Reader",
       role: UserRole.reader,
     },
-    update: { role: UserRole.reader, name: "Dev Reader" },
+    update: {
+      email: "dev_reader@novelviz.local",
+      name: "Dev Reader",
+      role: UserRole.reader,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_reader2" },
+    create: {
+      id: "dev_user_reader2",
+      clerkId: "user_dev_clerk_reader2",
+      email: "dev_reader2@novelviz.local",
+      name: "Dev Reader 2",
+      role: UserRole.reader,
+    },
+    update: {
+      email: "dev_reader2@novelviz.local",
+      name: "Dev Reader 2",
+      role: UserRole.reader,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_reader3" },
+    create: {
+      id: "dev_user_reader3",
+      clerkId: "user_dev_clerk_reader3",
+      email: "dev_reader3@novelviz.local",
+      name: "Dev Reader 3",
+      role: UserRole.reader,
+    },
+    update: {
+      email: "dev_reader3@novelviz.local",
+      name: "Dev Reader 3",
+      role: UserRole.reader,
+    },
   });
 
   await prisma.user.upsert({
@@ -126,7 +162,27 @@ async function seedDevRoleUsers() {
       name: "Dev Partner",
       role: UserRole.partner,
     },
-    update: { role: UserRole.partner, name: "Dev Partner" },
+    update: {
+      email: "dev_partner@novelviz.local",
+      name: "Dev Partner",
+      role: UserRole.partner,
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { clerkId: "user_dev_clerk_partner2" },
+    create: {
+      id: "dev_user_partner2",
+      clerkId: "user_dev_clerk_partner2",
+      email: "dev_partner2@novelviz.local",
+      name: "Dev Partner 2",
+      role: UserRole.partner,
+    },
+    update: {
+      email: "dev_partner2@novelviz.local",
+      name: "Dev Partner 2",
+      role: UserRole.partner,
+    },
   });
 
   await prisma.user.upsert({
@@ -138,7 +194,85 @@ async function seedDevRoleUsers() {
       name: "Dev Admin",
       role: UserRole.admin,
     },
-    update: { role: UserRole.admin, name: "Dev Admin" },
+    update: {
+      email: "dev_admin@novelviz.local",
+      name: "Dev Admin",
+      role: UserRole.admin,
+    },
+  });
+}
+
+/** Dracula chapters + library + progress for spoiler testing (early vs late readers). */
+async function seedDraculaChaptersAndReaderProgress() {
+  const dracula = await prisma.book.findFirst({
+    where: { title: "Dracula" },
+    select: { id: true },
+  });
+  if (!dracula) return;
+
+  for (let seq = 1; seq <= 15; seq++) {
+    await prisma.chapter.upsert({
+      where: {
+        bookId_sequenceNumber: { bookId: dracula.id, sequenceNumber: seq },
+      },
+      create: {
+        bookId: dracula.id,
+        sequenceNumber: seq,
+        title: `Chapter ${seq}`,
+        rawText: `Seed placeholder for Dracula chapter ${seq}.`,
+      },
+      update: {},
+    });
+  }
+
+  const ch2 = await prisma.chapter.findFirst({
+    where: { bookId: dracula.id, sequenceNumber: 2 },
+    select: { id: true },
+  });
+  const ch11 = await prisma.chapter.findFirst({
+    where: { bookId: dracula.id, sequenceNumber: 11 },
+    select: { id: true },
+  });
+  if (!ch2 || !ch11) return;
+
+  for (const userId of ["dev_user_reader2", "dev_user_reader3"] as const) {
+    await prisma.userBook.upsert({
+      where: { userId_bookId: { userId, bookId: dracula.id } },
+      create: { userId, bookId: dracula.id, isActive: true },
+      update: { isActive: true },
+    });
+  }
+
+  await prisma.readingProgress.upsert({
+    where: {
+      userId_bookId: { userId: "dev_user_reader2", bookId: dracula.id },
+    },
+    create: {
+      userId: "dev_user_reader2",
+      bookId: dracula.id,
+      currentChapterId: ch2.id,
+      currentChapterNumber: 2,
+    },
+    update: {
+      currentChapterId: ch2.id,
+      currentChapterNumber: 2,
+    },
+  });
+
+  await prisma.readingProgress.upsert({
+    where: {
+      userId_bookId: { userId: "dev_user_reader3", bookId: dracula.id },
+    },
+    create: {
+      userId: "dev_user_reader3",
+      bookId: dracula.id,
+      currentChapterId: ch11.id,
+      currentChapterNumber: 11,
+    },
+    update: {
+      currentChapterId: ch11.id,
+      currentChapterNumber: 11,
+    },
   });
 }
 
@@ -173,6 +307,8 @@ async function seed() {
       });
     }
   }
+
+  await seedDraculaChaptersAndReaderProgress();
 }
 
 seed()

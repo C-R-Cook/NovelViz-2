@@ -37,6 +37,12 @@ export default async function ReaderLayout({
           >
             My Library
           </Link>
+          <Link
+            href="/gallery"
+            className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
+          >
+            Gallery
+          </Link>
           {user.role === UserRole.admin ? (
             <Link
               href="/admin/books"
@@ -54,7 +60,7 @@ export default async function ReaderLayout({
             </Link>
           ) : null}
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <DevRoleSwitcher initialRole={user.role} />
+            <DevRoleSwitcher initialUserId={user.id} />
             <ThemeToggle />
           </div>
         </nav>

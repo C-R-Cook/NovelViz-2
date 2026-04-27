@@ -35,6 +35,12 @@ export default async function AdminLayout({
             Books
           </Link>
           <Link
+            href="/gallery"
+            className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
+          >
+            Gallery
+          </Link>
+          <Link
             href="/library"
             className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
           >
@@ -56,7 +62,7 @@ export default async function AdminLayout({
             <span className="text-xs font-semibold uppercase tracking-widest text-zinc-500 dark:text-zinc-500">
               Admin
             </span>
-            <DevRoleSwitcher initialRole={user.role} />
+            <DevRoleSwitcher initialUserId={user.id} />
             <ThemeToggle />
           </div>
         </nav>

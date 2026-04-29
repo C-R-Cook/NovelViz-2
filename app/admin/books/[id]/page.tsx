@@ -16,6 +16,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
   const row = await prisma.book.findUnique({
     where: { id },
     include: {
+      owner: { select: { id: true, name: true, email: true } },
       _count: { select: { chapters: true } },
     },
   });
@@ -33,6 +34,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     description: row.description,
     coverImageUrl: row.coverImageUrl,
     status: row.status,
+    ownerLabel: row.owner ? (row.owner.name ?? row.owner.email) : null,
     chapterCount: row._count.chapters,
   };
 

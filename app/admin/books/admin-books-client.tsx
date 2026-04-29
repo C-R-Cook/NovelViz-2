@@ -12,6 +12,7 @@ export type AdminBookRow = {
   author: string;
   coverImageUrl: string | null;
   status: BookStatus;
+  ownerLabel: string | null;
   /** Pre-formatted on the server to avoid locale hydration mismatches */
   createdAtLabel: string;
   chapterCount: number;
@@ -22,6 +23,8 @@ type FilterKey = "all" | BookStatus;
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "draft", label: "draft" },
+  { key: "pending_review", label: "pending_review" },
+  { key: "rejected", label: "rejected" },
   { key: "processing", label: "processing" },
   { key: "ready_for_review", label: "ready_for_review" },
   { key: "published", label: "published" },
@@ -35,6 +38,18 @@ export function StatusBadge({ status }: { status: BookStatus }) {
       return (
         <span className={`${base} bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200`}>
           draft
+        </span>
+      );
+    case "pending_review":
+      return (
+        <span className={`${base} bg-indigo-600 text-indigo-50`}>
+          pending_review
+        </span>
+      );
+    case "rejected":
+      return (
+        <span className={`${base} bg-red-600 text-red-50`}>
+          rejected
         </span>
       );
     case "processing":
@@ -69,42 +84,33 @@ export function StatusBadge({ status }: { status: BookStatus }) {
 export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [newTitle, setNewTitle] = useState("");
-  const [newAuthor, setNewAuthor] = useState("");
-  const [createBusy, setCreateBusy] = useState(false);
-  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [actionErr, setActionErr] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     if (filter === "all") return books;
     return books.filter((b) => b.status === filter);
   }, [books, filter]);
 
-  async function createBook(e: React.FormEvent) {
-    e.preventDefault();
-    setCreateErr(null);
-    setCreateBusy(true);
+  async function deleteBook(book: AdminBookRow) {
+    const confirmed = window.confirm(
+      `Delete "${book.title}" by ${book.author}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+
+    setActionErr(null);
+    setDeletingId(book.id);
     try {
-      const res = await fetch("/api/admin/books", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newTitle.trim(),
-          author: newAuthor.trim(),
-        }),
-      });
+      const res = await fetch(`/api/admin/books/${book.id}`, { method: "DELETE" });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error || res.statusText);
       }
-      const data = (await res.json()) as { book: { id: string } };
-      setNewTitle("");
-      setNewAuthor("");
-      router.push(`/admin/books/${data.book.id}`);
       router.refresh();
     } catch (err) {
-      setCreateErr(err instanceof Error ? err.message : "Create failed");
+      setActionErr(err instanceof Error ? err.message : "Delete failed");
     } finally {
-      setCreateBusy(false);
+      setDeletingId(null);
     }
   }
 
@@ -115,41 +121,15 @@ export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
           <h1 className="font-serif text-2xl font-semibold text-amber-900 dark:text-amber-100/95">
             Books
           </h1>
-          <form
-            onSubmit={createBook}
-            className="flex w-full max-w-xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end"
+          <Link
+            href="/partner/books/new"
+            className="inline-flex w-fit rounded-lg bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/80 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
           >
-            <label className="min-w-0 flex-1 space-y-1">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-500">Title</span>
-              <input
-                required
-                value={newTitle}
-                onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="New book title"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
-              />
-            </label>
-            <label className="min-w-0 flex-1 space-y-1">
-              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-500">Author</span>
-              <input
-                required
-                value={newAuthor}
-                onChange={(e) => setNewAuthor(e.target.value)}
-                placeholder="Author"
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={createBusy}
-              className="shrink-0 rounded-lg bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/80 disabled:opacity-50 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15 sm:mb-0.5"
-            >
-              {createBusy ? "Creating…" : "New book (draft)"}
-            </button>
-          </form>
+            New book
+          </Link>
         </div>
-        {createErr ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{createErr}</p>
+        {actionErr ? (
+          <p className="text-sm text-red-600 dark:text-red-400">{actionErr}</p>
         ) : null}
         <div className="flex flex-wrap gap-2">
           {FILTERS.map(({ key, label }) => (
@@ -176,6 +156,7 @@ export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
               <th className="px-4 py-3 font-medium">Cover</th>
               <th className="px-4 py-3 font-medium">Title</th>
               <th className="px-4 py-3 font-medium">Author</th>
+              <th className="px-4 py-3 font-medium">Owner</th>
               <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Chapters</th>
               <th className="px-4 py-3 font-medium">Created</th>
@@ -186,7 +167,7 @@ export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-4 py-8 text-center text-zinc-600 dark:text-zinc-500"
                 >
                   No books match this filter.
@@ -219,6 +200,9 @@ export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
                     {book.title}
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{book.author}</td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                    {book.ownerLabel ?? "Unassigned"}
+                  </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={book.status} />
                   </td>
@@ -229,12 +213,37 @@ export function AdminBooksClient({ books }: { books: AdminBookRow[] }) {
                     {book.createdAtLabel}
                   </td>
                   <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/books/${book.id}`}
-                      className="inline-flex rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-amber-950 ring-1 ring-zinc-400 transition hover:bg-zinc-300 hover:ring-amber-700/40 dark:bg-zinc-800/80 dark:text-amber-100/90 dark:ring-zinc-700 dark:hover:bg-zinc-800 dark:hover:ring-amber-500/30"
-                    >
-                      Manage
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/admin/books/${book.id}`}
+                        className="inline-flex rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-amber-950 ring-1 ring-zinc-400 transition hover:bg-zinc-300 hover:ring-amber-700/40 dark:bg-zinc-800/80 dark:text-amber-100/90 dark:ring-zinc-700 dark:hover:bg-zinc-800 dark:hover:ring-amber-500/30"
+                      >
+                        Manage
+                      </Link>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${book.title}`}
+                        disabled={deletingId === book.id}
+                        onClick={() => void deleteBook(book)}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-300/80 bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-900/60"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          className="h-4 w-4"
+                          aria-hidden="true"
+                        >
+                          <path d="M3 6h18" />
+                          <path d="M8 6V4h8v2" />
+                          <path d="M19 6l-1 14H6L5 6" />
+                          <path d="M10 11v6" />
+                          <path d="M14 11v6" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

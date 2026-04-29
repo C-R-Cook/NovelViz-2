@@ -1,12 +1,15 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { BookStatus } from "@db";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 const ALL_STATUSES: BookStatus[] = [
   "draft",
+  "pending_review",
+  "rejected",
   "published",
   "unlisted",
   "processing",
@@ -24,6 +27,16 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id: bookId } = await context.params;
+  const book = await prisma.book.findUnique({
+    where: { id: bookId },
+    select: { id: true, ownerId: true },
+  });
+  if (!book) {
+    return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: unknown;
   try {
@@ -43,13 +56,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const status = (body as { status: BookStatus }).status;
 
-  try {
-    const book = await prisma.book.update({
-      where: { id: bookId },
-      data: { status },
-    });
-    return NextResponse.json({ book });
-  } catch {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 });
-  }
+  const updated = await prisma.book.update({
+    where: { id: bookId },
+    data: { status },
+  });
+  return NextResponse.json({ book: updated });
 }

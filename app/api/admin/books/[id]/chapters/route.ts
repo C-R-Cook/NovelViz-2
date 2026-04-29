@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,6 +16,9 @@ export async function GET(_request: Request, context: RouteContext) {
   const book = await prisma.book.findUnique({ where: { id: bookId } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const chapters = await prisma.chapter.findMany({

@@ -11,6 +11,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import type { BookStatus } from "@db";
 import { Prisma } from "@db";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -78,6 +79,9 @@ export async function POST(request: Request, context: RouteContext) {
   const book = await prisma.book.findUnique({ where: { id: bookId } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (!INGEST_ALLOWED.includes(book.status)) {

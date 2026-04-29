@@ -16,6 +16,7 @@ export type AdminBookDetailModel = {
   description: string | null;
   coverImageUrl: string | null;
   status: BookStatus;
+  ownerLabel: string | null;
   chapterCount: number;
 };
 
@@ -268,6 +269,9 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               {title}
             </h1>
             <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-500">{author}</p>
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Owner: {book.ownerLabel ?? "Unassigned"}
+            </p>
           </div>
           <div className="flex shrink-0 flex-col justify-center gap-2 sm:max-w-[min(100%,18rem)] sm:items-end">
             {book.status !== "processing" &&

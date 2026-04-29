@@ -1,9 +1,28 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@db";
+import { BookStatus } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
+const ALL_STATUSES: BookStatus[] = [
+  "draft",
+  "pending_review",
+  "rejected",
+  "published",
+  "unlisted",
+  "processing",
+  "ready_for_review",
+];
+
+const ALLOWED_TRANSITIONS: Record<BookStatus, BookStatus[]> = {
+  draft: ["pending_review"],
+  pending_review: ["draft"],
+  rejected: ["draft"],
+  published: ["unlisted"],
+  unlisted: ["published"],
+  processing: [],
+  ready_for_review: [],
+};
 
 export async function PATCH(request: Request, context: RouteContext) {
   const user = await getCurrentUser();
@@ -11,15 +30,17 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const dbUser = await prisma.user.findUnique({ where: { clerkId: user.clerkId } });
+  if (!dbUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
   const { id } = await context.params;
-  const existingBook = await prisma.book.findUnique({
-    where: { id },
-    select: { id: true, ownerId: true },
-  });
-  if (!existingBook) {
+  const existing = await prisma.book.findUnique({ where: { id } });
+  if (!existing) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
-  if (user.role !== UserRole.admin && existingBook.ownerId !== user.id) {
+  if (existing.ownerId !== dbUser.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -29,7 +50,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-
   if (typeof body !== "object" || body === null) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
@@ -41,7 +61,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     genre?: string | null;
     publishedYear?: number | null;
     description?: string | null;
-    ownerId?: string | null;
+    status?: BookStatus;
+    rejectionReason?: string | null;
   } = {};
 
   if ("title" in b) {
@@ -65,10 +86,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   if ("publishedYear" in b) {
     if (b.publishedYear === null || b.publishedYear === "") {
       data.publishedYear = null;
-    } else if (
-      typeof b.publishedYear === "number" &&
-      Number.isInteger(b.publishedYear)
-    ) {
+    } else if (typeof b.publishedYear === "number" && Number.isInteger(b.publishedYear)) {
       data.publishedYear = b.publishedYear;
     } else {
       return NextResponse.json(
@@ -84,28 +102,36 @@ export async function PATCH(request: Request, context: RouteContext) {
         { status: 400 },
       );
     }
-    data.description =
-      b.description === null || b.description === "" ? null : b.description;
+    data.description = b.description === null || b.description === "" ? null : b.description;
   }
-  if ("ownerId" in b) {
-    if (
-      b.ownerId !== null &&
-      b.ownerId !== "" &&
-      typeof b.ownerId !== "string"
-    ) {
-      return NextResponse.json(
-        { error: "ownerId must be a string, null, or empty" },
-        { status: 400 },
-      );
+  if ("status" in b) {
+    if (typeof b.status !== "string") {
+      return NextResponse.json({ error: "status must be a BookStatus" }, { status: 400 });
     }
-    data.ownerId = b.ownerId === null || b.ownerId === "" ? null : b.ownerId;
+    if (!(ALL_STATUSES as string[]).includes(b.status)) {
+      return NextResponse.json({ error: "status must be a BookStatus" }, { status: 400 });
+    }
+    const next = b.status as BookStatus;
+    if (next !== existing.status) {
+      const allowed = ALLOWED_TRANSITIONS[existing.status] ?? [];
+      if (!allowed.includes(next)) {
+        return NextResponse.json(
+          { error: `Forbidden status transition from ${existing.status} to ${next}` },
+          { status: 403 },
+        );
+      }
+    }
+    data.status = next;
+    if (next === "draft" && existing.status === "rejected") {
+      data.rejectionReason = null;
+    }
   }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, ownerId",
+          "Provide at least one of: title, author, genre, publishedYear, description, status",
       },
       { status: 400 },
     );
@@ -114,28 +140,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   const book = await prisma.book.update({
     where: { id },
     data,
+    include: { _count: { select: { chapters: true } } },
   });
+
   return NextResponse.json({ book });
-}
-
-export async function DELETE(_request: Request, context: RouteContext) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id } = await context.params;
-  const existingBook = await prisma.book.findUnique({
-    where: { id },
-    select: { id: true, ownerId: true },
-  });
-  if (!existingBook) {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 });
-  }
-  if (user.role !== UserRole.admin && existingBook.ownerId !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  await prisma.book.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
 }

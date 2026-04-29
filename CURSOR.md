@@ -50,6 +50,7 @@ All models are defined in prisma/schema.prisma. Migration has been run successfu
   - `ready_for_review` — ingestion finished; awaiting admin before catalogue changes
 - scheduledPublishAt (nullable datetime)
 - isPublicDomain (boolean)
+- ownerId (nullable foreign key to `User.id`; partner owner when assigned)
 - Standard metadata: title, author, coverImageUrl, description, genre, publishedYear
 
 **Chapter**

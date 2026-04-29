@@ -12,6 +12,7 @@ export default async function AdminBooksPage() {
   const rows = await prisma.book.findMany({
     orderBy: { createdAt: "desc" },
     include: {
+      owner: { select: { id: true, name: true, email: true } },
       _count: { select: { chapters: true } },
     },
   });
@@ -27,6 +28,7 @@ export default async function AdminBooksPage() {
     author: b.author,
     coverImageUrl: b.coverImageUrl,
     status: b.status,
+    ownerLabel: b.owner ? (b.owner.name ?? b.owner.email) : null,
     createdAtLabel: createdAtFormatter.format(b.createdAt),
     chapterCount: b._count.chapters,
   }));

@@ -4,6 +4,7 @@ import {
   syncReadingProgressChapterNumbers,
 } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,6 +16,16 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id: bookId } = await context.params;
+  const book = await prisma.book.findUnique({
+    where: { id: bookId },
+    select: { id: true, ownerId: true },
+  });
+  if (!book) {
+    return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   let body: unknown;
   try {

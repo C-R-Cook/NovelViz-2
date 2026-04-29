@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import cloudinary from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 const ALLOWED_TYPES = new Set([
@@ -25,6 +26,9 @@ export async function POST(request: Request, context: RouteContext) {
   const existing = await prisma.book.findUnique({ where: { id: bookId } });
   if (!existing) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && existing.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let formData: FormData;

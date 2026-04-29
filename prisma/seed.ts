@@ -308,6 +308,11 @@ async function seed() {
     }
   }
 
+  await prisma.book.updateMany({
+    where: { title: { in: ["Dracula", "Frankenstein"] } },
+    data: { ownerId: "dev_user_partner" },
+  });
+
   await seedDraculaChaptersAndReaderProgress();
 }
 

@@ -35,12 +35,6 @@ export default async function PartnerLayout({
             Books
           </Link>
           <Link
-            href="/gallery"
-            className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
-          >
-            Gallery
-          </Link>
-          <Link
             href="/library"
             className="text-sm font-medium text-zinc-600 transition-colors hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
           >

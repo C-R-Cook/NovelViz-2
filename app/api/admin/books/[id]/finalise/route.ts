@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { chunkText, embedChunks } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@db";
+import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -31,6 +32,9 @@ export async function POST(_request: Request, context: RouteContext) {
   const book = await prisma.book.findUnique({ where: { id: bookId } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   if (book.status !== "draft") {

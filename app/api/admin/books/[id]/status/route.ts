@@ -13,7 +13,6 @@ const ALL_STATUSES: BookStatus[] = [
   "published",
   "unlisted",
   "processing",
-  "ready_for_review",
 ];
 
 function isBookStatus(v: unknown): v is BookStatus {
@@ -27,9 +26,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { id: bookId } = await context.params;
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: { id: true, ownerId: true },
+  const book = await prisma.book.findFirst({
+    where: { id: bookId, deletedAt: null },
+    select: { id: true, ownerId: true, status: true },
   });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
@@ -45,20 +44,56 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (
-    typeof body !== "object" ||
-    body === null ||
-    !("status" in body) ||
-    !isBookStatus((body as { status: unknown }).status)
-  ) {
-    return NextResponse.json({ error: "Expected { status: BookStatus }" }, { status: 400 });
+  if (typeof body !== "object" || body === null) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  const status = (body as { status: BookStatus }).status;
+  const b = body as Record<string, unknown>;
+  if (!("status" in b) || !isBookStatus(b.status)) {
+    return NextResponse.json({ error: "Expected { status: BookStatus, rejectionReason?: string | null }" }, { status: 400 });
+  }
+
+  const status = b.status;
+  let rejectionReasonPayload: string | undefined;
+
+  if ("rejectionReason" in b) {
+    const rr = b.rejectionReason;
+    if (rr !== null && rr !== undefined && typeof rr !== "string") {
+      return NextResponse.json({ error: "rejectionReason must be a string or null" }, { status: 400 });
+    }
+    rejectionReasonPayload = rr === null || rr === undefined ? undefined : rr.trim();
+  }
+
+  const data: {
+    status: BookStatus;
+    rejectionReason?: string | null;
+    listingPreferenceAfterReview?: null;
+  } = { status };
+
+  if (book.status === "pending_review" && status !== "pending_review") {
+    data.listingPreferenceAfterReview = null;
+  }
+
+  if (status === "rejected") {
+    const reason = (rejectionReasonPayload ?? "").trim();
+    if (!reason || reason.length < 20) {
+      return NextResponse.json(
+        { error: "rejectionReason is required (at least 20 characters) when status is rejected" },
+        { status: 400 },
+      );
+    }
+    data.rejectionReason = reason;
+  } else {
+    data.rejectionReason = null;
+  }
 
   const updated = await prisma.book.update({
     where: { id: bookId },
-    data: { status },
+    data,
   });
-  return NextResponse.json({ book: updated });
+  return NextResponse.json({
+    book: updated,
+    status: updated.status,
+    rejectionReason: updated.rejectionReason,
+  });
 }

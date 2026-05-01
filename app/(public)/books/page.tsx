@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export default async function BooksCataloguePage() {
   const books = await prisma.book.findMany({
-    where: { status: "published" },
+    where: { status: "published", deletedAt: null },
     orderBy: { title: "asc" },
     select: {
       id: true,

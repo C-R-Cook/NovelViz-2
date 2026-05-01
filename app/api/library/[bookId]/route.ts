@@ -19,7 +19,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const book = await prisma.book.findFirst({
-    where: { id: bookId, status: "published" },
+    where: { id: bookId, status: "published", deletedAt: null },
   });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });

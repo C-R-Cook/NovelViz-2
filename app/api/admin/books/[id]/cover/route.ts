@@ -23,7 +23,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { id: bookId } = await context.params;
 
-  const existing = await prisma.book.findUnique({ where: { id: bookId } });
+  const existing = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
   if (!existing) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }

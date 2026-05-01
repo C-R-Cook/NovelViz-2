@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { BookGenre } from "@db";
 import { XMLParser } from "fast-xml-parser";
 import JSZip from "jszip";
 import path from "node:path";
@@ -279,30 +280,105 @@ function getOpfDcElements(opfXml: string, localName: string): string[] {
   return out;
 }
 
-function getOpfPublishedYear(opfXml: string): number | null {
-  const dates = getOpfDcElements(opfXml, "date");
-  for (const t of dates) {
-    const y = parseInt(t.slice(0, 4), 10);
-    if (Number.isFinite(y) && y >= 1000 && y <= 3000) return y;
-    const m = t.match(/\b(1[0-9]{3}|20[0-9]{2})\b/);
-    if (m) {
-      const y2 = parseInt(m[1]!, 10);
-      if (Number.isFinite(y2) && y2 >= 1000 && y2 <= 3000) return y2;
-    }
+/** Years strictly after this are treated as PG-style digitisation for public-domain books. */
+const GUTENBERG_PD_DIGITISATION_AFTER_YEAR = 1995;
+
+function parsePublicationYearFromString(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const iso = t.match(/^(\d{4})(?:-\d{2}-\d{2}|T|$)/);
+  if (iso) {
+    const y = parseInt(iso[1]!, 10);
+    if (Number.isFinite(y) && y >= 1000 && y <= 2100) return y;
+  }
+  const m = t.match(/\b(1\d{3}|20[0-2]\d)\b/);
+  if (m) {
+    const y = parseInt(m[1]!, 10);
+    if (Number.isFinite(y) && y >= 1000 && y <= 2100) return y;
   }
   return null;
+}
+
+/** Parse `<meta …>` tags in OPF; returns `content` when present on the `<meta>` element. */
+function getOpfMetaTagContents(opfXml: string): { property?: string; name?: string; content: string }[] {
+  const out: { property?: string; name?: string; content: string }[] = [];
+  const re = /<meta\b([^>/]*)\/?>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(opfXml)) !== null) {
+    const attrs = m[1] ?? "";
+    const pick = (n: string) => {
+      const bm = attrs.match(new RegExp(`\\b${n}\\s*=\\s*(["'])([^"']*)\\1`, "i"));
+      return bm?.[2]?.trim();
+    };
+    const content = pick("content");
+    if (!content) continue;
+    out.push({
+      property: pick("property"),
+      name: pick("name"),
+      content: content.trim(),
+    });
+  }
+  return out;
+}
+
+function collectOpfPublicationDateStrings(opfXml: string): string[] {
+  const strings: string[] = [];
+  strings.push(...getOpfDcElements(opfXml, "date"));
+  for (const mt of getOpfMetaTagContents(opfXml)) {
+    const p = mt.property ?? "";
+    const n = mt.name ?? "";
+    if (
+      p === "dcterms:created" ||
+      p === "dcterms:issued" ||
+      p === "dcterms:date" ||
+      p === "original-publication-date"
+    ) {
+      strings.push(mt.content);
+      continue;
+    }
+    if (n === "original-publication-date") {
+      strings.push(mt.content);
+    }
+  }
+  return strings;
+}
+
+/**
+ * Prefer the earliest plausible original publication year. For public-domain works,
+ * drop years strictly after {@link GUTENBERG_PD_DIGITISATION_AFTER_YEAR} (digitisation placeholders).
+ */
+export function getBestPublicationYearFromOpf(
+  opfXml: string,
+  options?: { isPublicDomain?: boolean },
+): number | null {
+  const isPd = options?.isPublicDomain === true;
+  const candidates = collectOpfPublicationDateStrings(opfXml);
+  const years = new Set<number>();
+  for (const raw of candidates) {
+    const y = parsePublicationYearFromString(raw);
+    if (y != null) years.add(y);
+  }
+  let list = [...years];
+  if (isPd) {
+    list = list.filter((y) => y <= GUTENBERG_PD_DIGITISATION_AFTER_YEAR);
+  }
+  if (list.length === 0) return null;
+  return Math.min(...list);
 }
 
 export type EpubOpfMetadata = {
   title: string;
   author: string;
   description: string | null;
-  genre: string | null;
+  genre: BookGenre | null;
   publishedYear: number | null;
 };
 
 /** Best-effort Dublin Core metadata from package OPF XML (for admin ingest). */
-export function extractEpubMetadataFromOpf(opfXml: string): EpubOpfMetadata {
+export function extractEpubMetadataFromOpf(
+  opfXml: string,
+  options?: { isPublicDomain?: boolean },
+): EpubOpfMetadata {
   const title = getOpfTitle(opfXml);
   const creators = getOpfDcElements(opfXml, "creator");
   const author = creators.join(", ");
@@ -310,8 +386,8 @@ export function extractEpubMetadataFromOpf(opfXml: string): EpubOpfMetadata {
   const description =
     descriptions.length > 0 ? descriptions.join("\n\n").slice(0, 50_000) : null;
   const subjects = getOpfDcElements(opfXml, "subject");
-  const genre = subjects.length > 0 ? subjects[0]!.slice(0, 500) : null;
-  const publishedYear = getOpfPublishedYear(opfXml);
+  const genre = null;
+  const publishedYear = getBestPublicationYearFromOpf(opfXml, options);
   return {
     title,
     author,
@@ -319,6 +395,44 @@ export function extractEpubMetadataFromOpf(opfXml: string): EpubOpfMetadata {
     genre,
     publishedYear,
   };
+}
+
+const BOOK_GENRES: BookGenre[] = [
+  "fantasy",
+  "horror",
+  "romance",
+  "adventure",
+  "mystery",
+  "science_fiction",
+  "historical_fiction",
+  "literary_fiction",
+  "thriller",
+  "childrens_fiction",
+  "classic_literature",
+  "gothic",
+  "crime",
+  "biography",
+  "short_stories",
+];
+
+async function detectBookGenreFromSubjects(subjects: string[]): Promise<BookGenre | null> {
+  if (subjects.length === 0) return null;
+  const openai = getOpenAI();
+  const prompt = `Given these book subject tags: '${subjects.join("; ")}'\nPick the single best matching genre from this list:\nfantasy, horror, romance, adventure, mystery, science_fiction,\nhistorical_fiction, literary_fiction, thriller, childrens_fiction,\nclassic_literature, gothic, crime, biography, short_stories.\nReturn ONLY the genre value, nothing else.`;
+  try {
+    const res = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 20,
+      messages: [{ role: "user", content: prompt }],
+    });
+    const raw = res.choices[0]?.message?.content?.trim().toLowerCase() ?? "";
+    if ((BOOK_GENRES as string[]).includes(raw)) {
+      return raw as BookGenre;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function filterChapterAnchorsByTitle(anchors: ChapterAnchor[], opfBookTitle: string): ChapterAnchor[] {
@@ -737,8 +851,10 @@ export async function extractEpubCover(
  */
 export async function parseEpub(
   buffer: Buffer,
-): Promise<{ chapters: { title: string; content: string }[] }> {
+): Promise<{ chapters: { title: string; content: string }[]; genre: BookGenre | null }> {
   const { zip, opfXml, opfDir } = await openEpubPackage(buffer);
+  const subjects = getOpfDcElements(opfXml, "subject");
+  const detectedGenre = await detectBookGenreFromSubjects(subjects);
   const { manifestById, spineIdrefs, spineTocIdref } = parseOpfManifestAndSpine(opfXml);
   const opfBookTitle = getOpfTitle(opfXml);
 
@@ -865,7 +981,7 @@ export async function parseEpub(
     chapters.push({ title, content: text });
   }
 
-  return { chapters };
+  return { chapters, genre: detectedGenre };
 }
 
 export function detectFileType(_buffer: Buffer, filename: string): "epub" | "txt" {
@@ -876,13 +992,12 @@ export function detectFileType(_buffer: Buffer, filename: string): "epub" | "txt
 export async function processBook(
   buffer: Buffer,
   filename: string,
-): Promise<{ title: string; content: string }[]> {
+): Promise<{ chapters: { title: string; content: string }[]; genre: BookGenre | null }> {
   const type = detectFileType(buffer, filename);
   if (type === "epub") {
-    const { chapters } = await parseEpub(buffer);
-    return chapters;
+    return parseEpub(buffer);
   }
-  return detectChapters(buffer.toString("utf-8"));
+  return { chapters: detectChapters(buffer.toString("utf-8")), genre: null };
 }
 
 const CHAPTER_HEADER =

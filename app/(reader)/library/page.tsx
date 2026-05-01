@@ -22,7 +22,11 @@ export default async function LibraryPage() {
   }
 
   const userBooks = await prisma.userBook.findMany({
-    where: { userId: dbUser.id, isActive: true },
+    where: {
+      userId: dbUser.id,
+      isActive: true,
+      book: { deletedAt: null },
+    },
     include: { book: true },
     orderBy: { addedAt: "desc" },
   });
@@ -46,6 +50,7 @@ export default async function LibraryPage() {
     coverImageUrl: ub.book.coverImageUrl,
     readerAction: (booksWithProgress.has(ub.book.id) ? "continue" : "start") as
       "continue" | "start",
+    removedFromCatalogue: ub.book.status === "unlisted",
   }));
 
   return (

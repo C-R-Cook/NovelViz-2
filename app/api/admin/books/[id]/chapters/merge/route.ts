@@ -16,8 +16,8 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const { id: bookId } = await context.params;
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
+  const book = await prisma.book.findFirst({
+    where: { id: bookId, deletedAt: null },
     select: { id: true, ownerId: true },
   });
   if (!book) {

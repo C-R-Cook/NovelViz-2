@@ -27,6 +27,9 @@ const CHUNK_TX = { maxWait: 10_000, timeout: 300_000 } as const;
 /** Rows per INSERT — fewer round trips than one INSERT per chunk. */
 const CHUNK_INSERT_BATCH = 40;
 
+/** Align with ingestion OPF heuristic: PD books with year after this are likely digitisation, not original. */
+const PD_DIGITISATION_YEAR_FLOOR = 1995;
+
 function sniffImageMimeType(buf: Buffer): string {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
     return "image/jpeg";
@@ -60,10 +63,10 @@ type ChunkRow = {
   vector: string;
 };
 
-/** Ingest allowed before catalogue publish; `ready_for_review` can re-upload before publishing. */
+/** Ingest allowed before catalogue publish; `pending_review` can re-upload before publishing. */
 const INGEST_ALLOWED: BookStatus[] = [
   "draft",
-  "ready_for_review",
+  "pending_review",
   "published",
   "unlisted",
 ];
@@ -76,7 +79,7 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { id: bookId } = await context.params;
 
-  const book = await prisma.book.findUnique({ where: { id: bookId } });
+  const book = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
@@ -88,7 +91,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "Ingest is only allowed when status is draft, ready_for_review, published, or unlisted",
+          "Ingest is only allowed when status is draft, pending_review, published, or unlisted",
       },
       { status: 400 },
     );
@@ -128,7 +131,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (filename.toLowerCase().endsWith(".epub") && applyEpubMetadata) {
       try {
         const { opfXml } = await openEpubPackage(buffer);
-        const m = extractEpubMetadataFromOpf(opfXml);
+        const m = extractEpubMetadataFromOpf(opfXml, { isPublicDomain: book.isPublicDomain });
         const data: Prisma.BookUpdateInput = {};
         if (m.title) data.title = m.title.slice(0, 500);
         if (m.author) data.author = m.author.slice(0, 500);
@@ -136,7 +139,15 @@ export async function POST(request: Request, context: RouteContext) {
           data.description = m.description;
         }
         if (m.genre) data.genre = m.genre;
-        if (m.publishedYear != null) data.publishedYear = m.publishedYear;
+        if (m.publishedYear != null) {
+          const current = book.publishedYear;
+          const shouldOverwrite =
+            current === null ||
+            (book.isPublicDomain && current > PD_DIGITISATION_YEAR_FLOOR);
+          if (shouldOverwrite) {
+            data.publishedYear = m.publishedYear;
+          }
+        }
         if (Object.keys(data).length > 0) {
           await prisma.book.update({ where: { id: bookId }, data });
         }
@@ -145,7 +156,8 @@ export async function POST(request: Request, context: RouteContext) {
       }
     }
 
-    const chaptersIn = await processBook(buffer, filename);
+    const processed = await processBook(buffer, filename);
+    const chaptersIn = processed.chapters;
 
     if (chaptersIn.length === 0) {
       throw new Error(
@@ -250,13 +262,13 @@ export async function POST(request: Request, context: RouteContext) {
 
         await tx.book.update({
           where: { id: bookId },
-          data: { status: "ready_for_review" },
+          data: { status: "pending_review", genre: processed.genre },
         });
       },
       CHUNK_TX,
     );
 
-    const updated = await prisma.book.findUnique({ where: { id: bookId } });
+    const updated = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
     return NextResponse.json({
       ok: true,
       book: updated,

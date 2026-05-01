@@ -29,7 +29,7 @@ export async function POST(_request: Request, context: RouteContext) {
 
   const { id: bookId } = await context.params;
 
-  const book = await prisma.book.findUnique({ where: { id: bookId } });
+  const book = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
@@ -113,13 +113,13 @@ export async function POST(_request: Request, context: RouteContext) {
 
         await tx.book.update({
           where: { id: bookId },
-          data: { status: "ready_for_review" },
+          data: { status: "pending_review" },
         });
       },
       CHUNK_TX,
     );
 
-    const updated = await prisma.book.findUnique({ where: { id: bookId } });
+    const updated = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
     return NextResponse.json({
       ok: true,
       book: updated,

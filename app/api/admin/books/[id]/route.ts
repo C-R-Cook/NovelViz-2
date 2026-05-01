@@ -1,26 +1,31 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@db";
+import { BookGenre, BookStatus, UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
+const ALL_GENRES: BookGenre[] = [
+  "fantasy",
+  "horror",
+  "romance",
+  "adventure",
+  "mystery",
+  "science_fiction",
+  "historical_fiction",
+  "literary_fiction",
+  "thriller",
+  "childrens_fiction",
+  "classic_literature",
+  "gothic",
+  "crime",
+  "biography",
+  "short_stories",
+];
 
 export async function PATCH(request: Request, context: RouteContext) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { id } = await context.params;
-  const existingBook = await prisma.book.findUnique({
-    where: { id },
-    select: { id: true, ownerId: true },
-  });
-  if (!existingBook) {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 });
-  }
-  if (user.role !== UserRole.admin && existingBook.ownerId !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   let body: unknown;
@@ -35,13 +40,28 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const b = body as Record<string, unknown>;
+  const { id } = await context.params;
+  const wantsRestore = b.restoreDeleted === true;
+  const existingBook = await prisma.book.findFirst({
+    where: wantsRestore ? { id, deletedAt: { not: null } } : { id, deletedAt: null },
+    select: { id: true, ownerId: true },
+  });
+  if (!existingBook) {
+    return NextResponse.json({ error: "Book not found" }, { status: 404 });
+  }
+  if (user.role !== UserRole.admin && existingBook.ownerId !== user.id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const data: {
     title?: string;
     author?: string;
-    genre?: string | null;
+    genre?: BookGenre | null;
     publishedYear?: number | null;
     description?: string | null;
     ownerId?: string | null;
+    deletedAt?: null;
+    status?: BookStatus;
   } = {};
 
   if ("title" in b) {
@@ -57,10 +77,13 @@ export async function PATCH(request: Request, context: RouteContext) {
     data.author = b.author;
   }
   if ("genre" in b) {
-    if (b.genre !== null && typeof b.genre !== "string") {
-      return NextResponse.json({ error: "genre must be a string or null" }, { status: 400 });
+    if (b.genre === null || b.genre === "") {
+      data.genre = null;
+    } else if (typeof b.genre === "string" && (ALL_GENRES as string[]).includes(b.genre)) {
+      data.genre = b.genre as BookGenre;
+    } else {
+      return NextResponse.json({ error: "genre must be a BookGenre or null" }, { status: 400 });
     }
-    data.genre = b.genre === null || b.genre === "" ? null : b.genre;
   }
   if ("publishedYear" in b) {
     if (b.publishedYear === null || b.publishedYear === "") {
@@ -100,12 +123,19 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     data.ownerId = b.ownerId === null || b.ownerId === "" ? null : b.ownerId;
   }
+  if ("restoreDeleted" in b) {
+    if (b.restoreDeleted !== true) {
+      return NextResponse.json({ error: "restoreDeleted must be true" }, { status: 400 });
+    }
+    data.deletedAt = null;
+    data.status = BookStatus.unlisted;
+  }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, ownerId",
+          "Provide at least one of: title, author, genre, publishedYear, description, ownerId, restoreDeleted",
       },
       { status: 400 },
     );
@@ -125,17 +155,27 @@ export async function DELETE(_request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const existingBook = await prisma.book.findUnique({
-    where: { id },
+  const existingBook = await prisma.book.findFirst({
+    where: { id, deletedAt: null },
     select: { id: true, ownerId: true },
   });
   if (!existingBook) {
-    return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    const alreadyDeleted = await prisma.book.findFirst({
+      where: { id, deletedAt: { not: null } },
+      select: { id: true, ownerId: true },
+    });
+    if (!alreadyDeleted) {
+      return NextResponse.json({ error: "Book not found" }, { status: 404 });
+    }
+    if (user.role !== UserRole.admin && alreadyDeleted.ownerId !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json({ ok: true });
   }
   if (user.role !== UserRole.admin && existingBook.ownerId !== user.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  await prisma.book.delete({ where: { id } });
+  await prisma.book.update({ where: { id }, data: { deletedAt: new Date() } });
   return NextResponse.json({ ok: true });
 }

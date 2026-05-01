@@ -141,9 +141,10 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
         );
         return;
       }
+      const nextLikeCount = data.likeCount;
 
       setImageList((prev) =>
-        prev.map((image) => (image.id === imageId ? { ...image, likeCount: data.likeCount } : image)),
+        prev.map((image) => (image.id === imageId ? { ...image, likeCount: nextLikeCount } : image)),
       );
     } catch {
       setImageList((prev) =>

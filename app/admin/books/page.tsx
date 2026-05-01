@@ -1,6 +1,10 @@
-import { AdminBooksClient, type AdminBookRow } from "./admin-books-client";
+import {
+  ADMIN_BOOKS_PAGE_SIZE,
+  queryAdminBooksPage,
+  type AdminBooksFilterKey,
+} from "@/lib/admin-books-list";
+import { AdminBooksClient } from "./admin-books-client";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export default async function AdminBooksPage() {
@@ -9,29 +13,18 @@ export default async function AdminBooksPage() {
     redirect("/sign-in");
   }
 
-  const rows = await prisma.book.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      owner: { select: { id: true, name: true, email: true } },
-      _count: { select: { chapters: true } },
-    },
+  const initialFilter: AdminBooksFilterKey = "pending_review";
+  const { rows, hasMore } = await queryAdminBooksPage({
+    filter: initialFilter,
+    skip: 0,
   });
 
-  const createdAtFormatter = new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-
-  const books: AdminBookRow[] = rows.map((b) => ({
-    id: b.id,
-    title: b.title,
-    author: b.author,
-    coverImageUrl: b.coverImageUrl,
-    status: b.status,
-    ownerLabel: b.owner ? (b.owner.name ?? b.owner.email) : null,
-    createdAtLabel: createdAtFormatter.format(b.createdAt),
-    chapterCount: b._count.chapters,
-  }));
-
-  return <AdminBooksClient books={books} />;
+  return (
+    <AdminBooksClient
+      initialBooks={rows}
+      initialFilter={initialFilter}
+      initialHasMore={hasMore}
+      pageSize={ADMIN_BOOKS_PAGE_SIZE}
+    />
+  );
 }

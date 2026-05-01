@@ -18,8 +18,8 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
   }
 
   const { id } = await params;
-  const book = await prisma.book.findUnique({
-    where: { id },
+  const book = await prisma.book.findFirst({
+    where: { id, deletedAt: null },
     include: { _count: { select: { chapters: true } } },
   });
   if (!book) {
@@ -39,6 +39,7 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
     coverImageUrl: book.coverImageUrl,
     status: book.status,
     rejectionReason: book.rejectionReason,
+    listingPreferenceAfterReview: book.listingPreferenceAfterReview,
     chapterCount: book._count.chapters,
   };
 

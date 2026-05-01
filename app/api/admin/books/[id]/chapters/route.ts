@@ -13,7 +13,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const { id: bookId } = await context.params;
 
-  const book = await prisma.book.findUnique({ where: { id: bookId } });
+  const book = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }

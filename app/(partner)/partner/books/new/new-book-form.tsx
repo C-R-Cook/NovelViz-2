@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { GENRE_OPTIONS } from "@/lib/genre";
+import type { BookGenre } from "@db";
 
 export function NewPartnerBookForm() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [genre, setGenre] = useState("");
+  const [genre, setGenre] = useState<BookGenre | "">("");
   const [publishedYear, setPublishedYear] = useState("");
   const [description, setDescription] = useState("");
   const [ingestFile, setIngestFile] = useState<File | null>(null);
@@ -42,14 +44,20 @@ export function NewPartnerBookForm() {
       if (!res.ok || !data.metadata) {
         throw new Error(data.error || res.statusText);
       }
+      const metadata = data.metadata;
 
-      if (data.metadata.title) setTitle(data.metadata.title);
-      if (data.metadata.author) setAuthor(data.metadata.author);
-      if (data.metadata.genre) setGenre(data.metadata.genre);
-      if (typeof data.metadata.publishedYear === "number") {
-        setPublishedYear(String(data.metadata.publishedYear));
+      if (metadata.title) setTitle(metadata.title);
+      if (metadata.author) setAuthor(metadata.author);
+      if (metadata.genre) {
+        const matched = GENRE_OPTIONS.find((opt) => opt.value === metadata.genre);
+        if (matched) {
+          setGenre(matched.value as BookGenre);
+        }
       }
-      if (data.metadata.description) setDescription(data.metadata.description);
+      if (typeof metadata.publishedYear === "number") {
+        setPublishedYear(String(metadata.publishedYear));
+      }
+      if (metadata.description) setDescription(metadata.description);
     } catch (err) {
       setMetadataErr(
         err instanceof Error ? err.message : "Could not extract EPUB metadata",
@@ -88,7 +96,7 @@ export function NewPartnerBookForm() {
         body: JSON.stringify({
           title: title.trim(),
           author: author.trim(),
-          genre: genre.trim() === "" ? null : genre.trim(),
+          genre: genre === "" ? null : genre,
           publishedYear: py,
           description: description.trim() === "" ? null : description.trim(),
         }),
@@ -114,6 +122,18 @@ export function NewPartnerBookForm() {
         };
         if (!ingestRes.ok) {
           throw new Error(ingestData.error || ingestRes.statusText);
+        }
+
+        const draftRes = await fetch(`/api/partner/books/${data.book.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "draft" }),
+        });
+        const draftData = (await draftRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        if (!draftRes.ok) {
+          throw new Error(draftData.error || draftRes.statusText);
         }
       }
 
@@ -153,11 +173,18 @@ export function NewPartnerBookForm() {
           <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
             Genre
           </span>
-          <input
+          <select
             value={genre}
-            onChange={(e) => setGenre(e.target.value)}
+            onChange={(e) => setGenre(e.target.value as BookGenre | "")}
             className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
-          />
+          >
+            <option value="">Select genre</option>
+            {GENRE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="block space-y-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">

@@ -1,5 +1,6 @@
 import { BookLibraryActions } from "../book-library-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { formatGenre } from "@/lib/genre";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -13,7 +14,7 @@ export default async function BookDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   const book = await prisma.book.findFirst({
-    where: { id, status: "published" },
+    where: { id, status: "published", deletedAt: null },
     include: {
       _count: { select: { chapters: true } },
     },
@@ -81,7 +82,7 @@ export default async function BookDetailPage({ params }: PageProps) {
         <div className="min-w-0 flex-1 space-y-2.5 sm:space-y-3">
           {book.genre ? (
             <span className="inline-flex rounded border border-amber-700/35 bg-amber-100/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-900/90 dark:border-amber-900/40 dark:bg-amber-950/35 dark:text-amber-200/85">
-              {book.genre}
+              {formatGenre(book.genre)}
             </span>
           ) : null}
 

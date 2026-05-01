@@ -20,7 +20,30 @@ enum BookStatus {
   published
   unlisted
   processing
-  ready_for_review
+}
+
+/// Partner-visible choice stored when requesting review — admin aligns Publish vs Unlist with this hint.
+enum ListingPreferenceAfterReview {
+  published
+  unlisted
+}
+
+enum BookGenre {
+  fantasy
+  horror
+  romance
+  adventure
+  mystery
+  science_fiction
+  historical_fiction
+  literary_fiction
+  thriller
+  childrens_fiction
+  classic_literature
+  gothic
+  crime
+  biography
+  short_stories
 }
 
 enum AgeRange {
@@ -38,18 +61,20 @@ enum UserRole {
 }
 
 model Book {
-  id                 String     @id @default(cuid())
-  title              String
-  author             String
-  ownerId            String?
-  coverImageUrl      String?
-  description        String?
-  genre              String?
-  publishedYear      Int?
-  isPublicDomain     Boolean    @default(false)
-  status             BookStatus @default(draft)
-  rejectionReason    String?
-  scheduledPublishAt DateTime?
+  id                           String     @id @default(cuid())
+  title                        String
+  author                       String
+  ownerId                      String?
+  coverImageUrl                String?
+  description                  String?
+  genre                        BookGenre?
+  publishedYear                Int?
+  isPublicDomain               Boolean    @default(false)
+  status                       BookStatus @default(draft)
+  rejectionReason              String?
+  /// Set when submitting for admin review; cleared when review is withdrawn or resolved.
+  listingPreferenceAfterReview ListingPreferenceAfterReview?
+  scheduledPublishAt           DateTime?
 
   chapters        Chapter[]
   chunks          Chunk[]
@@ -61,6 +86,7 @@ model Book {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  deletedAt DateTime?
 
   @@index([status])
 }

@@ -13,8 +13,8 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
   }
 
   const { id } = await params;
-  const row = await prisma.book.findUnique({
-    where: { id },
+  const row = await prisma.book.findFirst({
+    where: { id, deletedAt: null },
     include: {
       owner: { select: { id: true, name: true, email: true } },
       _count: { select: { chapters: true } },
@@ -34,8 +34,14 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     description: row.description,
     coverImageUrl: row.coverImageUrl,
     status: row.status,
+    rejectionReason: row.rejectionReason ?? null,
+    listingPreferenceAfterReview: row.listingPreferenceAfterReview ?? null,
     ownerLabel: row.owner ? (row.owner.name ?? row.owner.email) : null,
     chapterCount: row._count.chapters,
+    createdAtLabel: new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(row.createdAt),
   };
 
   return (

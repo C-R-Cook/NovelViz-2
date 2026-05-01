@@ -1,6 +1,7 @@
 "use client";
 
 import { BookCardGrid } from "@/components/book-card-grid";
+import { formatGenre } from "@/lib/genre";
 import type { CatalogueBook } from "@/components/book-card-grid";
 import { useMemo, useState } from "react";
 
@@ -16,7 +17,7 @@ export function BookCatalogue({ books }: Props) {
     for (const b of books) {
       if (b.genre) set.add(b.genre);
     }
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
+    return Array.from(set).sort((a, b) => formatGenre(a).localeCompare(formatGenre(b)));
   }, [books]);
 
   const [genre, setGenre] = useState<string>("all");
@@ -66,7 +67,7 @@ export function BookCatalogue({ books }: Props) {
             <option value="all">All genres</option>
             {genres.map((g) => (
               <option key={g} value={g}>
-                {g}
+                {formatGenre(g)}
               </option>
             ))}
           </select>

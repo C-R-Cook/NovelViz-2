@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { PrismaNeon } from "@prisma/adapter-neon";
-import { BookStatus, PrismaClient, UserRole } from "@db";
+import { BookGenre, BookStatus, PrismaClient, UserRole } from "@db";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -17,7 +17,7 @@ const books = [
     author: "Bram Stoker",
     description:
       "A Gothic horror classic: Jonathan Harker’s journey to Transylvania and Count Dracula’s arrival in England.",
-    genre: "Gothic horror",
+    genre: BookGenre.gothic,
     publishedYear: 1897,
     coverImageUrl: "https://picsum.photos/400/600?random=1",
   },
@@ -26,7 +26,7 @@ const books = [
     author: "Robert Louis Stevenson",
     description:
       "Young Jim Hawkins finds a treasure map and sails into mutiny, pirates, and adventure on the Spanish Main.",
-    genre: "Adventure",
+    genre: BookGenre.adventure,
     publishedYear: 1883,
     coverImageUrl: "https://picsum.photos/400/600?random=2",
   },
@@ -35,7 +35,7 @@ const books = [
     author: "Jane Austen",
     description:
       "Elizabeth Bennet and Mr. Darcy navigate manners, misunderstanding, and marriage in Regency England.",
-    genre: "Romance",
+    genre: BookGenre.romance,
     publishedYear: 1813,
     coverImageUrl: "https://picsum.photos/400/600?random=3",
   },
@@ -44,7 +44,7 @@ const books = [
     author: "H. G. Wells",
     description:
       "An inventor travels far into the future and witnesses the fate of humanity in this foundational science fiction tale.",
-    genre: "Science fiction",
+    genre: BookGenre.science_fiction,
     publishedYear: 1895,
     coverImageUrl: "https://picsum.photos/400/600?random=4",
   },
@@ -53,7 +53,7 @@ const books = [
     author: "Arthur Conan Doyle",
     description:
       "Twelve stories of deduction and intrigue featuring the world’s most famous consulting detective.",
-    genre: "Mystery",
+    genre: BookGenre.mystery,
     publishedYear: 1892,
     coverImageUrl: "https://picsum.photos/400/600?random=5",
   },
@@ -62,7 +62,7 @@ const books = [
     author: "Mary Shelley",
     description:
       "Victor Frankenstein’s experiment and its terrible consequences—a landmark of Gothic and science fiction.",
-    genre: "Gothic",
+    genre: BookGenre.gothic,
     publishedYear: 1818,
     coverImageUrl: "https://picsum.photos/400/600?random=6",
   },
@@ -71,7 +71,7 @@ const books = [
     author: "Jules Verne",
     description:
       "Phileas Fogg wagers he can circle the globe in eighty days—rail, steamship, and comic misadventure ensue.",
-    genre: "Adventure",
+    genre: BookGenre.adventure,
     publishedYear: 1873,
     coverImageUrl: "https://picsum.photos/400/600?random=7",
   },
@@ -80,7 +80,7 @@ const books = [
     author: "Charlotte Brontë",
     description:
       "An orphaned governess finds independence, love, and secrets at Thornfield Hall.",
-    genre: "Gothic romance",
+    genre: BookGenre.historical_fiction,
     publishedYear: 1847,
     coverImageUrl: "https://picsum.photos/400/600?random=8",
   },
@@ -205,7 +205,7 @@ async function seedDevRoleUsers() {
 /** Dracula chapters + library + progress for spoiler testing (early vs late readers). */
 async function seedDraculaChaptersAndReaderProgress() {
   const dracula = await prisma.book.findFirst({
-    where: { title: "Dracula" },
+    where: { title: "Dracula", deletedAt: null },
     select: { id: true },
   });
   if (!dracula) return;
@@ -282,7 +282,7 @@ async function seed() {
 
   for (const book of books) {
     const existing = await prisma.book.findFirst({
-      where: { title: book.title },
+      where: { title: book.title, deletedAt: null },
     });
     const safeUpdateFields = {
       status: BookStatus.published,
@@ -312,6 +312,22 @@ async function seed() {
     where: { title: { in: ["Dracula", "Frankenstein"] } },
     data: { ownerId: "dev_user_partner" },
   });
+
+  await prisma.book.updateMany({
+    where: { ownerId: null, deletedAt: null },
+    data: { ownerId: "dev_user_admin" },
+  });
+
+  const duplicateJaneEyre = await prisma.book.findFirst({
+    where: { id: "cmokwxpqa00052ws7ymp7pi0m", deletedAt: null },
+    select: { id: true },
+  });
+  if (duplicateJaneEyre) {
+    await prisma.book.update({
+      where: { id: duplicateJaneEyre.id },
+      data: { deletedAt: new Date() },
+    });
+  }
 
   await seedDraculaChaptersAndReaderProgress();
 }

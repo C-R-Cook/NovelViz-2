@@ -463,7 +463,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
               </button>
               <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-500">
                 Re-chunks all chapters, rebuilds embeddings, sets status to
-                ready_for_review.
+                pending_review.
               </p>
               {finaliseErr ? (
                 <p className="mt-2 text-sm text-red-600 dark:text-red-400">{finaliseErr}</p>

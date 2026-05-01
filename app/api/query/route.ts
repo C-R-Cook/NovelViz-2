@@ -102,8 +102,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const book = await prisma.book.findUnique({
-    where: { id: bookId },
+  const book = await prisma.book.findFirst({
+    where: { id: bookId, deletedAt: null },
     select: { title: true, author: true },
   });
   if (!book) {

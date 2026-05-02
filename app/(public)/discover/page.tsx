@@ -1,7 +1,11 @@
 import { BookCatalogue } from "./book-catalogue";
 import { prisma } from "@/lib/prisma";
 
-export default async function BooksCataloguePage() {
+export const metadata = {
+  title: "Discover | NovelViz",
+};
+
+export default async function DiscoverPage() {
   const books = await prisma.book.findMany({
     where: { status: "published", deletedAt: null },
     orderBy: { title: "asc" },

@@ -74,10 +74,10 @@ export default async function LibraryPage() {
             Browse the catalogue and add titles you own in the real world.
           </p>
           <Link
-            href="/books"
+            href="/discover"
             className="mt-6 inline-flex rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:border-amber-600/70 hover:bg-amber-100 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:border-amber-600/60 dark:hover:bg-amber-950/50"
           >
-            Browse books
+            Discover books
           </Link>
         </div>
       ) : (

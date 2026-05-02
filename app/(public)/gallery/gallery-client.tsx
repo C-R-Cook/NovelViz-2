@@ -281,10 +281,10 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
         <p className="mt-6 rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
           You haven&apos;t added any books to your library yet.{" "}
           <Link
-            href="/books"
+            href="/discover"
             className="font-medium text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:decoration-amber-400/50 dark:hover:text-amber-200"
           >
-            Browse books
+            Discover books
           </Link>
         </p>
       ) : visibleImages.length === 0 ? (
@@ -350,7 +350,7 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                 <div className="space-y-2 p-3">
                   <p className="text-xs text-zinc-500 dark:text-zinc-500">
                     <Link
-                      href={`/books/${image.bookId}`}
+                      href={`/discover/${image.bookId}`}
                       className="transition-colors hover:text-amber-900 hover:underline decoration-amber-800/35 underline-offset-2 dark:hover:text-amber-200/90 dark:decoration-amber-400/40"
                     >
                       {image.bookTitle} · {image.bookAuthor}

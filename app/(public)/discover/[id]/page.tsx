@@ -1,6 +1,8 @@
 import { BookLibraryActions } from "../book-library-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { getPublishedDiscoverBookById } from "@/lib/discover-published-book";
 import { formatGenre } from "@/lib/genre";
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,15 +12,41 @@ type PageProps = {
   params: Promise<{ id: string }>;
 };
 
-export default async function BookDetailPage({ params }: PageProps) {
+function truncateForMeta(text: string | null, max = 155): string | undefined {
+  if (!text?.trim()) return undefined;
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= max) return normalized;
+  return `${normalized.slice(0, max - 1).trimEnd()}…`;
+}
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const book = await getPublishedDiscoverBookById(id);
+  if (!book) {
+    notFound();
+  }
+
+  const title = `${book.title} · ${book.author} | NovelViz`;
+  const description = truncateForMeta(book.description);
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: `${book.title} · ${book.author}`,
+      description,
+      type: "article",
+      ...(book.coverImageUrl
+        ? { images: [{ url: book.coverImageUrl, alt: book.title }] }
+        : {}),
+    },
+  };
+}
+
+export default async function DiscoverBookDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  const book = await prisma.book.findFirst({
-    where: { id, status: "published", deletedAt: null },
-    include: {
-      _count: { select: { chapters: true } },
-    },
-  });
+  const book = await getPublishedDiscoverBookById(id);
 
   if (!book) {
     notFound();
@@ -55,10 +83,10 @@ export default async function BookDetailPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-9">
       <Link
-        href="/books"
+        href="/discover"
         className="inline-flex text-xs font-medium text-zinc-600 transition hover:text-amber-800 sm:text-sm dark:text-zinc-500 dark:hover:text-amber-200/90"
       >
-        ← Back to catalogue
+        ← Back to discover
       </Link>
 
       <div className="mt-5 flex flex-row items-start gap-3.5 rounded-lg border border-zinc-200/95 bg-white p-2.5 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/90 dark:bg-zinc-900/50 dark:shadow-black/20 sm:mt-6 sm:gap-5 sm:p-3">

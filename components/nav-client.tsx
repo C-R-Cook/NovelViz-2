@@ -41,11 +41,11 @@ export function NavChrome({ initialUserId, role, isLoggedIn }: NavChromeProps) {
   const links = (
     <>
       <Link
-        href="/books"
-        className={navLinkClass(isActive(pathname, "/books"))}
+        href="/discover"
+        className={navLinkClass(isActive(pathname, "/discover"))}
         onClick={() => setMenuOpen(false)}
       >
-        Books
+        Discover
       </Link>
       <Link
         href="/gallery"

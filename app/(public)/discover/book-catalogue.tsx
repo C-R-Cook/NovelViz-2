@@ -44,7 +44,7 @@ export function BookCatalogue({ books }: Props) {
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-serif text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
-            Catalogue
+            Discover
           </h1>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-zinc-600 dark:text-zinc-500 sm:text-sm">
             Public-domain works ready for your library. Filter by genre or browse

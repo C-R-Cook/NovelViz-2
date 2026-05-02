@@ -36,7 +36,7 @@ export function BookCardGrid({ books, layout = "grid" }: Props) {
       }
     >
       {books.map((book) => {
-        const primaryHref = book.readerAction ? `/reader/${book.id}` : `/books/${book.id}`;
+        const primaryHref = book.readerAction ? `/reader/${book.id}` : `/discover/${book.id}`;
         const shelvedUnavailable = Boolean(book.removedFromCatalogue);
         const hoverCardClass =
           shelvedUnavailable

@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /** Large multipart uploads (e.g. EPUB ingest). See `experimental.serverActions.bodySizeLimit` in Next.js docs. */
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "256mb",
+    },
+  },
   async redirects() {
     return [
       { source: "/books", destination: "/discover", permanent: true },

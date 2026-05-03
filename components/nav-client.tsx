@@ -3,14 +3,12 @@
 import { useClerk } from "@clerk/nextjs";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
-import type { UserRole } from "@db";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 export type NavChromeProps = {
   initialUserId: string | null;
-  role: UserRole | null;
   isLoggedIn: boolean;
   userInitials: string;
   userName: string | null;
@@ -36,14 +34,12 @@ function NavUserMenu({
   initials,
   displayName,
   email,
-  role,
   isProduction,
   onNavigate,
 }: {
   initials: string;
   displayName: string | null;
   email: string;
-  role: UserRole | null;
   isProduction: boolean;
   onNavigate: () => void;
 }) {
@@ -62,8 +58,6 @@ function NavUserMenu({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open]);
 
-  const showPartner = role === "partner" || role === "admin";
-  const showAdmin = role === "admin";
   const headerLabel = displayName?.trim() || email;
 
   return (
@@ -101,7 +95,7 @@ function NavUserMenu({
             My Account
           </Link>
           <Link
-            href="/library"
+            href="/dashboard"
             className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
             role="menuitem"
             onClick={() => {
@@ -109,37 +103,8 @@ function NavUserMenu({
               onNavigate();
             }}
           >
-            My Library
+            Dashboard
           </Link>
-          {showPartner || showAdmin ? (
-            <div className="my-1 border-t border-zinc-800" role="separator" />
-          ) : null}
-          {showPartner ? (
-            <Link
-              href="/partner/dashboard"
-              className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onNavigate();
-              }}
-            >
-              Partner Dashboard
-            </Link>
-          ) : null}
-          {showAdmin ? (
-            <Link
-              href="/admin/books"
-              className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onNavigate();
-              }}
-            >
-              Admin
-            </Link>
-          ) : null}
           <div className="my-1 border-t border-zinc-800" role="separator" />
           {isProduction ? (
             <button
@@ -169,7 +134,6 @@ function NavUserMenu({
 
 export function NavChrome({
   initialUserId,
-  role,
   isLoggedIn,
   userInitials,
   userName,
@@ -241,7 +205,6 @@ export function NavChrome({
               initials={userInitials}
               displayName={userName}
               email={userEmail}
-              role={role}
               isProduction={isProduction}
               onNavigate={() => setMenuOpen(false)}
             />

@@ -8,10 +8,7 @@ const nextConfig: NextConfig = {
     },
   },
   async redirects() {
-    return [
-      { source: "/books", destination: "/discover", permanent: true },
-      { source: "/books/:id", destination: "/discover/:id", permanent: true },
-    ];
+    return [{ source: "/books/:id", destination: "/discover/:id", permanent: true }];
   },
   images: {
     remotePatterns: [
@@ -28,6 +25,11 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "v3.fal.media",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "v3b.fal.media",
         pathname: "/**",
       },
       {

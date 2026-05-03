@@ -1,9 +1,9 @@
 import { DiscoverCatalogueRoot } from "../discover-catalogue-root";
 
 export const metadata = {
-  title: "Discover | NovelViz",
+  title: "Books | NovelViz",
 };
 
-export default function DiscoverPage() {
+export default function BooksPage() {
   return <DiscoverCatalogueRoot />;
 }

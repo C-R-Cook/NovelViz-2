@@ -285,7 +285,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
       if (!res.ok) {
         throw new Error(data.error || res.statusText);
       }
-      router.push("/partner/dashboard");
+      router.push("/dashboard");
       router.refresh();
     } catch (err) {
       setDeleteErr(err instanceof Error ? err.message : "Delete failed");

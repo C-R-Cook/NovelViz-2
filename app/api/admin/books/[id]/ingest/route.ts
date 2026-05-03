@@ -12,12 +12,15 @@ import { prisma } from "@/lib/prisma";
 import type { BookStatus } from "@db";
 import { Prisma } from "@db";
 import { UserRole } from "@db";
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 /** Allow long ingest on Vercel / similar (seconds). Align with transaction timeouts below. */
 export const maxDuration = 300;
+
+/** Large EPUB uploads — avoid static caching of this route. */
+export const dynamic = "force-dynamic";
 
 /** Prisma interactive transactions default to 5s — chunk inserts often exceed that. */
 const CHAPTER_TX = { maxWait: 10_000, timeout: 120_000 } as const;
@@ -71,7 +74,7 @@ const INGEST_ALLOWED: BookStatus[] = [
   "unlisted",
 ];
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(request: NextRequest, context: RouteContext) {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -118,7 +121,8 @@ export async function POST(request: Request, context: RouteContext) {
     applyEpubMetadata = formData.get("applyEpubMetadata") === "true";
     buffer = Buffer.from(await file.arrayBuffer());
     filename = file.name;
-  } catch {
+  } catch (error) {
+    console.error("[ingest] Failed to parse multipart body:", error);
     return NextResponse.json({ error: "Invalid multipart body" }, { status: 400 });
   }
 

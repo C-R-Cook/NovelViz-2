@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { PublicFooter } from "@/components/public-footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,7 +31,10 @@ export default function RootLayout({
         <head>
           <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         </head>
-        <body>{children}</body>
+        <body className="flex min-h-screen flex-col">
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+          <PublicFooter />
+        </body>
       </html>
     </ClerkProvider>
   );

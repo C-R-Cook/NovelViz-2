@@ -1,16 +1,21 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import type { UserRole } from "@db";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type NavChromeProps = {
   initialUserId: string | null;
   role: UserRole | null;
   isLoggedIn: boolean;
+  userInitials: string;
+  userName: string | null;
+  userEmail: string;
+  isProduction: boolean;
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -27,16 +32,156 @@ function navLinkClass(active: boolean): string {
   return `${base} text-zinc-400 hover:text-zinc-100`;
 }
 
-export function NavChrome({ initialUserId, role, isLoggedIn }: NavChromeProps) {
+function NavUserMenu({
+  initials,
+  displayName,
+  email,
+  role,
+  isProduction,
+  onNavigate,
+}: {
+  initials: string;
+  displayName: string | null;
+  email: string;
+  role: UserRole | null;
+  isProduction: boolean;
+  onNavigate: () => void;
+}) {
+  const { signOut } = useClerk();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocMouseDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, [open]);
+
+  const showPartner = role === "partner" || role === "admin";
+  const showAdmin = role === "admin";
+  const headerLabel = displayName?.trim() || email;
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-semibold text-zinc-950 shadow-md ring-2 ring-zinc-800/80 transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 dark:bg-amber-500 dark:text-zinc-950 dark:ring-zinc-700/80 dark:hover:bg-amber-400"
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label="Account menu"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {initials.slice(0, 2)}
+      </button>
+      {open ? (
+        <div
+          className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-xl ring-1 ring-black/20 dark:bg-zinc-950"
+          role="menu"
+        >
+          <div className="border-b border-zinc-800 px-3 py-2">
+            <p className="truncate text-sm font-medium text-zinc-100">{headerLabel}</p>
+            {displayName?.trim() ? (
+              <p className="truncate text-xs text-zinc-500">{email}</p>
+            ) : null}
+          </div>
+          <Link
+            href="/account"
+            className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onNavigate();
+            }}
+          >
+            My Account
+          </Link>
+          <Link
+            href="/library"
+            className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onNavigate();
+            }}
+          >
+            My Library
+          </Link>
+          {showPartner || showAdmin ? (
+            <div className="my-1 border-t border-zinc-800" role="separator" />
+          ) : null}
+          {showPartner ? (
+            <Link
+              href="/partner/dashboard"
+              className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              Partner Dashboard
+            </Link>
+          ) : null}
+          {showAdmin ? (
+            <Link
+              href="/admin/books"
+              className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              Admin
+            </Link>
+          ) : null}
+          <div className="my-1 border-t border-zinc-800" role="separator" />
+          {isProduction ? (
+            <button
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800/80"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                void signOut({ redirectUrl: "/" });
+              }}
+            >
+              Sign Out
+            </button>
+          ) : (
+            <p className="px-3 py-2 text-xs leading-relaxed text-zinc-500">
+              Dev user: <span className="text-zinc-400">{headerLabel}</span>
+              <span className="mt-1 block text-[11px] text-zinc-600">
+                Use the role switcher to change identity. Production builds show Sign out here.
+              </span>
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function NavChrome({
+  initialUserId,
+  role,
+  isLoggedIn,
+  userInitials,
+  userName,
+  userEmail,
+  isProduction,
+}: NavChromeProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setMenuOpen(false);
   }, [pathname]);
-
-  const showPartner = role === "partner" || role === "admin";
-  const showAdmin = role === "admin";
 
   const links = (
     <>
@@ -54,33 +199,6 @@ export function NavChrome({ initialUserId, role, isLoggedIn }: NavChromeProps) {
       >
         Gallery
       </Link>
-      {isLoggedIn ? (
-        <Link
-          href="/library"
-          className={navLinkClass(isActive(pathname, "/library"))}
-          onClick={() => setMenuOpen(false)}
-        >
-          My Library
-        </Link>
-      ) : null}
-      {showPartner ? (
-        <Link
-          href="/partner/dashboard"
-          className={navLinkClass(isActive(pathname, "/partner"))}
-          onClick={() => setMenuOpen(false)}
-        >
-          Partner Dashboard
-        </Link>
-      ) : null}
-      {showAdmin ? (
-        <Link
-          href="/admin/books"
-          className={navLinkClass(isActive(pathname, "/admin"))}
-          onClick={() => setMenuOpen(false)}
-        >
-          Admin
-        </Link>
-      ) : null}
     </>
   );
 
@@ -90,6 +208,9 @@ export function NavChrome({ initialUserId, role, isLoggedIn }: NavChromeProps) {
       <ThemeToggle />
     </div>
   );
+
+  const signInClass =
+    "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-amber-200/95 transition hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
 
   return (
     <header className="border-b border-zinc-800/90 bg-zinc-950/95 shadow-lg shadow-black/20 backdrop-blur-md dark:border-zinc-800/80">
@@ -114,26 +235,41 @@ export function NavChrome({ initialUserId, role, isLoggedIn }: NavChromeProps) {
           </nav>
         </div>
 
-        <div className="hidden items-center gap-2 md:flex">{tools}</div>
-
-        <button
-          type="button"
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-zinc-700/80 bg-zinc-900/80 text-zinc-200 shadow-inner transition hover:bg-zinc-800 hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 md:hidden"
-          aria-expanded={menuOpen}
-          aria-controls="mobile-nav-menu"
-          aria-label={menuOpen ? "Close menu" : "Open menu"}
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          {menuOpen ? (
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {isLoggedIn ? (
+            <NavUserMenu
+              initials={userInitials}
+              displayName={userName}
+              email={userEmail}
+              role={role}
+              isProduction={isProduction}
+              onNavigate={() => setMenuOpen(false)}
+            />
           ) : (
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <Link href="/login" className={signInClass} onClick={() => setMenuOpen(false)}>
+              Sign In
+            </Link>
           )}
-        </button>
+          <div className="hidden items-center gap-2 md:flex">{tools}</div>
+          <button
+            type="button"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-zinc-700/80 bg-zinc-900/80 text-zinc-200 shadow-inner transition hover:bg-zinc-800 hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 md:hidden"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-nav-menu"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {menuOpen ? (

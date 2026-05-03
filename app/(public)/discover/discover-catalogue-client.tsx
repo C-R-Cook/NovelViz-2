@@ -1,5 +1,6 @@
 "use client";
 
+import { BookRequestModal } from "@/components/book-request-modal";
 import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
 import { GENRE_OPTIONS, formatGenre } from "@/lib/genre";
 import Image from "next/image";
@@ -39,6 +40,7 @@ export function DiscoverCatalogueClient({
   const [gridLoading, setGridLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [bookRequestOpen, setBookRequestOpen] = useState(false);
 
   const fetchSeq = useRef(0);
   const scrollerRef = useRef<HTMLDivElement>(null);
@@ -330,7 +332,25 @@ export function DiscoverCatalogueClient({
             </>
           )}
         </section>
+
+        <section className="mt-16 border-t border-zinc-800/90 pt-12 sm:mt-20 sm:pt-16" aria-labelledby="book-request-cta">
+          <h2 id="book-request-cta" className="font-serif text-xl font-semibold text-zinc-100 sm:text-2xl">
+            Can&apos;t find your book?
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500">
+            Let us know what you&apos;d like to read and we&apos;ll work with publishers to make it happen.
+          </p>
+          <button
+            type="button"
+            className="mt-5 rounded-lg bg-amber-500/20 px-4 py-2.5 text-sm font-medium text-amber-100 ring-1 ring-amber-500/45 transition hover:bg-amber-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+            onClick={() => setBookRequestOpen(true)}
+          >
+            Request a Book
+          </button>
+        </section>
       </div>
+
+      <BookRequestModal open={bookRequestOpen} onClose={() => setBookRequestOpen(false)} />
     </div>
   );
 }

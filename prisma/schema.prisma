@@ -229,14 +229,16 @@ model GeneratedImage {
 }
 
 model BookRequest {
-  id         String @id @default(cuid())
-  userId     String
+  id         String  @id @default(cuid())
+  userId     String?
   bookTitle  String
   authorName String
+  message    String? @db.Text
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([bookTitle])
 }

@@ -46,7 +46,7 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       <Link
-        href="/partner/dashboard"
+        href="/dashboard"
         className="inline-flex text-sm font-medium text-zinc-600 transition hover:text-amber-800 dark:text-zinc-400 dark:hover:text-amber-200/90"
       >
         ← Back to dashboard

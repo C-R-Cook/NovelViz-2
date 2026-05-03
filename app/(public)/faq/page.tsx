@@ -1,3 +1,25 @@
+/**
+ * FAQ page — static copy only (no database, no API).
+ *
+ * HOW TO EDIT CONTENT
+ * ---------------------
+ * 1. Scroll to `SECTIONS` below. That array is the entire FAQ.
+ * 2. Page order = array order: first section appears at the top, last at the bottom.
+ * 3. To add a **section**: push a new object `{ title: "Your heading", items: [...] }`
+ *    anywhere in the array (usually grouped with related topics).
+ * 4. To add a **question** inside a section: add `{ q: "…", a: "…" }` to that section’s `items`.
+ *    - `q` = question shown in the accordion header (keep it unique; it’s also the React `key`).
+ *    - `a` = answer shown when expanded (plain text; use \n for line breaks if you ever need them).
+ * 5. To **remove** something: delete that section object or that `{ q, a }` entry.
+ * 6. To **reorder**: move whole section objects, or move lines inside `items`.
+ *
+ * HOW TO EDIT LAYOUT / STYLES
+ * ----------------------------
+ * - Page shell (title, intro): see `FAQPage` return at the bottom.
+ * - Accordion look (borders, gold when open): see `ACCORDION_*` constants — change once, applies everywhere.
+ * - Section headings (small caps, amber): see `SECTION_HEADING_CLASS` on the `<h2>`.
+ */
+
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -5,10 +27,34 @@ export const metadata: Metadata = {
   description: "Frequently asked questions about NovelViz, spoiler-safe AI, and your library.",
 };
 
-type QA = { q: string; a: string };
-type Section = { title: string; items: QA[] };
+/** Single FAQ row: question (summary) + answer (expanded body). */
+type FAQItem = { q: string; a: string };
 
-const SECTIONS: Section[] = [
+/** One block on the page: a section title + any number of accordion items. */
+type FAQSection = { title: string; items: FAQItem[] };
+
+// --- Accordion styling (native `<details>` / `<summary>`). Gold accent when open. ---
+
+/* Each string is one literal so Tailwind’s scanner keeps every utility class. */
+const ACCORDION_DETAILS_CLASS =
+  "group rounded-xl border border-zinc-200/95 bg-white/90 shadow-sm shadow-zinc-900/5 transition-colors open:border-amber-500/55 open:bg-amber-50/40 open:ring-1 open:ring-amber-500/25 dark:border-zinc-800/90 dark:bg-zinc-900/35 dark:shadow-none open:dark:border-amber-600/40 open:dark:bg-zinc-900/60 open:dark:ring-amber-500/20";
+
+const ACCORDION_SUMMARY_CLASS =
+  "flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3.5 text-sm font-medium text-zinc-900 outline-none transition marker:content-none [&::-webkit-details-marker]:hidden sm:text-base dark:text-zinc-100";
+
+const ACCORDION_CHEVRON_CLASS =
+  "mt-0.5 shrink-0 text-xs text-amber-700 transition-transform duration-200 group-open:rotate-180 dark:text-amber-400/90";
+
+const ACCORDION_ANSWER_CLASS =
+  "border-t border-zinc-200/90 px-4 pb-4 pt-3 text-sm leading-relaxed text-zinc-600 group-open:border-amber-200/80 dark:border-zinc-800/80 dark:text-zinc-400 group-open:dark:border-amber-900/25";
+
+const SECTION_HEADING_CLASS =
+  "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800 dark:text-amber-200/85";
+
+// --- All FAQ content: edit here only (unless you add new layout above). ---
+
+const SECTIONS: FAQSection[] = [
+  // ----- About NovelViz -----
   {
     title: "About NovelViz",
     items: [
@@ -26,6 +72,8 @@ const SECTIONS: Section[] = [
       },
     ],
   },
+
+  // ----- Using NovelViz -----
   {
     title: "Using NovelViz",
     items: [
@@ -47,6 +95,27 @@ const SECTIONS: Section[] = [
       },
     ],
   },
+
+  // ----- About the Images -----
+  {
+    title: "About the Images",
+    items: [
+      {
+        q: "Why do the generated images look different from the film or TV adaptation I know?",
+        a: "NovelViz generates images directly from the author's original descriptions in the book — not from any film, TV show, or other adaptation. This means you're seeing the story as the author imagined it, which is often quite different from how it's been portrayed on screen. We think that's part of the magic.",
+      },
+      {
+        q: "Why does the same character look different in different images?",
+        a: "Each image is generated independently using descriptions from the book text. While we work hard to extract accurate visual details, character appearance can vary between generations. Consistent character appearance across multiple images is something we're actively improving.",
+      },
+      {
+        q: "Can I generate images from any scene?",
+        a: "You can generate images of any character, location, object, or moment — but only from content you've already read. The AI draws visual details directly from the book's descriptions up to your current chapter. Anything beyond where you are in the story is strictly off limits.",
+      },
+    ],
+  },
+
+  // ----- Books & Content -----
   {
     title: "Books & Content",
     items: [
@@ -64,6 +133,8 @@ const SECTIONS: Section[] = [
       },
     ],
   },
+
+  // ----- Account & Privacy -----
   {
     title: "Account & Privacy",
     items: [
@@ -83,6 +154,10 @@ const SECTIONS: Section[] = [
   },
 ];
 
+/**
+ * Renders the static FAQ: loops `SECTIONS` and builds one `<section>` per block,
+ * each containing native `<details>` accordions (no extra client JS).
+ */
 export default function FAQPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 text-zinc-900 sm:px-6 sm:py-16 dark:text-zinc-100">
@@ -94,32 +169,21 @@ export default function FAQPage() {
       </p>
 
       <div className="mt-12 space-y-12">
-        {SECTIONS.map((section, si) => (
-          <section key={section.title} aria-labelledby={`faq-section-${si}`}>
-            <h2
-              id={`faq-section-${si}`}
-              className="mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800 dark:text-amber-200/85"
-            >
+        {SECTIONS.map((section, sectionIndex) => (
+          <section key={section.title} aria-labelledby={`faq-section-${sectionIndex}`}>
+            <h2 id={`faq-section-${sectionIndex}`} className={SECTION_HEADING_CLASS}>
               {section.title}
             </h2>
             <div className="space-y-3">
               {section.items.map((item) => (
-                <details
-                  key={item.q}
-                  className="group rounded-xl border border-zinc-200/95 bg-white/90 shadow-sm shadow-zinc-900/5 transition-colors open:border-amber-500/55 open:bg-amber-50/40 open:ring-1 open:ring-amber-500/25 dark:border-zinc-800/90 dark:bg-zinc-900/35 dark:shadow-none open:dark:border-amber-600/40 open:dark:bg-zinc-900/60 open:dark:ring-amber-500/20"
-                >
-                  <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3.5 text-sm font-medium text-zinc-900 outline-none transition marker:content-none [&::-webkit-details-marker]:hidden sm:text-base dark:text-zinc-100">
+                <details key={item.q} className={ACCORDION_DETAILS_CLASS}>
+                  <summary className={ACCORDION_SUMMARY_CLASS}>
                     <span className="min-w-0 flex-1">{item.q}</span>
-                    <span
-                      className="mt-0.5 shrink-0 text-xs text-amber-700 transition-transform duration-200 group-open:rotate-180 dark:text-amber-400/90"
-                      aria-hidden
-                    >
+                    <span className={ACCORDION_CHEVRON_CLASS} aria-hidden>
                       ▼
                     </span>
                   </summary>
-                  <div className="border-t border-zinc-200/90 px-4 pb-4 pt-3 text-sm leading-relaxed text-zinc-600 group-open:border-amber-200/80 dark:border-zinc-800/80 dark:text-zinc-400 group-open:dark:border-amber-900/25">
-                    {item.a}
-                  </div>
+                  <div className={ACCORDION_ANSWER_CLASS}>{item.a}</div>
                 </details>
               ))}
             </div>

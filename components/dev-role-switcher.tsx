@@ -25,10 +25,8 @@ function writeDevUserCookie(userId: string) {
   document.cookie = `dev_role=; path=/; max-age=0; SameSite=Lax`;
 }
 
-function getHomeUrlForUser(user: DevIdentityUser): string {
-  if (user.role === "partner") return "/partner/dashboard";
-  if (user.role === "admin") return "/admin/books";
-  return "/library";
+function getHomeUrlForUser(_user: DevIdentityUser): string {
+  return "/dashboard";
 }
 
 function isKnownUserId(s: string | null): s is string {

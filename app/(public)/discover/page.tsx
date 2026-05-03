@@ -1,23 +1,24 @@
-import { BookCatalogue } from "./book-catalogue";
-import { prisma } from "@/lib/prisma";
+import { DiscoverCatalogueClient } from "./discover-catalogue-client";
+import {
+  getDiscoverBooksPage,
+  getDiscoverFeaturedBooks,
+} from "@/lib/discover-catalogue";
 
 export const metadata = {
   title: "Discover | NovelViz",
 };
 
 export default async function DiscoverPage() {
-  const books = await prisma.book.findMany({
-    where: { status: "published", deletedAt: null },
-    orderBy: { title: "asc" },
-    select: {
-      id: true,
-      title: true,
-      author: true,
-      description: true,
-      genre: true,
-      coverImageUrl: true,
-    },
-  });
+  const [featured, firstPage] = await Promise.all([
+    getDiscoverFeaturedBooks(),
+    getDiscoverBooksPage({}),
+  ]);
 
-  return <BookCatalogue books={books} />;
+  return (
+    <DiscoverCatalogueClient
+      featured={featured}
+      initialBooks={firstPage.books}
+      initialNextCursor={firstPage.nextCursor}
+    />
+  );
 }

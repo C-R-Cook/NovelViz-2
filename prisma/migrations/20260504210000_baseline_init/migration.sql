@@ -1,0 +1,2 @@
+-- Baseline: schema already matched the database (empty diff from migrate diff).
+-- This migration records current state; no DDL required.

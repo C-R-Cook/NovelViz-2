@@ -5,9 +5,11 @@ import { AGE_RANGE_OPTIONS, type AgeRange } from "@/lib/age-range";
 import { DEV_USER_COOKIE } from "@/lib/dev-users";
 import { COUNTRY_CODES, COUNTRY_OPTIONS } from "@/lib/countries";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
+import { GENDER_OPTIONS, type Gender } from "@/lib/gender";
+import { isValidUsernameFormat } from "@/lib/username";
 import { userInitials } from "@/lib/user-initials";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 const inputClass =
   "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-amber-500/80 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-600 dark:bg-zinc-900/80 dark:text-zinc-100 dark:focus:border-amber-400/70";
@@ -18,12 +20,16 @@ const sectionClass =
   "rounded-xl border border-zinc-200/90 bg-white/90 p-6 shadow-sm dark:border-zinc-800/90 dark:bg-zinc-900/40";
 
 export type AccountPageClientProps = {
+  viewerId: string;
   user: {
     name: string | null;
+    username: string | null;
     email: string;
     country: string | null;
     ageRange: AgeRange | null;
+    gender: Gender | null;
     genrePreferences: string[];
+    subscribedToMailingList: boolean;
   };
   stats: {
     libraryBookCount: number;
@@ -35,6 +41,7 @@ export type AccountPageClientProps = {
 };
 
 export function AccountPageClient({
+  viewerId,
   user: initialUser,
   stats,
   memberSinceLabel,
@@ -44,20 +51,80 @@ export function AccountPageClient({
   const { signOut } = useClerk();
 
   const [name, setName] = useState(initialUser.name ?? "");
+  const [publicUsername, setPublicUsername] = useState(initialUser.username ?? "");
+  const [usernameCheck, setUsernameCheck] = useState<"idle" | "checking" | "ok" | "bad">("idle");
   const [country, setCountry] = useState(initialUser.country ?? "");
   const [ageRange, setAgeRange] = useState<string>(initialUser.ageRange ?? "");
+  const [gender, setGender] = useState<string>(initialUser.gender ?? "");
+  const [subscribedToMailingList, setSubscribedToMailingList] = useState(
+    initialUser.subscribedToMailingList,
+  );
   const [genrePreferences, setGenrePreferences] = useState<string[]>(initialUser.genrePreferences);
 
   const [profileSaving, setProfileSaving] = useState(false);
+  const [publicSaving, setPublicSaving] = useState(false);
   const [prefsSaving, setPrefsSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [publicError, setPublicError] = useState<string | null>(null);
   const [prefsError, setPrefsError] = useState<string | null>(null);
   const [profileOk, setProfileOk] = useState(false);
+  const [publicOk, setPublicOk] = useState(false);
   const [prefsOk, setPrefsOk] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setName(initialUser.name ?? "");
+    setPublicUsername(initialUser.username ?? "");
+    setCountry(initialUser.country ?? "");
+    setAgeRange(initialUser.ageRange ?? "");
+    setGender(initialUser.gender ?? "");
+    setSubscribedToMailingList(initialUser.subscribedToMailingList);
+    setGenrePreferences(initialUser.genrePreferences);
+    setUsernameCheck("idle");
+  }, [initialUser]);
+
+  const normalizedPublicUsername = publicUsername.trim().toLowerCase();
+  const initialUsernameNorm = (initialUser.username ?? "").trim().toLowerCase();
+  const unchangedUsername =
+    normalizedPublicUsername.length > 0 &&
+    normalizedPublicUsername === initialUsernameNorm;
+
+  useEffect(() => {
+    if (!normalizedPublicUsername) {
+      setUsernameCheck("idle");
+      return;
+    }
+    if (unchangedUsername) {
+      setUsernameCheck("ok");
+      return;
+    }
+    if (!isValidUsernameFormat(normalizedPublicUsername)) {
+      setUsernameCheck("bad");
+      return;
+    }
+    const t = window.setTimeout(() => {
+      setUsernameCheck("checking");
+      void (async () => {
+        try {
+          const res = await fetch(
+            `/api/onboarding/check-username?username=${encodeURIComponent(normalizedPublicUsername)}&excludeUserId=${encodeURIComponent(viewerId)}`,
+          );
+          const data = (await res.json()) as { available?: boolean; valid?: boolean };
+          if (!data.valid) {
+            setUsernameCheck("bad");
+            return;
+          }
+          setUsernameCheck(data.available ? "ok" : "bad");
+        } catch {
+          setUsernameCheck("idle");
+        }
+      })();
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [normalizedPublicUsername, unchangedUsername, viewerId]);
 
   const countrySelectOptions = useMemo(() => {
     const base = [...COUNTRY_OPTIONS];
@@ -71,8 +138,8 @@ export function AccountPageClient({
   }, [initialUser.country]);
 
   const avatarInitials = useMemo(
-    () => userInitials(initialUser.name, initialUser.email),
-    [initialUser.email, initialUser.name],
+    () => userInitials(initialUser.username ?? initialUser.name, initialUser.email),
+    [initialUser.email, initialUser.name, initialUser.username],
   );
 
   const toggleGenre = useCallback((value: string) => {
@@ -81,6 +148,35 @@ export function AccountPageClient({
     );
     setPrefsOk(false);
   }, []);
+
+  const canSavePublicUsername =
+    isValidUsernameFormat(normalizedPublicUsername) &&
+    (unchangedUsername || usernameCheck === "ok") &&
+    !publicSaving;
+
+  async function savePublicProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setPublicError(null);
+    setPublicOk(false);
+    if (!canSavePublicUsername) return;
+    setPublicSaving(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: normalizedPublicUsername }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setPublicError(data.error ?? "Could not save username");
+        return;
+      }
+      setPublicOk(true);
+      router.refresh();
+    } finally {
+      setPublicSaving(false);
+    }
+  }
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -114,6 +210,8 @@ export function AccountPageClient({
       const body = {
         country: country || null,
         ageRange: ageRange || null,
+        gender: gender || null,
+        subscribedToMailingList,
         genrePreferences,
       };
       const res = await fetch("/api/account", {
@@ -168,6 +266,64 @@ export function AccountPageClient({
       </p>
 
       <div className="mt-10 space-y-8">
+        <section className={sectionClass} aria-labelledby="public-profile-heading">
+          <h2 id="public-profile-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            Public profile
+          </h2>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            This is how you appear in the gallery and public areas.
+          </p>
+          <form className="mt-6 space-y-4" onSubmit={(e) => void savePublicProfile(e)}>
+            <div>
+              <label htmlFor="account-username" className={labelClass}>
+                Username
+              </label>
+              <div className="relative mt-1">
+                <input
+                  id="account-username"
+                  name="username"
+                  type="text"
+                  autoComplete="username"
+                  className={`${inputClass} pr-10`}
+                  value={publicUsername}
+                  onChange={(e) => {
+                    setPublicUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""));
+                    setPublicOk(false);
+                  }}
+                  maxLength={20}
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-sm">
+                  {usernameCheck === "checking" ? (
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-400 border-t-amber-600" />
+                  ) : usernameCheck === "ok" ? (
+                    <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                  ) : usernameCheck === "bad" && normalizedPublicUsername.length > 0 ? (
+                    <span className="text-red-600 dark:text-red-400">✕</span>
+                  ) : null}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                3–20 characters: letters, numbers, and underscores only.
+              </p>
+            </div>
+            {publicError ? (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {publicError}
+              </p>
+            ) : null}
+            {publicOk ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400/90">Username saved.</p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={!canSavePublicUsername}
+              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-zinc-950 shadow transition hover:bg-amber-500 disabled:opacity-60 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+            >
+              {publicSaving ? "Saving…" : "Save username"}
+            </button>
+          </form>
+        </section>
+
         <section className={sectionClass} aria-labelledby="profile-heading">
           <h2 id="profile-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Profile
@@ -272,6 +428,41 @@ export function AccountPageClient({
                 ))}
               </select>
             </div>
+            <div>
+              <label htmlFor="account-gender" className={labelClass}>
+                Gender
+              </label>
+              <select
+                id="account-gender"
+                className={inputClass}
+                value={gender}
+                onChange={(e) => {
+                  setGender(e.target.value);
+                  setPrefsOk(false);
+                }}
+              >
+                <option value="">Prefer not to say</option>
+                {GENDER_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={subscribedToMailingList}
+                onChange={(e) => {
+                  setSubscribedToMailingList(e.target.checked);
+                  setPrefsOk(false);
+                }}
+                className="mt-1 h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500/30 dark:border-zinc-600"
+              />
+              <span className="text-sm text-zinc-800 dark:text-zinc-200">
+                Keep me updated about new books, features and early access offers
+              </span>
+            </label>
             <div>
               <span className={labelClass}>Genre preferences</span>
               <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">Select all that apply.</p>

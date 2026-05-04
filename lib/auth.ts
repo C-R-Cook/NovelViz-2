@@ -5,9 +5,11 @@ import {
   type DevIdentityUser,
   resolveDevUserIdFromCookies,
 } from "@/lib/dev-users";
+import { prisma } from "@/lib/prisma";
 
 /**
  * Current user for server components and route handlers.
+ * Includes `username` and `subscribedToMailingList` from the database when available (dev merges cookie identity with `User`).
  *
  * TODO (production): Replace dev branch with Clerk `auth()` + load or create `User` from DB:
  *   const { userId } = await auth();
@@ -23,7 +25,23 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       store.get(DEV_USER_COOKIE)?.value,
       store.get("dev_role")?.value,
     );
-    return DEV_USERS_BY_ID[id] ?? DEV_USERS_BY_ID.dev_user_admin;
+    const base = DEV_USERS_BY_ID[id] ?? DEV_USERS_BY_ID.dev_user_admin;
+    const dbUser = await prisma.user.findUnique({
+      where: { id: base.id },
+      select: { username: true, subscribedToMailingList: true },
+    });
+    if (!dbUser) {
+      return {
+        ...base,
+        username: base.username,
+        subscribedToMailingList: base.subscribedToMailingList,
+      };
+    }
+    return {
+      ...base,
+      username: dbUser.username,
+      subscribedToMailingList: dbUser.subscribedToMailingList,
+    };
   }
 
   // TODO: const { userId } = await auth(); … fetch User by clerkId

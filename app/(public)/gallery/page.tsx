@@ -46,6 +46,7 @@ export default async function GalleryPage() {
       },
       user: {
         select: {
+          username: true,
           name: true,
         },
       },
@@ -91,7 +92,7 @@ export default async function GalleryPage() {
       bookId: image.bookId,
       bookTitle: image.book.title,
       bookAuthor: image.book.author,
-      userName: image.user.name,
+      userName: image.user.username ?? image.user.name,
       spoilerLevel,
     };
   });

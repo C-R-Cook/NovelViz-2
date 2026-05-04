@@ -1,6 +1,6 @@
 import anthropic from "@/lib/anthropic";
 import { getCurrentUser } from "@/lib/auth";
-import { embedChunks } from "@/lib/ingestion";
+import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -113,9 +113,11 @@ export async function POST(request: Request) {
   const currentChapterNumber = progress.currentChapterNumber;
 
   let embeddingVec: number[];
+  let embeddingTokens = 0;
   try {
-    const batch = await embedChunks([questionText]);
-    embeddingVec = batch[0] ?? [];
+    const { embeddings, embeddingTokens: et } = await embedChunksWithTokenUsage([questionText]);
+    embeddingTokens = et;
+    embeddingVec = embeddings[0] ?? [];
   } catch (e) {
     console.error("[api/query POST] embed", e);
     return NextResponse.json(
@@ -174,6 +176,8 @@ ${excerptsJoined}
 My question: ${questionText}`;
 
   let responseText = "";
+  let promptTokens = 0;
+  let completionTokens = 0;
   try {
     const candidates = getAnthropicModelCandidates();
     let lastErr: unknown = null;
@@ -186,6 +190,8 @@ My question: ${questionText}`;
           system: systemPrompt,
           messages: [{ role: "user", content: userMessage }],
         });
+        promptTokens = message.usage?.input_tokens ?? 0;
+        completionTokens = message.usage?.output_tokens ?? 0;
         const first = message.content[0];
         responseText =
           first && first.type === "text" ? first.text : "No text response from the model.";
@@ -234,6 +240,9 @@ My question: ${questionText}`;
       chapterNumberAtTime: currentChapterNumber,
       questionText,
       responseText,
+      promptTokens,
+      completionTokens,
+      embeddingTokens,
     },
   });
 

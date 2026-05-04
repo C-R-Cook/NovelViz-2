@@ -74,7 +74,7 @@ function NavUserMenu({
       </button>
       {open ? (
         <div
-          className="absolute right-0 z-50 mt-2 w-56 origin-top-right rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-xl ring-1 ring-black/20 dark:bg-zinc-950"
+          className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-xl ring-1 ring-black/20 dark:bg-zinc-950"
           role="menu"
         >
           <div className="border-b border-zinc-800 px-3 py-2">
@@ -177,7 +177,7 @@ export function NavChrome({
     "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-amber-200/95 transition hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
 
   return (
-    <header className="border-b border-zinc-800/90 bg-zinc-950/95 shadow-lg shadow-black/20 backdrop-blur-md dark:border-zinc-800/80">
+    <header className="relative z-[100] border-b border-zinc-800/90 bg-zinc-950/95 shadow-lg shadow-black/20 backdrop-blur-md dark:border-zinc-800/80">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link

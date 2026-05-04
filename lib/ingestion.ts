@@ -1090,12 +1090,18 @@ function getOpenAI(): OpenAI {
 const EMBED_MODEL = "text-embedding-3-small";
 const BATCH_SIZE = 100;
 
-/** Batch embeddings (1536-dim for text-embedding-3-small). */
-export async function embedChunks(chunks: string[]): Promise<number[][]> {
-  if (chunks.length === 0) return [];
+/** Batch embeddings (1536-dim for text-embedding-3-small); sums `usage.total_tokens` across batches. */
+export async function embedChunksWithTokenUsage(chunks: string[]): Promise<{
+  embeddings: number[][];
+  embeddingTokens: number;
+}> {
+  if (chunks.length === 0) {
+    return { embeddings: [], embeddingTokens: 0 };
+  }
 
   const openai = getOpenAI();
   const out: number[][] = [];
+  let embeddingTokens = 0;
 
   for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
     const batch = chunks.slice(i, i + BATCH_SIZE);
@@ -1104,13 +1110,21 @@ export async function embedChunks(chunks: string[]): Promise<number[][]> {
       input: batch,
     });
 
+    embeddingTokens += res.usage?.total_tokens ?? 0;
+
     const sorted = [...res.data].sort((a, b) => a.index - b.index);
     for (const row of sorted) {
       out.push(row.embedding);
     }
   }
 
-  return out;
+  return { embeddings: out, embeddingTokens };
+}
+
+/** Batch embeddings (1536-dim for text-embedding-3-small). */
+export async function embedChunks(chunks: string[]): Promise<number[][]> {
+  const { embeddings } = await embedChunksWithTokenUsage(chunks);
+  return embeddings;
 }
 
 const RENUMBER_OFFSET = 1_000_000;

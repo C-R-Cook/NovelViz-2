@@ -1,7 +1,7 @@
 import anthropic from "@/lib/anthropic";
 import fal from "@/lib/fal";
 import { getCurrentUser } from "@/lib/auth";
-import { embedChunks } from "@/lib/ingestion";
+import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
@@ -56,7 +56,7 @@ async function getAnthropicTextResponse(
   systemPrompt: string,
   userMessage: string,
   maxTokens: number,
-): Promise<string> {
+): Promise<{ text: string; promptTokens: number; completionTokens: number }> {
   const candidates = getAnthropicModelCandidates();
   let lastErr: unknown = null;
 
@@ -71,7 +71,11 @@ async function getAnthropicTextResponse(
       const first = message.content[0];
       const text = first && first.type === "text" ? first.text.trim() : "";
       if (text) {
-        return text;
+        return {
+          text,
+          promptTokens: message.usage?.input_tokens ?? 0,
+          completionTokens: message.usage?.output_tokens ?? 0,
+        };
       }
       lastErr = new Error("Anthropic returned empty text content");
     } catch (err) {
@@ -204,8 +208,15 @@ Examples:
 Return ONLY the subject as a short noun phrase. Nothing else.`;
 
   let extractedSubject = "";
+  let subjectTokens = 0;
   try {
-    extractedSubject = await getAnthropicTextResponse(subjectExtractionSystemPrompt, userPrompt, 60);
+    const subjectMessage = await getAnthropicTextResponse(
+      subjectExtractionSystemPrompt,
+      userPrompt,
+      60,
+    );
+    extractedSubject = subjectMessage.text;
+    subjectTokens = subjectMessage.promptTokens + subjectMessage.completionTokens;
   } catch (e) {
     console.error("[api/imagine POST] subject extraction", e);
     return NextResponse.json(
@@ -232,10 +243,15 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
 
   let promptEmbeddingVec: number[];
   let subjectEmbeddingVec: number[];
+  let embeddingTokens = 0;
   try {
-    const batch = await embedChunks([userPrompt, subjectForEmbedding]);
-    promptEmbeddingVec = batch[0] ?? [];
-    subjectEmbeddingVec = batch[1] ?? [];
+    const { embeddings, embeddingTokens: embTok } = await embedChunksWithTokenUsage([
+      userPrompt,
+      subjectForEmbedding,
+    ]);
+    embeddingTokens = embTok;
+    promptEmbeddingVec = embeddings[0] ?? [];
+    subjectEmbeddingVec = embeddings[1] ?? [];
   } catch (e) {
     console.error("[api/imagine POST] embed", e);
     return NextResponse.json(
@@ -337,8 +353,13 @@ ${excerptsJoined}
 Reader's request: ${userPrompt}`;
 
   let enrichedPrompt = "";
+  let promptTokens = 0;
+  let completionTokens = 0;
   try {
-    enrichedPrompt = await getAnthropicTextResponse(systemPrompt, userMessage, 300);
+    const enrichMessage = await getAnthropicTextResponse(systemPrompt, userMessage, 300);
+    enrichedPrompt = enrichMessage.text;
+    promptTokens = enrichMessage.promptTokens;
+    completionTokens = enrichMessage.completionTokens;
   } catch (e) {
     console.error("[api/imagine POST] Anthropic error", e);
     return NextResponse.json(
@@ -393,6 +414,10 @@ Reader's request: ${userPrompt}`;
       imageUrl,
       isPublic: false,
       model: FAL_ENDPOINT,
+      promptTokens,
+      completionTokens,
+      embeddingTokens,
+      subjectTokens,
     },
     select: {
       id: true,

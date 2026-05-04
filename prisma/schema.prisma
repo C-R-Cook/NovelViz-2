@@ -197,12 +197,15 @@ model ReadingProgress {
 }
 
 model Query {
-  id                  String @id @default(cuid())
-  userId              String
-  bookId              String
+  id                 String @id @default(cuid())
+  userId             String
+  bookId             String
   chapterNumberAtTime Int
-  questionText        String @db.Text
-  responseText        String @db.Text
+  questionText       String @db.Text
+  responseText       String @db.Text
+  promptTokens         Int?
+  completionTokens     Int?
+  embeddingTokens      Int?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
@@ -231,6 +234,10 @@ model GeneratedImage {
   sampler             String?
   negativePrompt      String? @db.Text
   rawParameters       Json?
+  promptTokens        Int?
+  completionTokens    Int?
+  embeddingTokens     Int?
+  subjectTokens         Int?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)

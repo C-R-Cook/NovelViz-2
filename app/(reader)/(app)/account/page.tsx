@@ -13,10 +13,13 @@ export default async function AccountPage() {
     where: { id: session.id },
     select: {
       name: true,
+      username: true,
       email: true,
       country: true,
       ageRange: true,
+      gender: true,
       genrePreferences: true,
+      subscribedToMailingList: true,
       createdAt: true,
     },
   });
@@ -38,6 +41,7 @@ export default async function AccountPage() {
 
   return (
     <AccountPageClient
+      viewerId={session.id}
       user={user}
       stats={{ libraryBookCount, queryCount, generatedImageCount }}
       memberSinceLabel={memberSinceLabel}

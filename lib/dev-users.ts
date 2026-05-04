@@ -10,6 +10,8 @@ export type DevIdentityUser = {
   email: string;
   name: string | null;
   role: DevUserRole;
+  username: string | null;
+  subscribedToMailingList: boolean;
 };
 
 export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
@@ -19,6 +21,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_reader@novelviz.local",
     name: "Dev Reader",
     role: "reader",
+    username: "dev_reader",
+    subscribedToMailingList: false,
   },
   dev_user_reader2: {
     id: "dev_user_reader2",
@@ -26,6 +30,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_reader2@novelviz.local",
     name: "Dev Reader 2",
     role: "reader",
+    username: "dev_reader2",
+    subscribedToMailingList: false,
   },
   dev_user_reader3: {
     id: "dev_user_reader3",
@@ -33,6 +39,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_reader3@novelviz.local",
     name: "Dev Reader 3",
     role: "reader",
+    username: "dev_reader3",
+    subscribedToMailingList: false,
   },
   dev_user_partner: {
     id: "dev_user_partner",
@@ -40,6 +48,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_partner@novelviz.local",
     name: "Dev Partner",
     role: "partner",
+    username: "dev_partner",
+    subscribedToMailingList: false,
   },
   dev_user_partner2: {
     id: "dev_user_partner2",
@@ -47,6 +57,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_partner2@novelviz.local",
     name: "Dev Partner 2",
     role: "partner",
+    username: "dev_partner2",
+    subscribedToMailingList: false,
   },
   dev_user_admin: {
     id: "dev_user_admin",
@@ -54,6 +66,8 @@ export const DEV_USERS_BY_ID: Record<string, DevIdentityUser> = {
     email: "dev_admin@novelviz.local",
     name: "Dev Admin",
     role: "admin",
+    username: "dev_admin",
+    subscribedToMailingList: false,
   },
 };
 

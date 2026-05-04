@@ -8,14 +8,30 @@ export const AgeRange = {
   THIRTY5_44: "THIRTY5_44",
   FORTY5_54: "FORTY5_54",
   FIFTY5_PLUS: "FIFTY5_PLUS",
+  UNDER_18: "UNDER_18",
+  PREFER_NOT_TO_SAY: "PREFER_NOT_TO_SAY",
 } as const;
 
 export type AgeRange = (typeof AgeRange)[keyof typeof AgeRange];
 
+/** Account / preferences order (existing buckets first). */
 export const AGE_RANGE_OPTIONS: { value: AgeRange; label: string }[] = [
   { value: AgeRange.EIGHTEEN_24, label: "18–24" },
   { value: AgeRange.TWENTY5_34, label: "25–34" },
   { value: AgeRange.THIRTY5_44, label: "35–44" },
   { value: AgeRange.FORTY5_54, label: "45–54" },
   { value: AgeRange.FIFTY5_PLUS, label: "55+" },
+  { value: AgeRange.UNDER_18, label: "Under 18" },
+  { value: AgeRange.PREFER_NOT_TO_SAY, label: "Prefer not to say" },
+];
+
+/** Onboarding copy order: Under 18 first, then bands, then prefer not to say. */
+export const ONBOARDING_AGE_RANGE_OPTIONS: { value: AgeRange; label: string }[] = [
+  { value: AgeRange.UNDER_18, label: "Under 18" },
+  { value: AgeRange.EIGHTEEN_24, label: "18–24" },
+  { value: AgeRange.TWENTY5_34, label: "25–34" },
+  { value: AgeRange.THIRTY5_44, label: "35–44" },
+  { value: AgeRange.FORTY5_54, label: "45–54" },
+  { value: AgeRange.FIFTY5_PLUS, label: "55+" },
+  { value: AgeRange.PREFER_NOT_TO_SAY, label: "Prefer not to say" },
 ];

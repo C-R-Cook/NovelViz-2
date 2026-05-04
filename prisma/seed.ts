@@ -94,11 +94,13 @@ async function seedDevUser() {
       clerkId: "user_dev_clerk_local",
       email: "dev@novelviz.local",
       name: "Dev Reader",
+      username: "dev_local",
       role: UserRole.admin,
     },
     update: {
       email: "dev@novelviz.local",
       name: "Dev Reader",
+      username: "dev_local",
       role: UserRole.admin,
     },
   });
@@ -112,11 +114,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_reader",
       email: "dev_reader@novelviz.local",
       name: "Dev Reader",
+      username: "dev_reader",
       role: UserRole.reader,
     },
     update: {
       email: "dev_reader@novelviz.local",
       name: "Dev Reader",
+      username: "dev_reader",
       role: UserRole.reader,
     },
   });
@@ -128,11 +132,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_reader2",
       email: "dev_reader2@novelviz.local",
       name: "Dev Reader 2",
+      username: "dev_reader2",
       role: UserRole.reader,
     },
     update: {
       email: "dev_reader2@novelviz.local",
       name: "Dev Reader 2",
+      username: "dev_reader2",
       role: UserRole.reader,
     },
   });
@@ -144,11 +150,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_reader3",
       email: "dev_reader3@novelviz.local",
       name: "Dev Reader 3",
+      username: "dev_reader3",
       role: UserRole.reader,
     },
     update: {
       email: "dev_reader3@novelviz.local",
       name: "Dev Reader 3",
+      username: "dev_reader3",
       role: UserRole.reader,
     },
   });
@@ -160,11 +168,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_partner",
       email: "dev_partner@novelviz.local",
       name: "Dev Partner",
+      username: "dev_partner",
       role: UserRole.partner,
     },
     update: {
       email: "dev_partner@novelviz.local",
       name: "Dev Partner",
+      username: "dev_partner",
       role: UserRole.partner,
     },
   });
@@ -176,11 +186,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_partner2",
       email: "dev_partner2@novelviz.local",
       name: "Dev Partner 2",
+      username: "dev_partner2",
       role: UserRole.partner,
     },
     update: {
       email: "dev_partner2@novelviz.local",
       name: "Dev Partner 2",
+      username: "dev_partner2",
       role: UserRole.partner,
     },
   });
@@ -192,11 +204,13 @@ async function seedDevRoleUsers() {
       clerkId: "user_dev_clerk_admin",
       email: "dev_admin@novelviz.local",
       name: "Dev Admin",
+      username: "dev_admin",
       role: UserRole.admin,
     },
     update: {
       email: "dev_admin@novelviz.local",
       name: "Dev Admin",
+      username: "dev_admin",
       role: UserRole.admin,
     },
   });

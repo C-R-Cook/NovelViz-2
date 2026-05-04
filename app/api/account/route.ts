@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { AgeRange, BookGenre } from "@db";
+import { isValidUsernameFormat } from "@/lib/username";
+import { AgeRange, BookGenre, Gender } from "@db";
 import { NextResponse } from "next/server";
 
 const BOOK_GENRE_VALUES = new Set<string>(Object.values(BookGenre));
@@ -20,6 +21,14 @@ function parseAgeRange(raw: unknown): AgeRange | null {
   if (typeof raw !== "string") return null;
   const v = raw as AgeRange;
   if (Object.values(AgeRange).includes(v)) return v;
+  return null;
+}
+
+function parseGender(raw: unknown): Gender | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw !== "string") return null;
+  const v = raw as Gender;
+  if (Object.values(Gender).includes(v)) return v;
   return null;
 }
 
@@ -43,9 +52,12 @@ export async function PATCH(request: Request) {
   const b = body as Record<string, unknown>;
   const data: {
     name?: string | null;
+    username?: string;
     country?: string | null;
     ageRange?: AgeRange | null;
+    gender?: Gender | null;
     genrePreferences?: string[];
+    subscribedToMailingList?: boolean;
   } = {};
 
   if ("name" in b) {
@@ -57,6 +69,27 @@ export async function PATCH(request: Request) {
     } else {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
+  }
+
+  if ("username" in b) {
+    if (typeof b.username !== "string") {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+    const un = b.username.trim().toLowerCase();
+    if (!isValidUsernameFormat(un)) {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+    const clash = await prisma.user.findFirst({
+      where: {
+        username: { equals: un, mode: "insensitive" },
+        NOT: { id: session.id },
+      },
+      select: { id: true },
+    });
+    if (clash) {
+      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
+    }
+    data.username = un;
   }
 
   if ("country" in b) {
@@ -87,6 +120,20 @@ export async function PATCH(request: Request) {
     data.genrePreferences = parseGenrePreferences(b.genrePreferences);
   }
 
+  if ("gender" in b) {
+    data.gender = parseGender(b.gender);
+    if (b.gender !== null && b.gender !== undefined && b.gender !== "" && data.gender === null) {
+      return NextResponse.json({ error: "Invalid gender" }, { status: 400 });
+    }
+  }
+
+  if ("subscribedToMailingList" in b) {
+    if (typeof b.subscribedToMailingList !== "boolean") {
+      return NextResponse.json({ error: "subscribedToMailingList must be boolean" }, { status: 400 });
+    }
+    data.subscribedToMailingList = b.subscribedToMailingList;
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
@@ -98,11 +145,14 @@ export async function PATCH(request: Request) {
       select: {
         id: true,
         name: true,
+        username: true,
         email: true,
         role: true,
         country: true,
         ageRange: true,
+        gender: true,
         genrePreferences: true,
+        subscribedToMailingList: true,
         createdAt: true,
       },
     });

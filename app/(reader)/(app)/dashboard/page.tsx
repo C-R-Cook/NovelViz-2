@@ -24,6 +24,7 @@ export default async function DashboardPage() {
     select: {
       id: true,
       name: true,
+      username: true,
       email: true,
       role: true,
     },
@@ -133,7 +134,11 @@ export default async function DashboardPage() {
     <DashboardClient
       role={role}
       reader={{
-        displayName: dbUser.name?.trim() || dbUser.email.split("@")[0] || "Reader",
+        displayName:
+          dbUser.username?.trim() ||
+          dbUser.name?.trim() ||
+          dbUser.email.split("@")[0] ||
+          "Reader",
         email: dbUser.email,
         stats: { libraryBookCount, queryCount, generatedImageCount },
         currentlyReading: readingProgress.map((rp) => ({

@@ -52,6 +52,16 @@ enum AgeRange {
   THIRTY5_44
   FORTY5_54
   FIFTY5_PLUS
+  UNDER_18
+  PREFER_NOT_TO_SAY
+}
+
+enum Gender {
+  male
+  female
+  non_binary
+  other
+  prefer_not_to_say
 }
 
 enum UserRole {
@@ -131,14 +141,17 @@ model Chunk {
 }
 
 model User {
-  id               String    @id @default(cuid())
-  clerkId          String    @unique
-  email            String
-  name             String?
-  role             UserRole  @default(reader)
-  country          String?
-  ageRange         AgeRange?
-  genrePreferences String[]  @default([])
+  id                      String    @id @default(cuid())
+  clerkId                 String    @unique
+  email                   String
+  name                    String?
+  username                String?   @unique
+  gender                  Gender?
+  subscribedToMailingList Boolean   @default(false)
+  role                    UserRole  @default(reader)
+  country                 String?
+  ageRange                AgeRange?
+  genrePreferences        String[]  @default([])
 
   userBooks       UserBook[]
   ownedBooks      Book[]    @relation("OwnedBooks")

@@ -90,7 +90,7 @@ ${publishedNullOwner > 0 ? "Yes — at least one row matches." : "No — none."}
 - **\`app/admin/books/admin-books-client.tsx\`** — \`deleteBook(book)\` → same DELETE URL.
 - **\`app/(partner)/partner/books/[id]/partner-book-detail-client.tsx\`** — \`deleteBook()\` → same **admin** DELETE route (\`/api/admin/books/\${book.id}\`), not a partner-specific delete route.
 
-There is **no** \`DELETE\` handler under \`app/api/partner/books/[id]/route.ts\` in the surveyed file (partner updates use \`PATCH\` only). Other deletions in the codebase are **chapters**, **chunks**, or related rows during ingest/finalise — not whole-book delete except the admin route above.
+There is **no** \`DELETE\` handler under \`app/api/partner/books/[id]/route.ts\` in the surveyed file (partner updates use \`PATCH\` only). Other deletions in the codebase are **chapters**, **chunks**, or related rows during ingest — not whole-book delete except the admin route above.
 
 ## 7. Public \`/books\` catalogue query
 

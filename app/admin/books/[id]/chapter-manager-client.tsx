@@ -17,8 +17,7 @@ type Props = {
   status: BookStatus;
 };
 
-const STALE_MSG =
-  "Chapters edited — use Finalise Chapters to re-chunk before publishing";
+const STALE_MSG = "Chapters edited — the book stays in draft until you submit for review.";
 
 export function ChapterManagerClient({ bookId, status }: Props) {
   const router = useRouter();
@@ -33,8 +32,6 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [staleMsg, setStaleMsg] = useState<string | null>(null);
-  const [finaliseBusy, setFinaliseBusy] = useState(false);
-  const [finaliseErr, setFinaliseErr] = useState<string | null>(null);
   const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
   const chapterPickerRef = useRef<HTMLDivElement>(null);
 
@@ -238,33 +235,12 @@ export function ChapterManagerClient({ bookId, status }: Props) {
     }
   }
 
-  async function finalise() {
-    setFinaliseErr(null);
-    setFinaliseBusy(true);
-    try {
-      const res = await fetch(`/api/admin/books/${bookId}/finalise`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || res.statusText);
-      }
-      setStaleMsg(null);
-      await loadChapters();
-      router.refresh();
-    } catch (e) {
-      setFinaliseErr(e instanceof Error ? e.message : "Finalise failed");
-    } finally {
-      setFinaliseBusy(false);
-    }
-  }
-
   const idx = selected
     ? chapters.findIndex((c) => c.id === selected.id)
     : -1;
   const canPrev = idx > 0;
   const canNext = idx >= 0 && idx < chapters.length - 1;
-  const disabled = status === "processing" || actionBusy || finaliseBusy;
+  const disabled = status === "processing" || actionBusy;
 
   return (
     <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
@@ -447,26 +423,6 @@ export function ChapterManagerClient({ bookId, status }: Props) {
               </div>
               {actionErr ? (
                 <p className="text-sm text-red-600 dark:text-red-400">{actionErr}</p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {status === "draft" && !loading && chapters.length > 0 ? (
-            <div className="mt-6 border-t border-zinc-200/90 pt-4 dark:border-zinc-800/80">
-              <button
-                type="button"
-                disabled={disabled || finaliseBusy}
-                onClick={finalise}
-                className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/40 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/35 dark:hover:bg-amber-200/20"
-              >
-                {finaliseBusy ? "Finalising…" : "Finalise Chapters"}
-              </button>
-              <p className="mt-2 text-xs text-zinc-600 dark:text-zinc-500">
-                Re-chunks all chapters, rebuilds embeddings, sets status to
-                pending_review.
-              </p>
-              {finaliseErr ? (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{finaliseErr}</p>
               ) : null}
             </div>
           ) : null}

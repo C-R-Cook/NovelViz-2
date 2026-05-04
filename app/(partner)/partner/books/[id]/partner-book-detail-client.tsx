@@ -110,6 +110,10 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     return () => clearInterval(id);
   }, [book.status, router]);
 
+  useEffect(() => {
+    if (book.status !== "draft") setActiveTab("details");
+  }, [book.status]);
+
   async function saveMetadata(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -299,40 +303,45 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     statusBusy || (book.status === "draft" && book.chapterCount <= 0);
   const catalogueActionBusy = statusBusy || ingestBusy || deleteBusy;
 
+  /** Single scroll: book form then chapters while still in draft (before submit for review). */
+  const mergeBookAndChapterPanels = book.status === "draft";
+
   return (
     <div className="space-y-6">
-      <div
-        className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
-        role="tablist"
-        aria-label="Partner book tabs"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "details"}
-          onClick={() => setActiveTab("details")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            activeTab === "details"
-              ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-          }`}
+      {!mergeBookAndChapterPanels ? (
+        <div
+          className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
+          role="tablist"
+          aria-label="Partner book tabs"
         >
-          Book Details
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "chapters"}
-          onClick={() => setActiveTab("chapters")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            activeTab === "chapters"
-              ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-          }`}
-        >
-          Chapter Review
-        </button>
-      </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "details"}
+            onClick={() => setActiveTab("details")}
+            className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+              activeTab === "details"
+                ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+            }`}
+          >
+            Book Details
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "chapters"}
+            onClick={() => setActiveTab("chapters")}
+            className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+              activeTab === "chapters"
+                ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
+                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+            }`}
+          >
+            Chapter Review
+          </button>
+        </div>
+      ) : null}
 
       <div
         className="flex flex-col gap-2 border-b border-zinc-200/90 pb-4 dark:border-zinc-800/80"
@@ -498,7 +507,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
         ) : null}
       </div>
 
-      {activeTab === "details" ? (
+      {mergeBookAndChapterPanels || activeTab === "details" ? (
         <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 dark:border-zinc-800/80 dark:bg-zinc-900/35">
           <form
             onSubmit={(e) => {
@@ -598,9 +607,15 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             </div>
           </form>
         </section>
-      ) : (
+      ) : null}
+
+      {mergeBookAndChapterPanels ? (
+        <div className="mt-8">
+          <ChapterManagerClient bookId={book.id} status={book.status} />
+        </div>
+      ) : activeTab === "chapters" ? (
         <ChapterManagerClient bookId={book.id} status={book.status} />
-      )}
+      ) : null}
     </div>
   );
 }

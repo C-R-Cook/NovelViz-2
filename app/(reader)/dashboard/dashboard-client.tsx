@@ -130,9 +130,6 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
       <h1 className="font-serif text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
         Dashboard
       </h1>
-      <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-        Reader tools, partner publishing, and admin moderation in one place.
-      </p>
 
       <div className="mt-8 flex flex-wrap gap-1 border-b border-zinc-200 dark:border-zinc-800">
         <button type="button" className={`${tabBase} ${tab === "reader" ? tabActive : tabInactive}`} onClick={() => setTab("reader")}>

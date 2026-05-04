@@ -26,7 +26,7 @@ export type AdminBookDetailModel = {
   createdAtLabel: string;
 };
 
-type TabKey = "overview" | "edit" | "chapters";
+type TabKey = "overview" | "edit";
 
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
@@ -105,7 +105,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
   const [ingestErr, setIngestErr] = useState<string | null>(null);
   const [ingestBusy, setIngestBusy] = useState(false);
-  /** When true, ingest applies Dublin Core from the EPUB OPF to this book (ignored for .txt). */
+  /** When true, ingest applies Dublin Core from the EPUB OPF to this book. */
   const [applyEpubMetadata, setApplyEpubMetadata] = useState(false);
 
   const [publishErr, setPublishErr] = useState<string | null>(null);
@@ -323,6 +323,15 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   }
 
   async function uploadIngest(file: File) {
+    const name = file.name.toLowerCase();
+    const isEpub =
+      name.endsWith(".epub") ||
+      file.type === "application/epub+zip" ||
+      file.type === "application/x-epub+zip";
+    if (!isEpub) {
+      setIngestErr("Only EPUB files are supported.");
+      return;
+    }
     setIngestErr(null);
     setIngestBusy(true);
     try {
@@ -444,19 +453,6 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           }`}
         >
           Edit
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "chapters"}
-          onClick={() => setActiveTab("chapters")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            activeTab === "chapters"
-              ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
-          }`}
-        >
-          Chapters
         </button>
       </div>
 
@@ -593,64 +589,31 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
       {activeTab === "edit" ? (
         <section className="space-y-4">
-          <div className="rounded-lg border border-zinc-200/90 bg-zinc-50/80 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/40">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-                <input
-                  ref={ingestFileRef}
-                  type="file"
-                  accept=".epub,.txt,application/epub+zip,text/plain"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void uploadIngest(f);
-                    e.target.value = "";
-                  }}
-                />
+          {showReviewToggle ? (
+            <div className="rounded-lg border border-zinc-200/90 bg-zinc-50/80 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/40">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
-                  disabled={ingestBusy}
-                  onClick={() => ingestFileRef.current?.click()}
-                  className="rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                  disabled={reviewToggleDisabled}
+                  onClick={() =>
+                    void transitionStatus(book.status === "pending_review" ? "draft" : "pending_review", {
+                      successMessage:
+                        book.status === "pending_review"
+                          ? "Withdrawn from review."
+                          : "Submitted for review.",
+                    })
+                  }
+                  className={
+                    book.status === "pending_review"
+                      ? "rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                      : "rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-indigo-50 transition hover:bg-indigo-700 disabled:opacity-50"
+                  }
                 >
-                  {ingestBusy ? "Uploading..." : "Re-upload EPUB/TXT"}
+                  {statusBusy ? "Updating..." : book.status === "pending_review" ? "Withdraw Review" : "Submit Review"}
                 </button>
-                {showReviewToggle ? (
-                  <button
-                    type="button"
-                    disabled={reviewToggleDisabled}
-                    onClick={() =>
-                      void transitionStatus(book.status === "pending_review" ? "draft" : "pending_review", {
-                        successMessage:
-                          book.status === "pending_review"
-                            ? "Withdrawn from review."
-                            : "Submitted for review.",
-                      })
-                    }
-                    className={
-                      book.status === "pending_review"
-                        ? "rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
-                        : "rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-indigo-50 transition hover:bg-indigo-700 disabled:opacity-50"
-                    }
-                  >
-                    {statusBusy ? "Updating..." : book.status === "pending_review" ? "Withdraw Review" : "Submit Review"}
-                  </button>
-                ) : null}
-            </div>
-            <label className="mt-2 flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
-              <input
-                type="checkbox"
-                checked={applyEpubMetadata}
-                onChange={(e) => setApplyEpubMetadata(e.target.checked)}
-                className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-400 text-amber-600 focus:ring-amber-500/30 dark:border-zinc-600"
-              />
-              Fill title/author/description/genre/year from EPUB metadata (ignored for .txt).
-            </label>
-            {ingestErr ? (
-              <div className="mt-2 text-right text-sm text-red-600 dark:text-red-400">
-                <p>{ingestErr}</p>
               </div>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <div className="relative overflow-hidden rounded-xl border border-zinc-200/90 p-6 dark:border-zinc-800/80">
             <div
@@ -662,7 +625,18 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               className="relative z-10 space-y-4 rounded-lg bg-white/80 p-1 dark:bg-zinc-900/55"
             >
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
-                <div className="space-y-2">
+                <div className="w-36 space-y-2">
+                  <input
+                    ref={ingestFileRef}
+                    type="file"
+                    accept=".epub,application/epub+zip"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void uploadIngest(f);
+                      e.target.value = "";
+                    }}
+                  />
                   <input
                     ref={coverUploadRef}
                     type="file"
@@ -678,7 +652,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     type="button"
                     disabled={coverUploadBusy}
                     onClick={() => !coverUploadBusy && coverUploadRef.current?.click()}
-                    className="group relative block h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 p-0 text-left outline-none ring-amber-500/0 transition hover:ring-2 hover:ring-amber-500/40 focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:ring-amber-400/35 dark:focus-visible:ring-amber-400/40"
+                    className="group relative block h-52 w-full overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 p-0 text-left outline-none ring-amber-500/0 transition hover:ring-2 hover:ring-amber-500/40 focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:ring-amber-400/35 dark:focus-visible:ring-amber-400/40"
                     aria-label={coverUploadBusy ? "Uploading cover" : "Change cover image"}
                   >
                     {book.coverImageUrl ? (
@@ -700,6 +674,26 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                       </span>
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    disabled={ingestBusy}
+                    onClick={() => ingestFileRef.current?.click()}
+                    className="w-full rounded-lg bg-zinc-200 px-2 py-2 text-center text-xs font-medium leading-snug text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                  >
+                    {ingestBusy ? "Uploading…" : "Re-upload EPUB"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApplyEpubMetadata((v) => !v)}
+                    className={
+                      applyEpubMetadata
+                        ? "w-full rounded-lg bg-emerald-600 px-2 py-2 text-center text-[11px] font-semibold leading-snug text-white shadow-sm ring-1 ring-emerald-700/40 transition hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                        : "w-full rounded-lg bg-red-600 px-2 py-2 text-center text-[11px] font-semibold leading-snug text-white shadow-sm ring-1 ring-red-800/35 transition hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
+                    }
+                  >
+                    {applyEpubMetadata ? "Update data from EPUB" : "Do not update data from EPUB"}
+                  </button>
+                  {ingestErr ? <p className="text-xs text-red-600 dark:text-red-400">{ingestErr}</p> : null}
                   {coverUploadMsg ? (
                     <p className="text-xs text-emerald-700 dark:text-emerald-400/90">{coverUploadMsg}</p>
                   ) : null}
@@ -771,10 +765,12 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               </div>
             </form>
           </div>
+
+          <div className="mt-10 border-t border-zinc-200/90 pt-8 dark:border-zinc-800/80">
+            <ChapterManagerClient bookId={book.id} status={book.status} />
+          </div>
         </section>
       ) : null}
-
-      {activeTab === "chapters" ? <ChapterManagerClient bookId={book.id} status={book.status} /> : null}
 
       {rejectOpen ? (
         <div

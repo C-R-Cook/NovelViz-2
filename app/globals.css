@@ -24,3 +24,50 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Discover catalogue — entrance + genre pill glow (used by discover-catalogue-client) */
+@keyframes discover-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes discover-pill-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(251 191 36 / 0.18),
+      0 0 0 0 rgb(251 191 36 / 0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgb(251 191 36 / 0.25),
+      0 0 16px 2px rgb(251 191 36 / 0.12);
+  }
+}
+
+.discover-animate-in {
+  opacity: 0;
+  animation: discover-fade-up 0.45s ease forwards;
+}
+
+.discover-pill-pulse {
+  animation: discover-pill-glow 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-animate-in {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .discover-pill-pulse {
+    animation: none !important;
+  }
+}

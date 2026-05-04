@@ -29,11 +29,152 @@ function buildQuery(genre: string, cursor: string | null): string {
   return s ? `?${s}` : "";
 }
 
+function useDiscoverMotionPrefs() {
+  const [finePointer, setFinePointer] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mqFine = window.matchMedia("(pointer: fine)");
+    const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => {
+      setFinePointer(mqFine.matches);
+      setReducedMotion(mqReduce.matches);
+    };
+    sync();
+    mqFine.addEventListener("change", sync);
+    mqReduce.addEventListener("change", sync);
+    return () => {
+      mqFine.removeEventListener("change", sync);
+      mqReduce.removeEventListener("change", sync);
+    };
+  }, []);
+
+  return { finePointer, reducedMotion };
+}
+
+type FeaturedCarouselCardProps = {
+  book: DiscoverCatalogueBook;
+  index: number;
+  activeFeatured: number;
+  finePointer: boolean;
+  reducedMotion: boolean;
+};
+
+function FeaturedCarouselCard({
+  book,
+  index,
+  activeFeatured,
+  finePointer,
+  reducedMotion,
+}: FeaturedCarouselCardProps) {
+  const [hover, setHover] = useState(false);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50 });
+  const faceRef = useRef<HTMLDivElement>(null);
+
+  const offset = index - activeFeatured;
+  const scrollRotateY = offset === 0 ? 0 : offset < 0 ? 14 : -14;
+  const z = offset === 0 ? 20 : 10 - Math.abs(offset);
+
+  const baseScale = offset === 0 ? 1.02 : 0.88;
+  let scale = baseScale;
+  if (finePointer && hover) {
+    scale = offset === 0 ? 1.05 : Math.min(0.98, baseScale + 0.1);
+  }
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!finePointer || !faceRef.current) return;
+    const rect = faceRef.current.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ rx: -py * 9, ry: px * 11 });
+    setGlare({
+      x: ((e.clientX - rect.left) / rect.width) * 100,
+      y: ((e.clientY - rect.top) / rect.height) * 100,
+    });
+  };
+
+  const onMouseLeave = () => {
+    setHover(false);
+    setTilt({ rx: 0, ry: 0 });
+    setGlare({ x: 50, y: 50 });
+  };
+
+  const faceTransform =
+    finePointer && hover
+      ? `perspective(720px) rotateX(${tilt.rx}deg) rotateY(${scrollRotateY + tilt.ry * 0.35}deg)`
+      : `perspective(720px) rotateY(${scrollRotateY}deg)`;
+
+  return (
+    <span
+      className={`snap-center shrink-0 inline-block ${!reducedMotion ? "discover-animate-in" : ""}`}
+      style={!reducedMotion ? { animationDelay: `${index * 50}ms` } : undefined}
+    >
+      <Link
+        href={`/discover/${book.id}`}
+        data-carousel-card
+        onMouseEnter={() => finePointer && setHover(true)}
+        onMouseLeave={onMouseLeave}
+        onMouseMove={onMouseMove}
+        className="group block cursor-pointer outline-none transition-[transform,opacity] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-amber-500/50"
+        style={{
+          transform: `translateZ(0) scale(${scale})`,
+          zIndex: z,
+          transformStyle: "preserve-3d",
+        }}
+      >
+        <div
+          ref={faceRef}
+          className="relative w-[9.5rem] overflow-hidden rounded-lg transition-transform duration-200 ease-out will-change-transform sm:w-[11.5rem] md:w-[12.5rem]"
+          style={{ transform: faceTransform, transformStyle: "preserve-3d" }}
+        >
+          <div className="relative aspect-[2/3] w-full">
+            <Image
+              src={book.coverImageUrl}
+              alt={book.title}
+              fill
+              className="object-cover"
+              sizes="200px"
+              priority={index < 2}
+            />
+            <div
+              className="pointer-events-none absolute inset-0 opacity-0 mix-blend-overlay transition-opacity duration-300 ease-out group-hover:opacity-100"
+              style={{
+                background: `radial-gradient(ellipse 85% 70% at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 35%, transparent 58%)`,
+              }}
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/38 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/25 to-transparent opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pt-10">
+              <p className="line-clamp-2 text-sm font-semibold leading-snug text-white drop-shadow-md">
+                {book.title}
+              </p>
+              <p className="mt-1 line-clamp-1 text-xs text-zinc-300">{book.author}</p>
+              <div
+                className={`mt-2 flex justify-center transition-all duration-300 ease-out ${
+                  finePointer
+                    ? "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+                    : "hidden"
+                }`}
+              >
+                <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/25 backdrop-blur-sm">
+                  View book
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    </span>
+  );
+}
+
 export function DiscoverCatalogueClient({
   featured,
   initialBooks,
   initialNextCursor,
 }: Props) {
+  const { finePointer, reducedMotion } = useDiscoverMotionPrefs();
   const [genre, setGenre] = useState("all");
   const [books, setBooks] = useState(initialBooks);
   const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
@@ -165,6 +306,12 @@ export function DiscoverCatalogueClient({
   const showFeatured = featured.length > 0;
   const showEmpty = !gridLoading && books.length === 0;
 
+  const genreEnterDelayMs = showFeatured ? featured.length * 50 + 280 : 100;
+
+  const gridHoverClass = finePointer
+    ? "hover:scale-[1.04] hover:shadow-xl hover:shadow-black/55 focus-visible:scale-[1.04] focus-visible:shadow-xl"
+    : "active:scale-[0.99]";
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20 pt-6 text-zinc-100 sm:pt-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -191,45 +338,16 @@ export function DiscoverCatalogueClient({
                 onScroll={updateActiveFeatured}
                 className="-mx-4 flex gap-5 overflow-x-auto px-[min(18vw,7rem)] py-6 [scrollbar-width:none] sm:gap-6 sm:px-[min(14vw,8rem)] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory scroll-pb-4"
               >
-                {featured.map((book, i) => {
-                  const offset = i - activeFeatured;
-                  const scale = offset === 0 ? 1.06 : 0.88;
-                  const rotateY = offset === 0 ? 0 : offset < 0 ? 14 : -14;
-                  const z = offset === 0 ? 20 : 10 - Math.abs(offset);
-                  return (
-                    <Link
-                      key={book.id}
-                      href={`/discover/${book.id}`}
-                      data-carousel-card
-                      className="snap-center shrink-0 outline-none transition-[transform,opacity] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-amber-500/50"
-                      style={{
-                        transform: `rotateY(${rotateY}deg) scale(${scale})`,
-                        zIndex: z,
-                        transformStyle: "preserve-3d",
-                      }}
-                    >
-                      <div className="relative w-[9.5rem] overflow-hidden rounded-lg sm:w-[11.5rem] md:w-[12.5rem]">
-                        <div className="relative aspect-[2/3] w-full">
-                          <Image
-                            src={book.coverImageUrl}
-                            alt={book.title}
-                            fill
-                            className="object-cover"
-                            sizes="200px"
-                            priority={i < 2}
-                          />
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
-                          <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pt-10">
-                            <p className="line-clamp-2 text-sm font-semibold leading-snug text-white drop-shadow-md">
-                              {book.title}
-                            </p>
-                            <p className="mt-1 line-clamp-1 text-xs text-zinc-300">{book.author}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
+                {featured.map((book, i) => (
+                  <FeaturedCarouselCard
+                    key={book.id}
+                    book={book}
+                    index={i}
+                    activeFeatured={activeFeatured}
+                    finePointer={finePointer}
+                    reducedMotion={reducedMotion}
+                  />
+                ))}
               </div>
             </div>
           </section>
@@ -237,7 +355,12 @@ export function DiscoverCatalogueClient({
 
         <section className="mb-8">
           <h2 className="sr-only">Filter by genre</h2>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div
+            className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              !reducedMotion ? "discover-animate-in" : ""
+            }`}
+            style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
+          >
             {GENRE_PILLS.map((pill) => {
               const active = genre === pill.value;
               return (
@@ -245,9 +368,11 @@ export function DiscoverCatalogueClient({
                   key={pill.value}
                   type="button"
                   onClick={() => selectGenre(pill.value)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition-all duration-300 sm:text-sm ${
+                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium outline-none transition-all duration-200 ease-out sm:text-sm ${
+                    finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
+                  } ${
                     active
-                      ? "bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/50"
+                      ? `bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/55 ${!reducedMotion ? "discover-pill-pulse" : ""}`
                       : "bg-zinc-800/60 text-zinc-400 ring-1 ring-transparent hover:bg-zinc-800 hover:text-zinc-200"
                   }`}
                 >
@@ -280,37 +405,53 @@ export function DiscoverCatalogueClient({
           ) : (
             <>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
-                {books.map((book) => (
+                {books.map((book, i) => (
                   <Link
                     key={book.id}
                     href={`/discover/${book.id}`}
-                    className="group relative aspect-[2/3] overflow-hidden rounded-md outline-none transition-transform duration-300 ease-out hover:scale-105 focus-visible:ring-2 focus-visible:ring-amber-500/50"
+                    className={`group relative aspect-[2/3] cursor-pointer overflow-hidden rounded-md shadow-sm shadow-black/20 outline-none transition-all duration-200 ease-out ${gridHoverClass} focus-visible:ring-2 focus-visible:ring-amber-500/50 ${
+                      !reducedMotion ? "discover-animate-in" : ""
+                    }`}
+                    style={!reducedMotion ? { animationDelay: `${i * 50}ms` } : undefined}
                   >
                     <Image
                       src={book.coverImageUrl}
                       alt={book.title}
                       fill
-                      className="object-cover"
+                      className={`object-cover transition-transform duration-200 ease-out ${
+                        finePointer ? "group-hover:scale-[1.02]" : ""
+                      }`}
                       sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
                     />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100" />
                     {book.genre ? (
                       <div className="absolute right-2 top-2 max-w-[55%] truncate rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
                         {formatGenre(book.genre)}
                       </div>
                     ) : null}
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 p-2.5 pt-8 sm:p-3">
+                    <div
+                      className={`pointer-events-none absolute inset-x-0 bottom-0 p-2.5 pt-10 transition-transform duration-200 ease-out sm:p-3 ${
+                        finePointer ? "group-hover:-translate-y-1" : ""
+                      }`}
+                    >
                       <p className="line-clamp-2 text-xs font-bold leading-snug text-white drop-shadow sm:text-sm">
                         {book.title}
                       </p>
                       <p className="mt-0.5 line-clamp-1 text-[10px] text-zinc-400 sm:text-xs">
                         {book.author}
                       </p>
-                    </div>
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-300 ease-out group-hover:bg-black/40 group-hover:opacity-100">
-                      <span className="rounded-full bg-amber-500/20 px-3 py-1.5 text-xs font-medium text-amber-100 ring-1 ring-amber-400/40 backdrop-blur-sm">
-                        View book
-                      </span>
+                      <div
+                        className={`mt-1.5 transition-all duration-200 ease-out ${
+                          finePointer
+                            ? "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
+                            : "opacity-0"
+                        }`}
+                      >
+                        <span className="inline-block rounded-md bg-amber-500/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100 ring-1 ring-amber-400/40">
+                          View book
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 ))}

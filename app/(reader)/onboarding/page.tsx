@@ -1,5 +1,5 @@
 import { OnboardingClient } from "./onboarding-client";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
   if (user.username?.trim()) {
-    redirect("/dashboard");
+    redirect(getRoleHomeUrl(session.role));
   }
 
   return <OnboardingClient />;

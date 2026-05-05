@@ -24,7 +24,10 @@ export default async function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
-        <body className="flex min-h-screen flex-col bg-bg-base text-text-primary antialiased">
+        <body
+          className="flex min-h-screen flex-col bg-bg-base text-text-primary antialiased"
+          suppressHydrationWarning
+        >
           {isDev && DEV_PALETTE_HYDRATION_SCRIPT ? (
             <script dangerouslySetInnerHTML={{ __html: DEV_PALETTE_HYDRATION_SCRIPT }} />
           ) : null}

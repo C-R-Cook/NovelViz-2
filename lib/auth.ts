@@ -49,5 +49,5 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 }
 
 export function getRoleHomeUrl(_role: CurrentUser["role"]): string {
-  return "/dashboard";
+  return "/library";
 }

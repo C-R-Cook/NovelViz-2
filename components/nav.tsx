@@ -14,7 +14,9 @@ export async function Nav() {
       isLoggedIn={isLoggedIn}
       userInitials={initials}
       userName={user?.name ?? null}
+      userUsername={user?.username ?? null}
       userEmail={user?.email ?? ""}
+      userRole={user?.role ?? null}
       isProduction={process.env.NODE_ENV === "production"}
     />
   );

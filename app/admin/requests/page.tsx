@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
@@ -22,7 +22,7 @@ export default async function AdminBookRequestsPage() {
     redirect("/sign-in");
   }
   if (session.role !== UserRole.admin) {
-    redirect("/dashboard");
+    redirect(getRoleHomeUrl(session.role));
   }
 
   const requests = await prisma.bookRequest.findMany({

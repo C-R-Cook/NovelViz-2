@@ -1,5 +1,5 @@
 import { Nav } from "@/components/nav";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
 import { UserRole } from "@db";
 import { redirect } from "next/navigation";
 
@@ -13,7 +13,7 @@ export default async function PartnerLayout({
     redirect("/sign-in");
   }
   if (user.role === UserRole.reader) {
-    redirect("/dashboard");
+    redirect(getRoleHomeUrl(user.role));
   }
 
   return (

@@ -26,7 +26,7 @@ function writeDevUserCookie(userId: string) {
 }
 
 function getHomeUrlForUser(_user: DevIdentityUser): string {
-  return "/dashboard";
+  return "/library";
 }
 
 function isKnownUserId(s: string | null): s is string {

@@ -10,7 +10,9 @@ export type NavChromeProps = {
   isLoggedIn: boolean;
   userInitials: string;
   userName: string | null;
+  userUsername: string | null;
   userEmail: string;
+  userRole: "reader" | "partner" | "admin" | null;
   isProduction: boolean;
 };
 
@@ -30,14 +32,16 @@ function navLinkClass(active: boolean): string {
 
 function NavUserMenu({
   initials,
-  displayName,
-  email,
+  menuPrimaryLabel,
+  menuSecondaryLabel,
+  userRole,
   isProduction,
   onNavigate,
 }: {
   initials: string;
-  displayName: string | null;
-  email: string;
+  menuPrimaryLabel: string;
+  menuSecondaryLabel: string | null;
+  userRole: "reader" | "partner" | "admin";
   isProduction: boolean;
   onNavigate: () => void;
 }) {
@@ -56,7 +60,8 @@ function NavUserMenu({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open]);
 
-  const headerLabel = displayName?.trim() || email;
+  const showDashboard = userRole === "partner" || userRole === "admin";
+  const showAdmin = userRole === "admin";
 
   return (
     <div className="relative" ref={rootRef}>
@@ -76,9 +81,9 @@ function NavUserMenu({
           role="menu"
         >
           <div className="border-b border-border-subtle px-3 py-2">
-            <p className="truncate text-sm font-medium text-text-primary">{headerLabel}</p>
-            {displayName?.trim() ? (
-              <p className="truncate text-xs text-text-muted">{email}</p>
+            <p className="truncate text-sm font-medium text-text-primary">{menuPrimaryLabel}</p>
+            {menuSecondaryLabel ? (
+              <p className="truncate text-xs text-text-muted">{menuSecondaryLabel}</p>
             ) : null}
           </div>
           <Link
@@ -92,17 +97,35 @@ function NavUserMenu({
           >
             My Account
           </Link>
-          <Link
-            href="/dashboard"
-            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onNavigate();
-            }}
-          >
-            Dashboard
-          </Link>
+          {(showDashboard || showAdmin) && (
+            <div className="my-1 border-t border-border-subtle" role="separator" />
+          )}
+          {showDashboard ? (
+            <Link
+              href="/dashboard"
+              className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              Dashboard
+            </Link>
+          ) : null}
+          {showAdmin ? (
+            <Link
+              href="/admin/books"
+              className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              Admin
+            </Link>
+          ) : null}
           <div className="my-1 border-t border-border-subtle" role="separator" />
           {isProduction ? (
             <button
@@ -118,7 +141,7 @@ function NavUserMenu({
             </button>
           ) : (
             <p className="px-3 py-2 text-xs leading-relaxed text-text-muted">
-              Dev user: <span className="text-text-secondary">{headerLabel}</span>
+              Dev user: <span className="text-text-secondary">{menuPrimaryLabel}</span>
               <span className="mt-1 block text-[11px] text-text-muted">
                 Use the role switcher to change identity. Production builds show Sign out here.
               </span>
@@ -135,7 +158,9 @@ export function NavChrome({
   isLoggedIn,
   userInitials,
   userName,
+  userUsername,
   userEmail,
+  userRole,
   isProduction,
 }: NavChromeProps) {
   const pathname = usePathname();
@@ -145,15 +170,29 @@ export function NavChrome({
     setMenuOpen(false);
   }, [pathname]);
 
+  const menuPrimaryLabel =
+    userUsername?.trim() || userName?.trim() || userEmail || "Account";
+  const menuSecondaryLabel =
+    userUsername?.trim() || userName?.trim() ? userEmail : null;
+
   const links = (
     <>
       <Link
-        href="/discover"
-        className={navLinkClass(isActive(pathname, "/discover"))}
+        href="/books"
+        className={navLinkClass(isActive(pathname, "/books"))}
         onClick={() => setMenuOpen(false)}
       >
         Discover
       </Link>
+      {isLoggedIn ? (
+        <Link
+          href="/library"
+          className={navLinkClass(isActive(pathname, "/library"))}
+          onClick={() => setMenuOpen(false)}
+        >
+          My Library
+        </Link>
+      ) : null}
       <Link
         href="/gallery"
         className={navLinkClass(isActive(pathname, "/gallery"))}
@@ -191,16 +230,17 @@ export function NavChrome({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-          {isLoggedIn ? (
+          {isLoggedIn && userRole ? (
             <NavUserMenu
               initials={userInitials}
-              displayName={userName}
-              email={userEmail}
+              menuPrimaryLabel={menuPrimaryLabel}
+              menuSecondaryLabel={menuSecondaryLabel}
+              userRole={userRole}
               isProduction={isProduction}
               onNavigate={() => setMenuOpen(false)}
             />
           ) : (
-            <Link href="/login" className={signInClass} onClick={() => setMenuOpen(false)}>
+            <Link href="/sign-in" className={signInClass} onClick={() => setMenuOpen(false)}>
               Sign In
             </Link>
           )}

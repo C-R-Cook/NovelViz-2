@@ -1,5 +1,6 @@
 import { DashboardClient } from "./dashboard-client";
 import { getCurrentUser } from "@/lib/auth";
+import { fetchPartnerAnalytics } from "@/lib/partner-analytics";
 import {
   PARTNER_BOOKS_PAGE_SIZE,
   fetchPartnerDashboardStats,
@@ -74,18 +75,21 @@ export default async function DashboardPage() {
 
   let partnerPayload: {
     stats: { totalBooks: number; totalReaders: number; totalQueries: number; totalImages: number };
+    analytics: Awaited<ReturnType<typeof fetchPartnerAnalytics>>;
     initialBooks: Awaited<ReturnType<typeof queryPartnerBooksPage>>["rows"];
     initialHasMore: boolean;
     pageSize: number;
   } | null = null;
 
   if (role === UserRole.partner || role === UserRole.admin) {
-    const [stats, page0] = await Promise.all([
+    const [stats, analytics, page0] = await Promise.all([
       fetchPartnerDashboardStats(userId),
+      fetchPartnerAnalytics(userId),
       queryPartnerBooksPage({ ownerId: userId, skip: 0 }),
     ]);
     partnerPayload = {
       stats,
+      analytics,
       initialBooks: page0.rows,
       initialHasMore: page0.hasMore,
       pageSize: PARTNER_BOOKS_PAGE_SIZE,

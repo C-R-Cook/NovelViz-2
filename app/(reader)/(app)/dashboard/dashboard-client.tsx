@@ -1,6 +1,8 @@
 "use client";
 
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
+import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
+import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import type { PartnerDashboardBookRow } from "@/lib/partner-books-list";
 import Image from "next/image";
@@ -41,6 +43,7 @@ export type DashboardClientProps = {
   };
   partner: {
     stats: { totalBooks: number; totalReaders: number; totalQueries: number; totalImages: number };
+    analytics: PartnerAnalyticsPayload;
     initialBooks: PartnerDashboardBookRow[];
     initialHasMore: boolean;
     pageSize: number;
@@ -287,12 +290,11 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
                 Upload new book
               </Link>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <StatMini label="Total books" value={partner.stats.totalBooks} />
-              <StatMini label="Total readers" value={partner.stats.totalReaders} />
-              <StatMini label="Total queries" value={partner.stats.totalQueries} />
-              <StatMini label="Total images" value={partner.stats.totalImages} />
-            </div>
+            <p className="text-xs text-text-muted">
+              <span className="font-medium text-text-secondary">{partner.stats.totalBooks}</span> books
+              in your catalogue
+            </p>
+            <PartnerDashboardAnalytics data={partner.analytics} />
             <div className="rounded-xl border border-border">
               <PartnerDashboardBooksClient
                 initialBooks={partner.initialBooks}

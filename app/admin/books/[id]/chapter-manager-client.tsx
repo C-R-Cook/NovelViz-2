@@ -243,26 +243,26 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   const disabled = status === "processing" || actionBusy;
 
   return (
-    <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/35 dark:shadow-black/20">
-      <h2 className="mb-4 font-serif text-lg font-semibold text-amber-900 dark:text-amber-100/90">
+    <section className="rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
+      <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">
         Chapter Manager
       </h2>
 
       {status === "processing" ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-500">
+        <p className="text-sm text-text-muted">
           Chapters are not editable while ingestion is running.
         </p>
       ) : loading ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-500">Loading chapters…</p>
+        <p className="text-sm text-text-muted">Loading chapters…</p>
       ) : loadErr ? (
-        <p className="text-sm text-red-600 dark:text-red-400">{loadErr}</p>
+        <p className="text-sm text-error">{loadErr}</p>
       ) : (
         <>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="block min-w-[240px] flex-1 space-y-1.5">
               <span
                 id="chapter-manager-label"
-                className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500"
+                className="text-xs font-medium uppercase tracking-wide text-text-muted"
               >
                 Chapter
               </span>
@@ -275,7 +275,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                   aria-labelledby="chapter-manager-label chapter-manager-trigger"
                   disabled={disabled}
                   onClick={() => setChapterPickerOpen((o) => !o)}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-left text-sm text-zinc-900 outline-none ring-amber-400/0 transition focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-bg-surface px-3 py-2 text-left text-sm text-text-primary outline-none ring-accent/0 transition focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {selected
@@ -283,7 +283,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                       : "Select a chapter…"}
                   </span>
                   <svg
-                    className={`h-4 w-4 shrink-0 text-zinc-600 transition-transform dark:text-zinc-500 ${chapterPickerOpen ? "rotate-180" : ""}`}
+                    className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${chapterPickerOpen ? "rotate-180" : ""}`}
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={2}
@@ -301,14 +301,14 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                   <ul
                     role="listbox"
                     aria-labelledby="chapter-manager-label"
-                    className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-[min(50vh,20rem)] overflow-y-auto overscroll-contain rounded-lg border border-zinc-300 bg-white py-1 shadow-lg shadow-zinc-900/15 ring-1 ring-zinc-200 dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-black/50 dark:ring-zinc-800/80"
+                    className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-[min(50vh,20rem)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
                   >
                     <li role="none">
                       <button
                         type="button"
                         role="option"
                         aria-selected={selectedId === ""}
-                        className="w-full px-3 py-2 text-left text-sm text-zinc-600 transition hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-200"
+                        className="w-full px-3 py-2 text-left text-sm text-text-muted transition hover:bg-bg-surface hover:text-text-primary"
                         onClick={async () => {
                           setSelectedId("");
                           setStaleMsg(null);
@@ -324,10 +324,10 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                           type="button"
                           role="option"
                           aria-selected={selectedId === c.id}
-                          className={`w-full px-3 py-2 text-left text-sm transition hover:bg-zinc-100 dark:hover:bg-zinc-900 ${
+                          className={`w-full px-3 py-2 text-left text-sm transition hover:bg-bg-surface ${
                             selectedId === c.id
-                              ? "bg-amber-100 text-amber-950 dark:bg-amber-500/10 dark:text-amber-100"
-                              : "text-zinc-800 dark:text-zinc-200"
+                              ? "bg-accent-muted text-text-primary"
+                              : "text-text-primary"
                           }`}
                           onClick={async () => {
                             setSelectedId(c.id);
@@ -347,16 +347,16 @@ export function ChapterManagerClient({ bookId, status }: Props) {
           </div>
 
           {staleMsg ? (
-            <p className="mb-4 rounded-lg border border-amber-600/35 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100/95">
+            <p className="mb-4 rounded-lg border border-accent/35 bg-accent-muted px-3 py-2 text-sm text-text-primary">
               {staleMsg}
             </p>
           ) : null}
 
           {selected ? (
-            <div className="space-y-4 border-t border-zinc-200/90 pt-4 dark:border-zinc-800/80">
+            <div className="space-y-4 border-t border-border pt-4">
               <form onSubmit={saveTitle} className="space-y-2">
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
                     Chapter title
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
@@ -364,33 +364,33 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                       value={chapterTitle}
                       onChange={(e) => setChapterTitle(e.target.value)}
                       disabled={disabled}
-                      className="min-w-[200px] flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                      className="min-w-[200px] flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
                     />
                     <button
                       type="submit"
                       disabled={disabled || savingTitle}
-                      className="rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                      className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
                     >
                       {savingTitle ? "Saving…" : "Save title"}
                     </button>
                   </div>
                 </label>
                 {titleErr ? (
-                  <p className="text-sm text-red-600 dark:text-red-400">{titleErr}</p>
+                  <p className="text-sm text-error">{titleErr}</p>
                 ) : null}
                 {titleOk ? (
-                  <p className="text-sm text-emerald-700 dark:text-emerald-400/90">{titleOk}</p>
+                  <p className="text-sm text-success">{titleOk}</p>
                 ) : null}
               </form>
 
               <label className="block space-y-1.5">
-                <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
                   Raw text (read-only)
                 </span>
                 <textarea
                   readOnly
                   value={selected.rawText}
-                  className="max-h-[400px] w-full resize-y overflow-auto rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 font-mono text-xs leading-relaxed text-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/50 dark:text-zinc-300"
+                  className="max-h-[400px] w-full resize-y overflow-auto rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-xs leading-relaxed text-text-primary"
                   rows={12}
                 />
               </label>
@@ -400,7 +400,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                   type="button"
                   disabled={disabled || !canPrev}
                   onClick={mergeIntoPrevious}
-                  className="rounded-lg bg-zinc-200 px-3 py-2 text-sm text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                  className="rounded-lg bg-bg-raised px-3 py-2 text-sm text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-40"
                 >
                   Merge into previous
                 </button>
@@ -408,7 +408,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                   type="button"
                   disabled={disabled || !canNext}
                   onClick={mergeIntoNext}
-                  className="rounded-lg bg-zinc-200 px-3 py-2 text-sm text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-40 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                  className="rounded-lg bg-bg-raised px-3 py-2 text-sm text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-40"
                 >
                   Merge into next
                 </button>
@@ -416,13 +416,13 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                   type="button"
                   disabled={disabled}
                   onClick={deleteChapter}
-                  className="rounded-lg bg-red-100 px-3 py-2 text-sm text-red-900 ring-1 ring-red-300/80 transition hover:bg-red-200/80 disabled:opacity-40 dark:bg-red-950/60 dark:text-red-200 dark:ring-red-900/60 dark:hover:bg-red-900/50"
+                  className="rounded-lg bg-error/15 px-3 py-2 text-sm text-error ring-1 ring-error/35 transition hover:bg-error/25 disabled:opacity-40"
                 >
                   Delete
                 </button>
               </div>
               {actionErr ? (
-                <p className="text-sm text-red-600 dark:text-red-400">{actionErr}</p>
+                <p className="text-sm text-error">{actionErr}</p>
               ) : null}
             </div>
           ) : null}

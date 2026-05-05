@@ -1,31 +1,170 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
+/* -------------------------------------------------------------------------- */
+/* Design tokens — default Palette A: Midnight Library                        */
+/* -------------------------------------------------------------------------- */
 :root {
-  --background: #fafafa;
-  --foreground: #18181b;
+  /* Backgrounds */
+  --bg-base: #0a0a0a;
+  --bg-surface: #141414;
+  --bg-raised: #1e1e1e;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Text */
+  --text-primary: #f5f0e8;
+  --text-secondary: #b8b0a0;
+  --text-muted: #6b6560;
+  --text-inverse: #0a0a0a;
+
+  /* Accent */
+  --accent: #c9a84c;
+  --accent-hover: #d4b460;
+  --accent-muted: rgba(201, 168, 76, 0.15);
+  --accent-text: #c9a84c;
+
+  /* Borders */
+  --border: #2a2a2a;
+  --border-subtle: #1e1e1e;
+
+  /* Status colours */
+  --status-draft: #4a4a4a;
+  --status-pending: #b45309;
+  --status-processing: #1d4ed8;
+  --status-ready: #b45309;
+  --status-published: #15803d;
+  --status-unlisted: #c2410c;
+  --status-rejected: #b91c1c;
+
+  /* Feedback */
+  --success: #15803d;
+  --warning: #b45309;
+  --error: #b91c1c;
+  --info: #1d4ed8;
+
+  /* Discover pill glow (keyframes read these at computed time) */
+  --discover-pill-glow-a: color-mix(in srgb, var(--accent) 18%, transparent);
+  --discover-pill-glow-b: color-mix(in srgb, var(--accent) 25%, transparent);
+  --discover-pill-glow-c: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.dark {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+/* Palette B — Gothic Noir */
+body.palette-gothic {
+  --bg-base: #0d0a12;
+  --bg-surface: #16121f;
+  --bg-raised: #201a2e;
+  --bg-overlay: rgba(13, 10, 18, 0.8);
+  --text-primary: #ede9f5;
+  --text-secondary: #a89ec0;
+  --text-muted: #635a7a;
+  --accent: #c084fc;
+  --accent-hover: #d09ffe;
+  --accent-muted: rgba(192, 132, 252, 0.15);
+  --accent-text: #c084fc;
+  --border: #2d2540;
+  --border-subtle: #201a2e;
+}
+
+/* Palette C — Candlelight */
+body.palette-candlelight {
+  --bg-base: #0f0c08;
+  --bg-surface: #1a1510;
+  --bg-raised: #241e16;
+  --bg-overlay: rgba(15, 12, 8, 0.8);
+  --text-primary: #f0e6d3;
+  --text-secondary: #c4aa88;
+  --text-muted: #7a6548;
+  --accent: #e8b86d;
+  --accent-hover: #f0c47d;
+  --accent-muted: rgba(232, 184, 109, 0.15);
+  --accent-text: #e8b86d;
+  --border: #332a1e;
+  --border-subtle: #241e16;
+}
+
+/* Palette D — Moonlight Silver */
+body.palette-moonlight {
+  --bg-base: #080c12;
+  --bg-surface: #0e1420;
+  --bg-raised: #151d2e;
+  --bg-overlay: rgba(8, 12, 18, 0.8);
+  --text-primary: #e8eef5;
+  --text-secondary: #8fa8c0;
+  --text-muted: #4a6070;
+  --accent: #c0c8d8;
+  --accent-hover: #d0d8e8;
+  --accent-muted: rgba(192, 200, 216, 0.15);
+  --accent-text: #c0c8d8;
+  --border: #1e2a3a;
+  --border-subtle: #151d2e;
+}
+
+/* Palette E — Crimson */
+body.palette-crimson {
+  --bg-base: #0a0808;
+  --bg-surface: #140e0e;
+  --bg-raised: #1e1414;
+  --bg-overlay: rgba(10, 8, 8, 0.8);
+  --text-primary: #f5eeee;
+  --text-secondary: #c0a0a0;
+  --text-muted: #7a5555;
+  --accent: #dc2626;
+  --accent-hover: #ef4444;
+  --accent-muted: rgba(220, 38, 38, 0.15);
+  --accent-text: #dc2626;
+  --border: #2a1a1a;
+  --border-subtle: #1e1414;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
+
+  --color-bg-base: var(--bg-base);
+  --color-bg-surface: var(--bg-surface);
+  --color-bg-raised: var(--bg-raised);
+  --color-bg-overlay: var(--bg-overlay);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-muted: var(--accent-muted);
+  --color-accent-text: var(--accent-text);
+
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+
+  --color-status-draft: var(--status-draft);
+  --color-status-pending: var(--status-pending);
+  --color-status-processing: var(--status-processing);
+  --color-status-ready: var(--status-ready);
+  --color-status-published: var(--status-published);
+  --color-status-unlisted: var(--status-unlisted);
+  --color-status-rejected: var(--status-rejected);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  color-scheme: dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg-base);
+  color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Discover catalogue — entrance + genre pill glow (used by discover-catalogue-client) */
+/* Discover catalogue — entrance + genre pill glow */
 @keyframes discover-fade-up {
   from {
     opacity: 0;
@@ -41,13 +180,13 @@ body {
   0%,
   100% {
     box-shadow:
-      0 0 0 0 rgb(251 191 36 / 0.18),
-      0 0 0 0 rgb(251 191 36 / 0);
+      0 0 0 0 var(--discover-pill-glow-a),
+      0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 1px rgb(251 191 36 / 0.25),
-      0 0 16px 2px rgb(251 191 36 / 0.12);
+      0 0 0 1px var(--discover-pill-glow-b),
+      0 0 16px 2px var(--discover-pill-glow-c);
   }
 }
 

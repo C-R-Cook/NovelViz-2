@@ -82,10 +82,8 @@ function DevRoleSwitcherInner({ initialUserId }: Props) {
   }, []);
 
   return (
-    <label className="flex shrink-0 items-center gap-2">
-      <span className="hidden text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500 sm:inline">
-        Dev user
-      </span>
+    <label className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+      <span className="text-[10px] font-bold uppercase tracking-wide text-warning">Dev user</span>
       <select
         value={userId}
         aria-label="Development user"
@@ -93,7 +91,7 @@ function DevRoleSwitcherInner({ initialUserId }: Props) {
           const v = e.target.value;
           if (isKnownUserId(v)) applyUser(v);
         }}
-        className="min-w-[10.5rem] cursor-pointer rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 shadow-inner outline-none ring-amber-500/20 transition focus:border-amber-600/50 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:ring-amber-500/30 dark:focus:border-amber-500/40"
+        className="min-w-[10.5rem] cursor-pointer rounded-lg border border-border bg-bg-raised px-2 py-1.5 text-xs font-medium text-text-primary shadow-inner outline-none ring-accent/30 transition focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <optgroup label="Readers">
           {READER_IDS.map((id) => (

@@ -12,7 +12,7 @@ const SUBJECTS = [
 
 function PartnershipNote() {
   return (
-    <p className="rounded-lg border border-amber-300/70 bg-amber-50/90 px-4 py-3 text-sm leading-relaxed text-amber-950/95 dark:border-amber-800/35 dark:bg-amber-950/25 dark:text-amber-100/90">
+    <p className="rounded-lg border border-accent/50 bg-accent-muted px-4 py-3 text-sm leading-relaxed text-text-primary">
       For publishing partnerships, you can also apply directly for a partner account.
     </p>
   );
@@ -64,14 +64,14 @@ export function ContactBlock() {
   if (done) {
     return (
       <div
-        className="rounded-xl border border-amber-400/50 bg-amber-50/95 px-5 py-6 text-center text-sm leading-relaxed text-amber-950 dark:border-amber-700/35 dark:bg-amber-950/30 dark:text-amber-50/95"
+        className="rounded-xl border border-accent/50 bg-accent-muted px-5 py-6 text-center text-sm leading-relaxed text-text-primary"
         role="status"
       >
         <p>Thanks for getting in touch. We&apos;ll get back to you within 2 business days.</p>
         <button
           type="button"
           onClick={() => setDone(false)}
-          className="mt-4 text-xs font-medium text-amber-800 underline-offset-2 hover:text-amber-950 hover:underline dark:text-amber-300/90 dark:hover:text-amber-200"
+          className="mt-4 text-xs font-medium text-accent-text underline-offset-2 hover:text-text-primary hover:underline"
         >
           Send another message
         </button>
@@ -85,7 +85,7 @@ export function ContactBlock() {
         <div>
           <label
             htmlFor="contact-name"
-            className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="mb-1.5 block text-xs font-medium text-text-secondary"
           >
             Name
           </label>
@@ -97,13 +97,13 @@ export function ContactBlock() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-amber-500/0 transition placeholder:text-zinc-400 focus:border-amber-600/60 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2.5 text-sm text-text-primary outline-none ring-accent/0 transition placeholder:text-text-secondary focus:border-accent/60 focus:ring-2 focus:ring-accent/25"
           />
         </div>
         <div>
           <label
             htmlFor="contact-email"
-            className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="mb-1.5 block text-xs font-medium text-text-secondary"
           >
             Email
           </label>
@@ -115,13 +115,13 @@ export function ContactBlock() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-amber-500/0 transition placeholder:text-zinc-400 focus:border-amber-600/60 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2.5 text-sm text-text-primary outline-none ring-accent/0 transition placeholder:text-text-secondary focus:border-accent/60 focus:ring-2 focus:ring-accent/25"
           />
         </div>
         <div>
           <label
             htmlFor="contact-subject"
-            className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="mb-1.5 block text-xs font-medium text-text-secondary"
           >
             Subject
           </label>
@@ -130,7 +130,7 @@ export function ContactBlock() {
             name="subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-amber-500/0 transition focus:border-amber-600/60 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2.5 text-sm text-text-primary outline-none ring-accent/0 transition focus:border-accent/60 focus:ring-2 focus:ring-accent/25"
           >
             {SUBJECTS.map((s) => (
               <option key={s.value} value={s.value}>
@@ -142,9 +142,9 @@ export function ContactBlock() {
         <div>
           <label
             htmlFor="contact-message"
-            className="mb-1.5 block text-xs font-medium text-zinc-600 dark:text-zinc-400"
+            className="mb-1.5 block text-xs font-medium text-text-secondary"
           >
-            Message <span className="font-normal text-zinc-500 dark:text-zinc-500">(min. 20 characters)</span>
+            Message <span className="font-normal text-text-muted">(min. 20 characters)</span>
           </label>
           <textarea
             id="contact-message"
@@ -154,14 +154,14 @@ export function ContactBlock() {
             rows={6}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none ring-amber-500/0 transition placeholder:text-zinc-400 focus:border-amber-600/60 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-700 dark:bg-zinc-950/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+            className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2.5 text-sm text-text-primary outline-none ring-accent/0 transition placeholder:text-text-secondary focus:border-accent/60 focus:ring-2 focus:ring-accent/25"
           />
         </div>
-        {error ? <p className="text-sm text-red-600 dark:text-red-400/90">{error}</p> : null}
+        {error ? <p className="text-sm text-error">{error}</p> : null}
         <button
           type="submit"
           disabled={pending}
-          className="rounded-lg bg-amber-600/90 px-5 py-2.5 text-sm font-medium text-amber-950 transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-accent/90 px-5 py-2.5 text-sm font-medium text-text-primary transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending ? "Sending…" : "Submit"}
         </button>

@@ -37,19 +37,19 @@ type FAQSection = { title: string; items: FAQItem[] };
 
 /* Each string is one literal so Tailwind’s scanner keeps every utility class. */
 const ACCORDION_DETAILS_CLASS =
-  "group rounded-xl border border-zinc-200/95 bg-white/90 shadow-sm shadow-zinc-900/5 transition-colors open:border-amber-500/55 open:bg-amber-50/40 open:ring-1 open:ring-amber-500/25 dark:border-zinc-800/90 dark:bg-zinc-900/35 dark:shadow-none open:dark:border-amber-600/40 open:dark:bg-zinc-900/60 open:dark:ring-amber-500/20";
+  "group rounded-xl border border-border/95 bg-bg-surface/90 shadow-sm shadow-bg-overlay/5 transition-colors open:border-accent/55 open:bg-accent-muted open:ring-1 open:ring-accent/25   ";
 
 const ACCORDION_SUMMARY_CLASS =
-  "flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3.5 text-sm font-medium text-zinc-900 outline-none transition marker:content-none [&::-webkit-details-marker]:hidden sm:text-base dark:text-zinc-100";
+  "flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-3.5 text-sm font-medium text-text-primary outline-none transition marker:content-none [&::-webkit-details-marker]:hidden sm:text-base";
 
 const ACCORDION_CHEVRON_CLASS =
-  "mt-0.5 shrink-0 text-xs text-amber-700 transition-transform duration-200 group-open:rotate-180 dark:text-amber-400/90";
+  "mt-0.5 shrink-0 text-xs text-warning transition-transform duration-200 group-open:rotate-180";
 
 const ACCORDION_ANSWER_CLASS =
-  "border-t border-zinc-200/90 px-4 pb-4 pt-3 text-sm leading-relaxed text-zinc-600 group-open:border-amber-200/80 dark:border-zinc-800/80 dark:text-zinc-400 group-open:dark:border-amber-900/25";
+  "border-t border-border px-4 pb-4 pt-3 text-sm leading-relaxed text-text-muted group-open:border-accent/30 group-";
 
 const SECTION_HEADING_CLASS =
-  "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-amber-800 dark:text-amber-200/85";
+  "mb-4 text-xs font-semibold uppercase tracking-[0.18em] text-accent-text";
 
 // --- All FAQ content: edit here only (unless you add new layout above). ---
 
@@ -160,11 +160,11 @@ const SECTIONS: FAQSection[] = [
  */
 export default function FAQPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 text-zinc-900 sm:px-6 sm:py-16 dark:text-zinc-100">
+    <div className="mx-auto max-w-3xl px-4 py-12 text-text-primary sm:px-6 sm:py-16">
       <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">
         Frequently asked questions
       </h1>
-      <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+      <p className="mt-3 max-w-xl text-sm leading-relaxed text-text-secondary">
         Everything you need to know about reading with NovelViz — safely and on your terms.
       </p>
 

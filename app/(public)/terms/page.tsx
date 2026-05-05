@@ -8,18 +8,18 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "May 1, 2026";
 
-const h2 = "text-lg font-semibold tracking-tight text-zinc-900 sm:text-xl dark:text-zinc-100";
-const p = "mt-3 text-sm leading-relaxed text-zinc-600 sm:text-[15px] dark:text-zinc-400";
-const ul = "mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-zinc-600 sm:text-[15px] dark:text-zinc-400";
+const h2 = "text-lg font-semibold tracking-tight text-text-primary sm:text-xl";
+const p = "mt-3 text-sm leading-relaxed text-text-muted sm:text-[15px]";
+const ul = "mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-text-muted sm:text-[15px]";
 const linkClass =
-  "text-amber-800 underline-offset-2 hover:text-amber-950 hover:underline dark:text-amber-400/95 dark:hover:text-amber-300";
-const emStrong = "font-semibold text-zinc-800 dark:text-zinc-200";
+  "text-accent-text underline-offset-2 hover:text-text-primary hover:underline";
+const emStrong = "font-semibold text-text-primary";
 
 export default function TermsPage() {
   return (
-    <article className="mx-auto max-w-3xl px-4 py-12 text-zinc-900 sm:px-6 sm:py-16 dark:text-zinc-100">
+    <article className="mx-auto max-w-3xl px-4 py-12 text-text-primary sm:px-6 sm:py-16">
       <h1 className="font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Terms of Service</h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Last updated: {LAST_UPDATED}</p>
+      <p className="mt-2 text-sm text-text-secondary">Last updated: {LAST_UPDATED}</p>
 
       <div className="mt-10 space-y-8">
           <h2 className={h2}>1. Acceptance of terms</h2>

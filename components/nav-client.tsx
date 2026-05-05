@@ -1,8 +1,6 @@
 "use client";
 
 import { useClerk } from "@clerk/nextjs";
-import { DevRoleSwitcher } from "@/components/dev-role-switcher";
-import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -23,11 +21,11 @@ function isActive(pathname: string, href: string): boolean {
 
 function navLinkClass(active: boolean): string {
   const base =
-    "border-b-2 border-transparent px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
+    "border-b-2 border-transparent px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
   if (active) {
-    return `${base} border-amber-500 text-zinc-100 dark:border-amber-400 dark:text-zinc-100`;
+    return `${base} border-accent text-text-primary`;
   }
-  return `${base} text-zinc-400 hover:text-zinc-100`;
+  return `${base} text-text-muted hover:text-text-primary`;
 }
 
 function NavUserMenu({
@@ -64,7 +62,7 @@ function NavUserMenu({
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-400 text-xs font-semibold text-zinc-950 shadow-md ring-2 ring-zinc-800/80 transition hover:bg-amber-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50 dark:bg-amber-500 dark:text-zinc-950 dark:ring-zinc-700/80 dark:hover:bg-amber-400"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-text-inverse shadow-md ring-2 ring-border transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
         aria-expanded={open}
         aria-haspopup="true"
         aria-label="Account menu"
@@ -74,18 +72,18 @@ function NavUserMenu({
       </button>
       {open ? (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-lg border border-zinc-700/90 bg-zinc-900 py-1 shadow-xl ring-1 ring-black/20 dark:bg-zinc-950"
+          className="absolute right-0 top-full z-50 mt-2 w-56 origin-top-right rounded-lg border border-border bg-bg-surface py-1 shadow-xl ring-1 ring-bg-overlay"
           role="menu"
         >
-          <div className="border-b border-zinc-800 px-3 py-2">
-            <p className="truncate text-sm font-medium text-zinc-100">{headerLabel}</p>
+          <div className="border-b border-border-subtle px-3 py-2">
+            <p className="truncate text-sm font-medium text-text-primary">{headerLabel}</p>
             {displayName?.trim() ? (
-              <p className="truncate text-xs text-zinc-500">{email}</p>
+              <p className="truncate text-xs text-text-muted">{email}</p>
             ) : null}
           </div>
           <Link
             href="/account"
-            className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
             role="menuitem"
             onClick={() => {
               setOpen(false);
@@ -96,7 +94,7 @@ function NavUserMenu({
           </Link>
           <Link
             href="/dashboard"
-            className="block px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
             role="menuitem"
             onClick={() => {
               setOpen(false);
@@ -105,11 +103,11 @@ function NavUserMenu({
           >
             Dashboard
           </Link>
-          <div className="my-1 border-t border-zinc-800" role="separator" />
+          <div className="my-1 border-t border-border-subtle" role="separator" />
           {isProduction ? (
             <button
               type="button"
-              className="block w-full px-3 py-2 text-left text-sm text-zinc-200 hover:bg-zinc-800/80"
+              className="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-raised"
               role="menuitem"
               onClick={() => {
                 setOpen(false);
@@ -119,9 +117,9 @@ function NavUserMenu({
               Sign Out
             </button>
           ) : (
-            <p className="px-3 py-2 text-xs leading-relaxed text-zinc-500">
-              Dev user: <span className="text-zinc-400">{headerLabel}</span>
-              <span className="mt-1 block text-[11px] text-zinc-600">
+            <p className="px-3 py-2 text-xs leading-relaxed text-text-muted">
+              Dev user: <span className="text-text-secondary">{headerLabel}</span>
+              <span className="mt-1 block text-[11px] text-text-muted">
                 Use the role switcher to change identity. Production builds show Sign out here.
               </span>
             </p>
@@ -133,7 +131,7 @@ function NavUserMenu({
 }
 
 export function NavChrome({
-  initialUserId,
+  initialUserId: _initialUserId,
   isLoggedIn,
   userInitials,
   userName,
@@ -166,26 +164,19 @@ export function NavChrome({
     </>
   );
 
-  const tools = (
-    <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
-      <DevRoleSwitcher initialUserId={initialUserId} />
-      <ThemeToggle />
-    </div>
-  );
-
   const signInClass =
-    "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-amber-200/95 transition hover:text-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
+    "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-accent-text/95 transition hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
   return (
-    <header className="relative z-[100] border-b border-zinc-800/90 bg-zinc-950/95 shadow-lg shadow-black/20 backdrop-blur-md dark:border-zinc-800/80">
+    <header className="relative z-[100] border-b border-border bg-bg-base/95 shadow-lg shadow-bg-overlay backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
             className={`shrink-0 font-serif text-lg font-semibold tracking-tight sm:text-xl ${
               isActive(pathname, "/")
-                ? "text-amber-200"
-                : "text-amber-100/90 hover:text-amber-50"
+                ? "text-accent-text"
+                : "text-accent-text/90 hover:text-accent-hover"
             }`}
             onClick={() => setMenuOpen(false)}
           >
@@ -213,10 +204,9 @@ export function NavChrome({
               Sign In
             </Link>
           )}
-          <div className="hidden items-center gap-2 md:flex">{tools}</div>
           <button
             type="button"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-zinc-700/80 bg-zinc-900/80 text-zinc-200 shadow-inner transition hover:bg-zinc-800 hover:text-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 md:hidden"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border bg-bg-surface/80 text-text-primary shadow-inner transition hover:bg-bg-raised hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 md:hidden"
             aria-expanded={menuOpen}
             aria-controls="mobile-nav-menu"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -238,14 +228,11 @@ export function NavChrome({
       {menuOpen ? (
         <div
           id="mobile-nav-menu"
-          className="border-t border-zinc-800/90 bg-zinc-950/98 px-4 py-4 md:hidden"
+          className="border-t border-border bg-bg-base/98 px-4 py-4 md:hidden"
         >
           <nav className="flex flex-col gap-1" aria-label="Main mobile">
             {links}
           </nav>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-800/80 pt-4">
-            {tools}
-          </div>
         </div>
       ) : null}
     </header>

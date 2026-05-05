@@ -150,33 +150,33 @@ export function NewPartnerBookForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
             Title
           </span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
             Author
           </span>
           <input
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
           />
         </label>
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
             Genre
           </span>
           <select
             value={genre}
             onChange={(e) => setGenre(e.target.value as BookGenre | "")}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
           >
             <option value="">Select genre</option>
             {GENRE_OPTIONS.map((opt) => (
@@ -187,30 +187,30 @@ export function NewPartnerBookForm() {
           </select>
         </label>
         <label className="block space-y-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
             Published year
           </span>
           <input
             type="number"
             value={publishedYear}
             onChange={(e) => setPublishedYear(e.target.value)}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+            className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
           />
         </label>
       </div>
       <label className="block space-y-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+        <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
           Description
         </span>
         <textarea
           rows={5}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+          className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
         />
       </label>
-      <div className="space-y-2 rounded-lg border border-zinc-200/90 bg-zinc-50/80 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/35">
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+      <div className="space-y-2 rounded-lg border border-border bg-bg-base/80 p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
           Optional: Upload EPUB/TXT now
         </p>
         <input
@@ -226,20 +226,20 @@ export function NewPartnerBookForm() {
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+            className="rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised"
           >
             {ingestFile ? "Change file" : "Choose file"}
           </button>
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">
+          <span className="text-xs text-text-secondary">
             {ingestFile ? ingestFile.name : "No file selected"}
           </span>
         </div>
-        <label className="flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+        <label className="flex items-start gap-2 text-xs text-text-secondary">
           <input
             type="checkbox"
             checked={applyEpubMetadata}
             onChange={(e) => setApplyEpubMetadata(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 rounded border-zinc-400 text-amber-600 focus:ring-amber-500/30 dark:border-zinc-600"
+            className="mt-0.5 h-3.5 w-3.5 rounded border-border text-accent-text focus:ring-accent/30"
           />
           <span>
             Fill title/author/description/genre/published year from EPUB metadata
@@ -247,19 +247,19 @@ export function NewPartnerBookForm() {
           </span>
         </label>
         {extractingMetadata ? (
-          <p className="text-xs text-zinc-600 dark:text-zinc-400">
+          <p className="text-xs text-text-secondary">
             Reading EPUB metadata...
           </p>
         ) : null}
         {metadataErr ? (
-          <p className="text-xs text-red-600 dark:text-red-400">{metadataErr}</p>
+          <p className="text-xs text-error">{metadataErr}</p>
         ) : null}
       </div>
-      {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? <p className="text-sm text-error">{error}</p> : null}
       <button
         type="submit"
         disabled={submitting || extractingMetadata}
-        className="rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/40 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/35 dark:hover:bg-amber-200/20"
+        className="rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
       >
         {submitting ? "Creating..." : "Create Book"}
       </button>

@@ -80,6 +80,7 @@ export function PartnerDashboardBooksClient({
               <th className="px-4 py-3 font-medium">Readers</th>
               <th className="px-4 py-3 font-medium">Queries</th>
               <th className="px-4 py-3 font-medium">Images</th>
+              <th className="px-4 py-3 font-medium">Stats</th>
               <th className="px-4 py-3 font-medium" />
             </tr>
           </thead>
@@ -124,6 +125,14 @@ export function PartnerDashboardBooksClient({
                 </td>
                 <td className="px-4 py-3 tabular-nums text-text-secondary">
                   {book.imageCount}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/partner/books/${book.id}/stats`}
+                    className="inline-flex rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-accent/40 hover:bg-bg-raised"
+                  >
+                    Stats
+                  </Link>
                 </td>
                 <td className="px-4 py-3">
                   <Link

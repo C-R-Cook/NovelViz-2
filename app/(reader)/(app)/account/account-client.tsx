@@ -12,12 +12,12 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 shadow-sm outline-none transition focus:border-amber-500/80 focus:ring-2 focus:ring-amber-500/25 dark:border-zinc-600 dark:bg-zinc-900/80 dark:text-zinc-100 dark:focus:border-amber-400/70";
+  "mt-1 w-full rounded-md border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-accent/80 focus:ring-2 focus:ring-accent/25";
 
-const labelClass = "block text-sm font-medium text-zinc-800 dark:text-zinc-200";
+const labelClass = "block text-sm font-medium text-text-primary";
 
 const sectionClass =
-  "rounded-xl border border-zinc-200/90 bg-white/90 p-6 shadow-sm dark:border-zinc-800/90 dark:bg-zinc-900/40";
+  "rounded-xl border border-border bg-bg-surface/90 p-6 shadow-sm";
 
 export type AccountPageClientProps = {
   viewerId: string;
@@ -258,19 +258,19 @@ export function AccountPageClient({
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+      <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary">
         My Account
       </h1>
-      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="mt-2 text-sm text-text-secondary">
         Manage your profile and reading preferences.
       </p>
 
       <div className="mt-10 space-y-8">
         <section className={sectionClass} aria-labelledby="public-profile-heading">
-          <h2 id="public-profile-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 id="public-profile-heading" className="text-lg font-semibold text-text-primary">
             Public profile
           </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-text-secondary">
             This is how you appear in the gallery and public areas.
           </p>
           <form className="mt-6 space-y-4" onSubmit={(e) => void savePublicProfile(e)}>
@@ -294,30 +294,30 @@ export function AccountPageClient({
                 />
                 <span className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-sm">
                   {usernameCheck === "checking" ? (
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-400 border-t-amber-600" />
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
                   ) : usernameCheck === "ok" ? (
-                    <span className="text-emerald-600 dark:text-emerald-400">✓</span>
+                    <span className="text-success">✓</span>
                   ) : usernameCheck === "bad" && normalizedPublicUsername.length > 0 ? (
-                    <span className="text-red-600 dark:text-red-400">✕</span>
+                    <span className="text-error">✕</span>
                   ) : null}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+              <p className="mt-1 text-xs text-text-muted">
                 3–20 characters: letters, numbers, and underscores only.
               </p>
             </div>
             {publicError ? (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              <p className="text-sm text-error" role="alert">
                 {publicError}
               </p>
             ) : null}
             {publicOk ? (
-              <p className="text-sm text-emerald-700 dark:text-emerald-400/90">Username saved.</p>
+              <p className="text-sm text-success">Username saved.</p>
             ) : null}
             <button
               type="submit"
               disabled={!canSavePublicUsername}
-              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-zinc-950 shadow transition hover:bg-amber-500 disabled:opacity-60 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
             >
               {publicSaving ? "Saving…" : "Save username"}
             </button>
@@ -325,12 +325,12 @@ export function AccountPageClient({
         </section>
 
         <section className={sectionClass} aria-labelledby="profile-heading">
-          <h2 id="profile-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 id="profile-heading" className="text-lg font-semibold text-text-primary">
             Profile
           </h2>
           <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
             <div
-              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-amber-400 text-2xl font-semibold text-zinc-950 shadow-inner dark:bg-amber-500 dark:text-zinc-950"
+              className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-accent text-2xl font-semibold text-text-inverse shadow-inner"
               aria-hidden
             >
               {avatarInitials}
@@ -355,25 +355,25 @@ export function AccountPageClient({
               </div>
               <div>
                 <span className={labelClass}>Email</span>
-                <p className="mt-1 rounded-md border border-zinc-200/90 bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950/60 dark:text-zinc-300">
+                <p className="mt-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-secondary">
                   {initialUser.email}
                 </p>
-                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                <p className="mt-1 text-xs text-text-muted">
                   Email is managed by Clerk and cannot be changed here.
                 </p>
               </div>
               {profileError ? (
-                <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                <p className="text-sm text-error" role="alert">
                   {profileError}
                 </p>
               ) : null}
               {profileOk ? (
-                <p className="text-sm text-emerald-700 dark:text-emerald-400/90">Profile saved.</p>
+                <p className="text-sm text-success">Profile saved.</p>
               ) : null}
               <button
                 type="submit"
                 disabled={profileSaving}
-                className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-zinc-950 shadow transition hover:bg-amber-500 disabled:opacity-60 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+                className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
               >
                 {profileSaving ? "Saving…" : "Save profile"}
               </button>
@@ -382,7 +382,7 @@ export function AccountPageClient({
         </section>
 
         <section className={sectionClass} aria-labelledby="prefs-heading">
-          <h2 id="prefs-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 id="prefs-heading" className="text-lg font-semibold text-text-primary">
             Reading preferences
           </h2>
           <form className="mt-6 space-y-6" onSubmit={savePreferences}>
@@ -457,15 +457,15 @@ export function AccountPageClient({
                   setSubscribedToMailingList(e.target.checked);
                   setPrefsOk(false);
                 }}
-                className="mt-1 h-4 w-4 rounded border-zinc-300 text-amber-600 focus:ring-amber-500/30 dark:border-zinc-600"
+                className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
               />
-              <span className="text-sm text-zinc-800 dark:text-zinc-200">
+              <span className="text-sm text-text-primary">
                 Keep me updated about new books, features and early access offers
               </span>
             </label>
             <div>
               <span className={labelClass}>Genre preferences</span>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">Select all that apply.</p>
+              <p className="mt-1 text-xs text-text-muted">Select all that apply.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {GENRE_OPTIONS.map(({ value }) => {
                   const selected = genrePreferences.includes(value);
@@ -474,10 +474,10 @@ export function AccountPageClient({
                       key={value}
                       type="button"
                       onClick={() => toggleGenre(value)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:text-sm ${
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:text-sm ${
                         selected
-                          ? "border-amber-500/80 bg-amber-400/25 text-amber-950 dark:border-amber-400/60 dark:bg-amber-500/20 dark:text-amber-100"
-                          : "border-zinc-300 bg-zinc-50 text-zinc-700 hover:border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900/50 dark:text-zinc-300 dark:hover:border-zinc-500"
+                          ? "border-accent bg-accent text-text-inverse"
+                          : "border-border bg-bg-raised text-text-secondary hover:border-border hover:text-text-primary"
                       }`}
                       aria-pressed={selected}
                     >
@@ -488,17 +488,17 @@ export function AccountPageClient({
               </div>
             </div>
             {prefsError ? (
-              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+              <p className="text-sm text-error" role="alert">
                 {prefsError}
               </p>
             ) : null}
             {prefsOk ? (
-              <p className="text-sm text-emerald-700 dark:text-emerald-400/90">Preferences saved.</p>
+              <p className="text-sm text-success">Preferences saved.</p>
             ) : null}
             <button
               type="submit"
               disabled={prefsSaving}
-              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-zinc-950 shadow transition hover:bg-amber-500 disabled:opacity-60 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
             >
               {prefsSaving ? "Saving…" : "Save preferences"}
             </button>
@@ -506,42 +506,42 @@ export function AccountPageClient({
         </section>
 
         <section className={sectionClass} aria-labelledby="stats-heading">
-          <h2 id="stats-heading" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          <h2 id="stats-heading" className="text-lg font-semibold text-text-primary">
             Reading stats
           </h2>
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <dt className="text-zinc-500 dark:text-zinc-400">Member since</dt>
-              <dd className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">{memberSinceLabel}</dd>
+            <div className="rounded-lg border border-border/80 bg-bg-base/80 px-4 py-3">
+              <dt className="text-text-muted">Member since</dt>
+              <dd className="mt-1 font-medium text-text-primary">{memberSinceLabel}</dd>
             </div>
-            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <dt className="text-zinc-500 dark:text-zinc-400">Books in library</dt>
-              <dd className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">{stats.libraryBookCount}</dd>
+            <div className="rounded-lg border border-border/80 bg-bg-base/80 px-4 py-3">
+              <dt className="text-text-muted">Books in library</dt>
+              <dd className="mt-1 font-medium text-text-primary">{stats.libraryBookCount}</dd>
             </div>
-            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <dt className="text-zinc-500 dark:text-zinc-400">Questions asked</dt>
-              <dd className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">{stats.queryCount}</dd>
+            <div className="rounded-lg border border-border/80 bg-bg-base/80 px-4 py-3">
+              <dt className="text-text-muted">Questions asked</dt>
+              <dd className="mt-1 font-medium text-text-primary">{stats.queryCount}</dd>
             </div>
-            <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/80 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-950/40">
-              <dt className="text-zinc-500 dark:text-zinc-400">Images generated</dt>
-              <dd className="mt-1 font-medium text-zinc-900 dark:text-zinc-100">{stats.generatedImageCount}</dd>
+            <div className="rounded-lg border border-border/80 bg-bg-base/80 px-4 py-3">
+              <dt className="text-text-muted">Images generated</dt>
+              <dd className="mt-1 font-medium text-text-primary">{stats.generatedImageCount}</dd>
             </div>
           </dl>
         </section>
 
         <section
-          className={`${sectionClass} border-red-200/90 dark:border-red-900/50`}
+          className={`${sectionClass} border-error/30`}
           aria-labelledby="danger-heading"
         >
-          <h2 id="danger-heading" className="text-lg font-semibold text-red-800 dark:text-red-300">
+          <h2 id="danger-heading" className="text-lg font-semibold text-error">
             Danger zone
           </h2>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-text-secondary">
             Permanently delete your NovelViz account and associated reading data.
           </p>
           <button
             type="button"
-            className="mt-4 rounded-md border border-red-600/90 bg-transparent px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/30 dark:border-red-500/80 dark:text-red-300 dark:hover:bg-red-950/40"
+            className="mt-4 rounded-md border border-error/40 bg-transparent px-4 py-2 text-sm font-medium text-error transition hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30"
             onClick={() => {
               setDeleteError(null);
               setDeleteOpen(true);
@@ -554,7 +554,7 @@ export function AccountPageClient({
 
       {deleteOpen ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay/50 p-4 backdrop-blur-sm"
           role="presentation"
           onClick={() => (deletePending ? null : setDeleteOpen(false))}
         >
@@ -562,24 +562,24 @@ export function AccountPageClient({
             role="dialog"
             aria-modal="true"
             aria-labelledby="delete-dialog-title"
-            className="max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+            className="max-w-md rounded-xl border border-border bg-bg-surface p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="delete-dialog-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+            <h3 id="delete-dialog-title" className="text-lg font-semibold text-text-primary">
               Delete account?
             </h3>
-            <p className="mt-3 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+            <p className="mt-3 text-sm leading-relaxed text-text-secondary">
               Are you sure? This will permanently delete your account and all your data. This cannot be undone.
             </p>
             {deleteError ? (
-              <p className="mt-3 text-sm text-red-600 dark:text-red-400" role="alert">
+              <p className="mt-3 text-sm text-error" role="alert">
                 {deleteError}
               </p>
             ) : null}
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
-                className="rounded-md border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 transition hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-base"
                 disabled={deletePending}
                 onClick={() => setDeleteOpen(false)}
               >
@@ -587,7 +587,7 @@ export function AccountPageClient({
               </button>
               <button
                 type="button"
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500 disabled:opacity-60"
+                className="rounded-md bg-error px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-error/100 disabled:opacity-60"
                 disabled={deletePending}
                 onClick={() => void confirmDelete()}
               >

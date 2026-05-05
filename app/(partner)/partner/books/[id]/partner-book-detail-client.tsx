@@ -29,19 +29,19 @@ function statusActionChipClass(status: BookStatus): string {
     "inline-flex w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium tracking-tight";
   switch (status) {
     case "draft":
-      return `${base} bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200`;
+      return `${base} bg-bg-raised text-text-primary`;
     case "pending_review":
-      return `${base} bg-indigo-600 text-indigo-50`;
+      return `${base} bg-info text-text-primary`;
     case "rejected":
-      return `${base} bg-red-600 text-red-50`;
+      return `${base} bg-error text-text-primary`;
     case "processing":
-      return `${base} animate-pulse bg-blue-600 text-blue-50 ring-2 ring-blue-400/40`;
+      return `${base} animate-pulse bg-status-processing text-text-primary ring-2 ring-status-processing/40`;
     case "published":
-      return `${base} bg-emerald-600 text-emerald-50`;
+      return `${base} bg-success text-text-primary`;
     case "unlisted":
-      return `${base} bg-orange-600 text-orange-50`;
+      return `${base} bg-status-unlisted text-text-primary`;
     default:
-      return `${base} bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200`;
+      return `${base} bg-bg-raised text-text-primary`;
   }
 }
 
@@ -53,19 +53,19 @@ function statusActionChipLabel(status: BookStatus): string {
 function actionRowGradientClass(status: BookStatus): string {
   switch (status) {
     case "draft":
-      return "bg-gradient-to-r from-zinc-400/16 via-zinc-400/7 to-transparent dark:from-zinc-500/28 dark:via-zinc-500/12";
+      return "bg-gradient-to-r from-text-muted/16 via-text-muted/7 to-transparent";
     case "processing":
-      return "bg-gradient-to-r from-blue-500/16 via-blue-500/7 to-transparent dark:from-blue-500/26 dark:via-blue-500/12";
+      return "bg-gradient-to-r from-status-processing/16 via-status-processing/7 to-transparent";
     case "pending_review":
-      return "bg-gradient-to-r from-indigo-500/16 via-indigo-500/7 to-transparent dark:from-indigo-500/26 dark:via-indigo-500/12";
+      return "bg-gradient-to-r from-info/16 via-info/7 to-transparent";
     case "rejected":
-      return "bg-gradient-to-r from-rose-500/14 via-rose-500/7 to-transparent dark:from-rose-500/24 dark:via-rose-500/10";
+      return "bg-gradient-to-r from-rose-500/14 via-rose-500/7 to-transparent";
     case "published":
-      return "bg-gradient-to-r from-emerald-500/14 via-emerald-500/6 to-transparent dark:from-emerald-500/24 dark:via-emerald-500/10";
+      return "bg-gradient-to-r from-success/14 via-success/6 to-transparent";
     case "unlisted":
-      return "bg-gradient-to-r from-orange-500/14 via-orange-500/6 to-transparent dark:from-orange-500/24 dark:via-orange-500/10";
+      return "bg-gradient-to-r from-status-unlisted/14 via-status-unlisted/6 to-transparent";
     default:
-      return "bg-gradient-to-r from-zinc-400/10 via-zinc-400/4 to-transparent dark:from-zinc-500/14 dark:via-zinc-500/6";
+      return "bg-gradient-to-r from-text-muted/10 via-text-muted/4 to-transparent";
   }
 }
 
@@ -310,7 +310,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     <div className="space-y-6">
       {!mergeBookAndChapterPanels ? (
         <div
-          className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
+          className="flex gap-1 border-b border-border"
           role="tablist"
           aria-label="Partner book tabs"
         >
@@ -321,8 +321,8 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             onClick={() => setActiveTab("details")}
             className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
               activeTab === "details"
-                ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                ? "border-b-2 border-accent text-text-primary"
+                : "text-text-muted hover:text-text-primary"
             }`}
           >
             Book Details
@@ -334,8 +334,8 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             onClick={() => setActiveTab("chapters")}
             className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
               activeTab === "chapters"
-                ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                ? "border-b-2 border-accent text-text-primary"
+                : "text-text-muted hover:text-text-primary"
             }`}
           >
             Chapter Review
@@ -344,7 +344,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
       ) : null}
 
       <div
-        className="flex flex-col gap-2 border-b border-zinc-200/90 pb-4 dark:border-zinc-800/80"
+        className="flex flex-col gap-2 border-b border-border pb-4"
         aria-label="Book actions"
       >
         <div
@@ -369,7 +369,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             type="button"
             disabled={ingestBusy}
             onClick={() => ingestFileRef.current?.click()}
-            className="rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+            className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
           >
             {ingestBusy ? "Uploading..." : "Re-upload EPUB/TXT"}
           </button>
@@ -387,8 +387,8 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
               }
               className={
                 book.status === "pending_review"
-                  ? "rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
-                  : "rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-indigo-50 transition hover:bg-indigo-700 disabled:opacity-50"
+                  ? "rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
+                  : "rounded-lg bg-info px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-info disabled:opacity-50"
               }
             >
               {statusBusy
@@ -405,7 +405,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
               onClick={() =>
                 void transitionStatus("unlisted")
               }
-              className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-orange-50 transition hover:bg-orange-700 disabled:opacity-50"
+              className="rounded-lg bg-status-unlisted px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-status-unlisted disabled:opacity-50"
             >
               Remove from catalogue
             </button>
@@ -415,7 +415,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
               type="button"
               disabled={catalogueActionBusy}
               onClick={() => void transitionStatus("published")}
-              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-emerald-50 transition hover:bg-emerald-700 disabled:opacity-50"
+              className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
             >
               Add to catalogue
             </button>
@@ -425,7 +425,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             aria-label={`Delete ${book.title}`}
             disabled={deleteBusy || statusBusy || ingestBusy}
             onClick={() => void deleteBook()}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-300/80 bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-900/60"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-error/35 bg-error/15 text-error transition hover:bg-error/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -446,11 +446,11 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
           </div>
         </div>
         {book.status === "draft" ? (
-          <fieldset className="space-y-2 rounded-lg border border-zinc-200/90 bg-white/70 px-3 py-2.5 dark:border-zinc-800/70 dark:bg-zinc-950/40">
-            <legend className="px-1 text-xs font-medium text-zinc-600 dark:text-zinc-400">
+          <fieldset className="space-y-2 rounded-lg border border-border bg-bg-surface/70 px-3 py-2.5">
+            <legend className="px-1 text-xs font-medium text-text-secondary">
               When approved by an admin
             </legend>
-            <div className="flex flex-col gap-2 text-sm text-zinc-800 dark:text-zinc-200">
+            <div className="flex flex-col gap-2 text-sm text-text-primary">
               <label className="flex cursor-pointer items-start gap-2">
                 <input
                   type="radio"
@@ -475,9 +475,9 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
           </fieldset>
         ) : null}
         {book.status === "pending_review" ? (
-          <p className="text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+          <p className="text-xs leading-relaxed text-text-secondary">
             Your request:{" "}
-            <span className="font-medium text-zinc-800 dark:text-zinc-200">
+            <span className="font-medium text-text-primary">
               {labelListingPreferenceAfterReview(book.listingPreferenceAfterReview ?? "published")}
             </span>
           </p>
@@ -486,20 +486,20 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
           <div
             role="alert"
             aria-label="Rejection reason"
-            className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-950 dark:border-red-900 dark:bg-red-950/55 dark:text-red-50"
+            className="rounded-xl border border-error/40 bg-error/10 p-4 text-text-primary"
           >
-            <p className="text-sm font-semibold text-red-900 dark:text-red-100">
+            <p className="text-sm font-semibold text-error">
               Your book was rejected
             </p>
             {book.rejectionReason ? (
-              <p className="mt-2 whitespace-pre-wrap text-sm text-red-900/90 dark:text-red-100/90">
+              <p className="mt-2 whitespace-pre-wrap text-sm text-error/90">
                 {book.rejectionReason}
               </p>
             ) : null}
           </div>
         ) : null}
         {statusErr || deleteErr || ingestErr ? (
-          <div className="space-y-1 text-right text-sm text-red-600 dark:text-red-400">
+          <div className="space-y-1 text-right text-sm text-error">
             {statusErr ? <p>{statusErr}</p> : null}
             {deleteErr ? <p>{deleteErr}</p> : null}
             {ingestErr ? <p>{ingestErr}</p> : null}
@@ -508,7 +508,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
       </div>
 
       {mergeBookAndChapterPanels || activeTab === "details" ? (
-        <section className="rounded-xl border border-zinc-200/90 bg-white/85 p-6 dark:border-zinc-800/80 dark:bg-zinc-900/35">
+        <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -523,11 +523,11 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
               <div className="space-y-2">
                 {/* TODO: Add partner cover upload endpoint and action. */}
-                <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
+                <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
                   {book.coverImageUrl ? (
                     <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
                   ) : (
-                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
+                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
                       No cover image
                     </div>
                   )}
@@ -537,7 +537,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white ring-1 ring-red-800/40 transition hover:bg-red-800 disabled:opacity-50 dark:bg-red-600 dark:ring-red-500/35 dark:hover:bg-red-500"
+                      className="w-full rounded-lg bg-error px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-error/40 transition hover:bg-error/90 disabled:opacity-50"
                     >
                       {saving ? "Updating…" : "Resubmit"}
                     </button>
@@ -545,13 +545,13 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/40 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/35 dark:hover:bg-amber-200/20"
+                      className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
                     >
                       {saving ? "Saving..." : "Save"}
                     </button>
                   )}
-                  {saveMsg ? <p className="text-sm text-emerald-700 dark:text-emerald-400/90">{saveMsg}</p> : null}
-                  {saveErr ? <p className="text-sm text-red-600 dark:text-red-400">{saveErr}</p> : null}
+                  {saveMsg ? <p className="text-sm text-success">{saveMsg}</p> : null}
+                  {saveErr ? <p className="text-sm text-error">{saveErr}</p> : null}
                 </div>
               </div>
 
@@ -563,13 +563,13 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                   </div>
                   <div className="space-y-3">
                     <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
                         Genre
                       </span>
                       <select
                         value={genre}
                         onChange={(e) => setGenre(e.target.value as BookGenre | "")}
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                       >
                         <option value="">Select genre</option>
                         {GENRE_OPTIONS.map((opt) => (
@@ -580,27 +580,27 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                       </select>
                     </label>
                     <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
                         Year
                       </span>
                       <input
                         type="number"
                         value={publishedYear}
                         onChange={(e) => setPublishedYear(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                       />
                     </label>
                   </div>
                 </div>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
                     Description
                   </span>
                   <textarea
                     rows={6}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                    className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                   />
                 </label>
               </div>
@@ -633,14 +633,14 @@ function Field({
 }) {
   return (
     <label className="flex items-center gap-2">
-      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
         {label}
       </span>
       <input
         required={required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
       />
     </label>
   );

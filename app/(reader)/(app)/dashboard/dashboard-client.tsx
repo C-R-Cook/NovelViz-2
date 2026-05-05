@@ -14,13 +14,13 @@ const REJECT_REASON =
   "This book has been rejected during admin moderation review. The publisher may revise and resubmit after addressing the feedback provided.";
 
 const tabBase =
-  "rounded-t-lg border border-b-0 border-transparent px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40";
-const tabInactive = "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200";
+  "rounded-t-lg border border-b-0 border-transparent px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+const tabInactive = "border-transparent text-text-muted hover:text-text-primary";
 const tabActive =
-  "border-amber-500/80 border-zinc-200 bg-white text-amber-900 dark:border-amber-400/60 dark:border-b-zinc-950 dark:bg-zinc-950 dark:text-amber-100";
+  "border-accent/80 border-border bg-bg-surface text-accent-text";
 
 const card =
-  "rounded-xl border border-zinc-200/90 bg-white/90 p-4 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-900/40";
+  "rounded-xl border border-border bg-bg-surface/90 p-4 shadow-sm";
 
 export type DashboardClientProps = {
   role: DashboardRole;
@@ -57,8 +57,8 @@ export type DashboardClientProps = {
 function StatMini({ label, value }: { label: string; value: number }) {
   return (
     <div className={card}>
-      <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-zinc-100">{value}</p>
+      <p className="text-xs uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold text-text-primary">{value}</p>
     </div>
   );
 }
@@ -76,7 +76,7 @@ function ActivityTimestamp({ ms }: { ms: number }) {
     setText(formatActivityAtUtc(new Date(ms)));
   }, [ms]);
 
-  return <p className="mt-1 text-xs text-zinc-500">{text}</p>;
+  return <p className="mt-1 text-xs text-text-muted">{text}</p>;
 }
 
 export function DashboardClient({ role, reader, partner, admin }: DashboardClientProps) {
@@ -127,11 +127,11 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <h1 className="font-serif text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
+      <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
         Dashboard
       </h1>
 
-      <div className="mt-8 flex flex-wrap gap-1 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="mt-8 flex flex-wrap gap-1 border-b border-border">
         <button type="button" className={`${tabBase} ${tab === "reader" ? tabActive : tabInactive}`} onClick={() => setTab("reader")}>
           Reader
         </button>
@@ -151,24 +151,24 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
         ) : null}
       </div>
 
-      <div className="rounded-b-xl rounded-tr-xl border border-zinc-200/90 border-t-0 bg-white/90 p-6 shadow-sm dark:border-zinc-800/80 dark:bg-zinc-950/40 dark:shadow-none">
+      <div className="rounded-b-xl rounded-tr-xl border border-border border-t-0 bg-bg-surface/90 p-6 shadow-sm">
         {tab === "reader" ? (
           <div className="space-y-10">
             <div>
-              <p className="text-lg text-zinc-800 dark:text-zinc-100">
-                Welcome back, <span className="font-semibold text-amber-800 dark:text-amber-200/90">{reader.displayName}</span>
+              <p className="text-lg text-text-primary">
+                Welcome back, <span className="font-semibold text-accent-text">{reader.displayName}</span>
               </p>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{reader.email}</p>
+              <p className="mt-1 text-sm text-text-secondary">{reader.email}</p>
               <Link
                 href="/library"
-                className="mt-4 inline-flex text-sm font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300/90"
+                className="mt-4 inline-flex text-sm font-medium text-accent-text underline-offset-2 hover:underline"
               >
                 Open My Library →
               </Link>
             </div>
 
             <section aria-labelledby="reader-stats">
-              <h2 id="reader-stats" className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+              <h2 id="reader-stats" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                 Reading stats
               </h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -179,11 +179,11 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
             </section>
 
             <section aria-labelledby="reader-continue">
-              <h2 id="reader-continue" className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+              <h2 id="reader-continue" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                 Currently reading
               </h2>
               {reader.currentlyReading.length === 0 ? (
-                <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                <p className="mt-3 text-sm text-text-secondary">
                   No books in progress. Add a book from Discover and open it to start reading.
                 </p>
               ) : (
@@ -191,26 +191,26 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
                   {reader.currentlyReading.map((b) => (
                     <li
                       key={b.bookId}
-                      className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+                      className="flex flex-wrap items-center gap-4 rounded-xl border border-border/80 bg-bg-base/80 p-4"
                     >
-                      <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950">
+                      <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-border bg-bg-surface">
                         {b.coverImageUrl ? (
                           <Image src={b.coverImageUrl} alt="" fill className="object-cover" sizes="56px" />
                         ) : (
-                          <div className="flex h-full items-center justify-center text-xs text-zinc-500">—</div>
+                          <div className="flex h-full items-center justify-center text-xs text-text-muted">—</div>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{b.title}</p>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">{b.author}</p>
-                        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
+                        <p className="font-medium text-text-primary">{b.title}</p>
+                        <p className="text-sm text-text-secondary">{b.author}</p>
+                        <p className="mt-1 text-xs text-text-muted">
                           Chapter {b.currentChapterNumber}
                           {b.chapterTitle ? `: ${b.chapterTitle}` : ""}
                         </p>
                       </div>
                       <Link
                         href={`/reader/${b.bookId}`}
-                        className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-500 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+                        className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent"
                       >
                         Continue reading
                       </Link>
@@ -221,21 +221,21 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
             </section>
 
             <section aria-labelledby="reader-activity">
-              <h2 id="reader-activity" className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+              <h2 id="reader-activity" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                 Recent activity
-                <span className="ml-2 font-normal normal-case text-zinc-400 dark:text-zinc-600">(UTC)</span>
+                <span className="ml-2 font-normal normal-case text-text-secondary">(UTC)</span>
               </h2>
               <div className="mt-4 grid gap-6 lg:grid-cols-2">
                 <div>
-                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Last questions</h3>
+                  <h3 className="text-xs font-medium text-text-secondary">Last questions</h3>
                   {reader.recentQueries.length === 0 ? (
-                    <p className="mt-2 text-sm text-zinc-500">No questions yet.</p>
+                    <p className="mt-2 text-sm text-text-muted">No questions yet.</p>
                   ) : (
                     <ul className="mt-2 space-y-3">
                       {reader.recentQueries.map((q) => (
-                        <li key={q.id} className="rounded-lg border border-zinc-200/80 bg-white px-3 py-2 text-sm dark:border-zinc-800 dark:bg-zinc-900/40">
-                          <p className="text-xs text-zinc-500">{q.bookTitle}</p>
-                          <p className="mt-1 text-zinc-800 dark:text-zinc-200">{truncate(q.questionText, 160)}</p>
+                        <li key={q.id} className="rounded-lg border border-border/80 bg-bg-surface px-3 py-2 text-sm">
+                          <p className="text-xs text-text-muted">{q.bookTitle}</p>
+                          <p className="mt-1 text-text-primary">{truncate(q.questionText, 160)}</p>
                           <ActivityTimestamp ms={q.createdAtMs} />
                         </li>
                       ))}
@@ -243,23 +243,23 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
                   )}
                 </div>
                 <div>
-                  <h3 className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Last images</h3>
+                  <h3 className="text-xs font-medium text-text-secondary">Last images</h3>
                   {reader.recentImages.length === 0 ? (
-                    <p className="mt-2 text-sm text-zinc-500">No images yet.</p>
+                    <p className="mt-2 text-sm text-text-muted">No images yet.</p>
                   ) : (
                     <ul className="mt-2 space-y-3">
                       {reader.recentImages.map((img) => (
                         <li
                           key={img.id}
-                          className="flex gap-3 rounded-lg border border-zinc-200/80 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900/40"
+                          className="flex gap-3 rounded-lg border border-border/80 bg-bg-surface p-2"
                         >
-                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-zinc-200 dark:border-zinc-700">
+                          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-border">
                             <Image src={img.imageUrl} alt="" fill className="object-cover" sizes="64px" />
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs text-zinc-500">{img.bookTitle}</p>
+                            <p className="text-xs text-text-muted">{img.bookTitle}</p>
                             <ActivityTimestamp ms={img.createdAtMs} />
-                            <Link href="/gallery" className="mt-1 inline-block text-xs font-medium text-amber-800 hover:underline dark:text-amber-300/90">
+                            <Link href="/gallery" className="mt-1 inline-block text-xs font-medium text-accent-text hover:underline">
                               View in gallery
                             </Link>
                           </div>
@@ -277,12 +277,12 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
           <div className="space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Your books</h2>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Manage drafts, ingestion, and publishing.</p>
+                <h2 className="text-lg font-semibold text-text-primary">Your books</h2>
+                <p className="mt-1 text-sm text-text-secondary">Manage drafts, ingestion, and publishing.</p>
               </div>
               <Link
                 href="/partner/books/new"
-                className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-amber-500 dark:bg-amber-500 dark:text-zinc-950 dark:hover:bg-amber-400"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent"
               >
                 Upload new book
               </Link>
@@ -293,7 +293,7 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
               <StatMini label="Total queries" value={partner.stats.totalQueries} />
               <StatMini label="Total images" value={partner.stats.totalImages} />
             </div>
-            <div className="rounded-xl border border-zinc-200/90 dark:border-zinc-800/80">
+            <div className="rounded-xl border border-border">
               <PartnerDashboardBooksClient
                 initialBooks={partner.initialBooks}
                 initialHasMore={partner.initialHasMore}
@@ -306,7 +306,7 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
         {tab === "admin" && admin ? (
           <div className="space-y-8">
             <section aria-labelledby="admin-stats">
-              <h2 id="admin-stats" className="text-sm font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+              <h2 id="admin-stats" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                 Quick stats
               </h2>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -319,77 +319,77 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
             <section className="flex flex-wrap gap-3" aria-label="Admin shortcuts">
               <Link
                 href="/admin/books"
-                className="rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                className="rounded-lg border border-border bg-bg-surface px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
               >
                 Manage all books
               </Link>
               <Link
                 href="/admin/stats"
-                className="rounded-lg border border-zinc-300 bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+                className="rounded-lg border border-border bg-bg-surface px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
               >
                 View statistics
               </Link>
             </section>
 
-            <section aria-labelledby="admin-book-requests" className="rounded-xl border border-zinc-200/90 bg-zinc-50/50 p-5 dark:border-zinc-800 dark:bg-zinc-900/30">
-              <h2 id="admin-book-requests" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            <section aria-labelledby="admin-book-requests" className="rounded-xl border border-border bg-bg-base/50 p-5">
+              <h2 id="admin-book-requests" className="text-lg font-semibold text-text-primary">
                 Book requests
               </h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              <p className="mt-1 text-sm text-text-secondary">
                 Total requests recorded:{" "}
-                <span className="font-semibold text-zinc-800 dark:text-zinc-200">{admin.bookRequests.totalCount}</span>
+                <span className="font-semibold text-text-primary">{admin.bookRequests.totalCount}</span>
               </p>
-              <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-zinc-500">Top requested titles</h3>
+              <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-text-muted">Top requested titles</h3>
               {admin.bookRequests.topBooks.length === 0 ? (
-                <p className="mt-2 text-sm text-zinc-500">No book requests yet.</p>
+                <p className="mt-2 text-sm text-text-muted">No book requests yet.</p>
               ) : (
-                <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-zinc-800 dark:text-zinc-200">
+                <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-text-primary">
                   {admin.bookRequests.topBooks.map((row) => (
                     <li key={row.bookTitle}>
                       <span className="font-medium">{row.bookTitle}</span>{" "}
-                      <span className="text-zinc-500 dark:text-zinc-400">({row.count} requests)</span>
+                      <span className="text-text-muted">({row.count} requests)</span>
                     </li>
                   ))}
                 </ol>
               )}
               <Link
                 href="/admin/requests"
-                className="mt-4 inline-flex text-sm font-medium text-amber-800 underline-offset-2 hover:underline dark:text-amber-300/90"
+                className="mt-4 inline-flex text-sm font-medium text-accent-text underline-offset-2 hover:underline"
               >
                 View all book requests →
               </Link>
             </section>
 
             <section aria-labelledby="admin-queue">
-              <h2 id="admin-queue" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+              <h2 id="admin-queue" className="text-lg font-semibold text-text-primary">
                 Moderation queue
               </h2>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">Books awaiting review ({pendingBooks.length} shown).</p>
+              <p className="mt-1 text-sm text-text-secondary">Books awaiting review ({pendingBooks.length} shown).</p>
               {pendingBooks.length === 0 ? (
-                <p className="mt-4 text-sm text-zinc-500">No books are pending review.</p>
+                <p className="mt-4 text-sm text-text-muted">No books are pending review.</p>
               ) : (
                 <ul className="mt-4 space-y-4">
                   {pendingBooks.map((book) => (
                     <li
                       key={book.id}
-                      className="flex flex-wrap items-center gap-4 rounded-xl border border-zinc-200/80 bg-zinc-50/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/50"
+                      className="flex flex-wrap items-center gap-4 rounded-xl border border-border/80 bg-bg-base/80 p-4"
                     >
-                      <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded border border-zinc-300 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950">
+                      <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-bg-surface">
                         {book.coverImageUrl ? (
                           <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="44px" />
                         ) : (
-                          <div className="flex h-full items-center justify-center text-[10px] text-zinc-500">—</div>
+                          <div className="flex h-full items-center justify-center text-[10px] text-text-muted">—</div>
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-zinc-900 dark:text-zinc-100">{book.title}</p>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">{book.author}</p>
+                        <p className="font-medium text-text-primary">{book.title}</p>
+                        <p className="text-sm text-text-secondary">{book.author}</p>
                       </div>
                       <div className="flex shrink-0 flex-wrap gap-2">
                         <button
                           type="button"
                           disabled={actionId === book.id}
-                          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                          className="rounded-lg bg-success px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-success/100 disabled:opacity-50"
                           onClick={() => void runModeration(book.id, "published")}
                         >
                           {actionId === book.id ? "…" : "Approve"}
@@ -397,14 +397,14 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
                         <button
                           type="button"
                           disabled={actionId === book.id}
-                          className="rounded-lg border border-red-600/80 bg-transparent px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40"
+                          className="rounded-lg border border-error/40 bg-transparent px-3 py-1.5 text-sm font-medium text-error transition hover:bg-error/10 disabled:opacity-50"
                           onClick={() => void runModeration(book.id, "rejected")}
                         >
                           Reject
                         </button>
                         <Link
                           href={`/admin/books/${book.id}`}
-                          className="inline-flex items-center rounded-lg border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800/80"
+                          className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-surface"
                         >
                           Details
                         </Link>

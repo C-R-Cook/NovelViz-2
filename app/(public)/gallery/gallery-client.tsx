@@ -169,8 +169,8 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
 
   function tabPillClasses(active: boolean) {
     return active
-      ? "border-amber-700/45 bg-amber-950/40 text-amber-100 shadow-[inset_0_1px_0_0_rgba(251,191,36,0.14)] dark:border-amber-500/35 dark:bg-amber-950/55 dark:text-amber-50 dark:shadow-[inset_0_1px_0_0_rgba(251,191,36,0.12)]"
-      : "border-zinc-300/90 bg-zinc-100/90 text-zinc-600 hover:border-zinc-400 hover:bg-zinc-200/80 hover:text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200";
+      ? "border-accent/45 bg-accent-muted text-accent-text shadow-[inset_0_1px_0_0_color-mix(in_srgb,var(--accent)_14%,transparent)]"
+      : "border-border/90 bg-bg-surface/90 text-text-muted hover:border-border hover:bg-bg-raised/80 hover:text-text-primary";
   }
 
   function selectBookFromSearch(bookId: string, title: string) {
@@ -191,13 +191,13 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
   return (
     <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
       <header className="space-y-2">
-        <h1 className="font-serif text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100 sm:text-3xl">
+        <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
           Gallery
         </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Images created by readers</p>
+        <p className="text-sm text-text-secondary">Images created by readers</p>
       </header>
 
-      <div className="mt-6 flex flex-col gap-4 border-b border-zinc-200/80 pb-4 dark:border-zinc-800/80 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <div className="mt-6 flex flex-col gap-4 border-b border-border/80 pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="flex flex-wrap gap-2">
           {isLoggedIn ? (
             <button
@@ -239,7 +239,7 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                 window.setTimeout(() => setBookSuggestOpen(false), 150);
               }}
               placeholder="Filter by book..."
-              className="min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
               aria-autocomplete="list"
               aria-expanded={bookSuggestOpen}
               aria-controls="gallery-book-suggestions"
@@ -248,7 +248,7 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
               <button
                 type="button"
                 onClick={clearBookFilter}
-                className="shrink-0 rounded-lg border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-medium text-zinc-700 transition hover:bg-zinc-200 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                className="shrink-0 rounded-lg border border-border bg-bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition hover:bg-bg-raised"
               >
                 Clear
               </button>
@@ -258,13 +258,13 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
             <ul
               id="gallery-book-suggestions"
               role="listbox"
-              className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-zinc-200/95 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+              className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border/95 bg-bg-surface py-1 shadow-lg"
             >
               {bookSuggestions.map((b) => (
                 <li key={b.bookId} role="option">
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-surface"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => selectBookFromSearch(b.bookId, b.bookTitle)}
                   >
@@ -278,17 +278,17 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
       </div>
 
       {showMyBooksEmpty ? (
-        <p className="mt-6 rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
           You haven&apos;t added any books to your library yet.{" "}
           <Link
             href="/discover"
-            className="font-medium text-amber-800 underline decoration-amber-800/40 underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:decoration-amber-400/50 dark:hover:text-amber-200"
+            className="font-medium text-accent-text underline decoration-accent/40 underline-offset-2 hover:text-accent-text"
           >
             Discover books
           </Link>
         </p>
       ) : visibleImages.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
           No images match this filter.
         </p>
       ) : (
@@ -301,11 +301,11 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
             return (
               <article
                 key={image.id}
-                className="overflow-hidden rounded-lg border border-zinc-200/90 bg-white shadow-sm shadow-zinc-900/5 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:shadow-black/20"
+                className="overflow-hidden rounded-lg border border-border bg-bg-surface shadow-sm shadow-bg-overlay/5"
               >
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-zinc-950">
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-bg-base">
                   {mainTab === "featured" ? (
-                    <span className="absolute left-2 top-2 z-10 rounded border border-amber-800/40 bg-amber-950/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-100/95 shadow-sm dark:border-amber-600/35 dark:bg-amber-950/90">
+                    <span className="absolute left-2 top-2 z-10 rounded border border-accent/40 bg-bg-base/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-text/95 shadow-sm">
                       Featured
                     </span>
                   ) : null}
@@ -320,17 +320,17 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                     }`}
                   />
                   {locked ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 px-3 text-center">
-                      <LockIcon className="h-8 w-8 text-amber-200/90" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg-overlay/70 px-3 text-center">
+                      <LockIcon className="h-8 w-8 text-accent-text/90" />
                       {!isLoggedIn ? (
-                        <p className="text-sm font-medium text-zinc-100">Sign in to unlock</p>
+                        <p className="text-sm font-medium text-text-primary">Sign in to unlock</p>
                       ) : image.spoilerLevel === "unstarted" ? (
-                        <p className="max-w-[14rem] text-sm font-medium leading-snug text-zinc-100">
+                        <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
                           Start reading {image.bookTitle} to unlock
                         </p>
                       ) : (
                         <>
-                          <p className="max-w-[14rem] text-sm font-medium leading-snug text-zinc-100">
+                          <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
                             Contains content from Chapter {image.chapterNumberAtTime}
                           </p>
                           <button
@@ -338,7 +338,7 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                             onClick={() =>
                               setRevealedImageIds((prev) => ({ ...prev, [image.id]: true }))
                             }
-                            className="rounded-md border border-amber-700/50 bg-amber-950/50 px-3 py-1.5 text-xs font-medium text-amber-100 transition hover:bg-amber-900/60"
+                            className="rounded-md border border-accent/35 bg-status-pending/50 px-3 py-1.5 text-xs font-medium text-accent-text transition hover:bg-status-pending/60"
                           >
                             Show anyway
                           </button>
@@ -348,16 +348,16 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                   ) : null}
                 </div>
                 <div className="space-y-2 p-3">
-                  <p className="text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="text-xs text-text-muted">
                     <Link
                       href={`/discover/${image.bookId}`}
-                      className="transition-colors hover:text-amber-900 hover:underline decoration-amber-800/35 underline-offset-2 dark:hover:text-amber-200/90 dark:decoration-amber-400/40"
+                      className="transition-colors hover:text-accent-text hover:underline decoration-accent/35 underline-offset-2"
                     >
                       {image.bookTitle} · {image.bookAuthor}
                     </Link>
                   </p>
-                  <p className="line-clamp-3 text-sm text-zinc-800 dark:text-zinc-200">{image.userPrompt}</p>
-                  <div className="flex items-center justify-between text-xs text-zinc-500 dark:text-zinc-500">
+                  <p className="line-clamp-3 text-sm text-text-primary">{image.userPrompt}</p>
+                  <div className="flex items-center justify-between text-xs text-text-muted">
                     <span>Chapter {image.chapterNumberAtTime}</span>
                     <span>{image.userName?.trim() || "Anonymous reader"}</span>
                   </div>
@@ -366,7 +366,7 @@ export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props)
                       type="button"
                       onClick={() => void likeImage(image.id)}
                       disabled={!!likingIds[image.id]}
-                      className="inline-flex items-center gap-1 rounded-md border border-rose-200/90 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
+                      className="inline-flex items-center gap-1 rounded-md border border-rose-200/90 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <span aria-hidden>♡</span>
                       <span>{image.likeCount}</span>

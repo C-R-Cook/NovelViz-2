@@ -436,25 +436,25 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
       <header className="space-y-3 sm:space-y-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
-          <h1 className="font-serif text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl">
+          <h1 className="font-serif text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
             {book.title}
           </h1>
-          <span className="hidden text-zinc-300 sm:inline dark:text-zinc-600" aria-hidden>
+          <span className="hidden text-text-secondary sm:inline" aria-hidden>
             ·
           </span>
-          <p className="min-w-0 text-sm text-zinc-600 dark:text-zinc-400">{book.author}</p>
+          <p className="min-w-0 text-sm text-text-secondary">{book.author}</p>
         </div>
 
       </header>
 
       {total === 0 ? (
-        <p className="mt-6 rounded-lg border border-zinc-200/90 bg-zinc-50/80 px-4 py-3 text-sm text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-300">
+        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
           This book hasn&apos;t been ingested yet, check back soon
         </p>
       ) : (
         <>
           <section className="mt-4 grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,11rem)_1fr]">
-            <div className="mx-auto w-full max-w-[11rem] shrink-0 justify-self-center self-start overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900 md:mx-0 md:max-w-none md:justify-self-stretch">
+            <div className="mx-auto w-full max-w-[11rem] shrink-0 justify-self-center self-start overflow-hidden rounded-xl border border-border bg-bg-surface md:mx-0 md:max-w-none md:justify-self-stretch">
               <div className="relative aspect-[2/3] w-full">
                 {book.coverImageUrl ? (
                   <Image
@@ -465,29 +465,29 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     sizes="(min-width: 768px) 176px, (min-width: 640px) 40vw, 75vw"
                   />
                 ) : (
-                  <div className="flex h-full items-center justify-center px-4 text-center text-sm leading-tight text-zinc-500 dark:text-zinc-600">
+                  <div className="flex h-full items-center justify-center px-4 text-center text-sm leading-tight text-text-muted">
                     No cover available
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="min-w-0 space-y-3 rounded-xl border border-zinc-200/90 bg-white/60 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/30 sm:p-5">
-              <h2 className="font-serif text-lg font-semibold text-zinc-900 dark:text-amber-100/90">
+            <div className="min-w-0 space-y-3 rounded-xl border border-border bg-bg-surface/60 p-4 sm:p-5">
+              <h2 className="font-serif text-lg font-semibold text-text-primary">
                 Ask &amp; imagine
               </h2>
-              <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-500">
+              <p className="text-xs leading-relaxed text-text-muted">
                 We use only information and descriptions up to your current chapter to avoid spoilers.
               </p>
 
-              <section className="rounded-lg border border-zinc-200/80 bg-zinc-50/70 px-3 py-3 dark:border-zinc-800/70 dark:bg-zinc-900/20 sm:px-4">
+              <section className="rounded-lg border border-border/80 bg-bg-base/70 px-3 py-3 sm:px-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <label className="min-w-0 sm:min-w-72">
                     <span className="sr-only">Current chapter</span>
                     <select
                       value={selectedChapterId}
                       onChange={(e) => setSelectedChapterId(e.target.value)}
-                      className="w-full rounded-md border border-zinc-300 bg-white px-2.5 py-1.5 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100"
+                      className="w-full rounded-md border border-border bg-bg-surface px-2.5 py-1.5 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                     >
                       {chapters.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -500,7 +500,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     type="button"
                     onClick={saveProgress}
                     disabled={saving || !selectedChapterId}
-                    className="shrink-0 rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-900/60 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                    className="shrink-0 rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-surface disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {saving ? "Saving…" : "Save chapter"}
                   </button>
@@ -509,8 +509,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                   <p
                     className={
                       message.type === "ok"
-                        ? "mt-2 text-xs text-emerald-700 dark:text-emerald-400/90"
-                        : "mt-2 text-xs text-red-600 dark:text-red-400"
+                        ? "mt-2 text-xs text-success"
+                        : "mt-2 text-xs text-error"
                     }
                   >
                     {message.text}
@@ -519,7 +519,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
               </section>
 
               <div
-                className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
+                className="flex gap-1 border-b border-border"
                 role="tablist"
                 aria-label="Reader AI tools"
               >
@@ -530,8 +530,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                   onClick={() => setActiveAiTab("imagine")}
                   className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
                     activeAiTab === "imagine"
-                      ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                      ? "border-b-2 border-accent text-text-primary"
+                      : "text-text-muted hover:text-text-primary"
                   }`}
                 >
                   Generate Image
@@ -543,8 +543,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                   onClick={() => setActiveAiTab("ask")}
                   className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
                     activeAiTab === "ask"
-                      ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+                      ? "border-b-2 border-accent text-text-primary"
+                      : "text-text-muted hover:text-text-primary"
                   }`}
                 >
                   Ask a Question
@@ -559,28 +559,28 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                       placeholder="Describe a scene, character, or moment from what you've read..."
                       rows={4}
                       disabled={imgLoading}
-                      className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                      className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => void submitImage()}
                         disabled={imgLoading || !imgPrompt.trim()}
-                        className="rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50"
+                        className="rounded-lg border border-accent/35 bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent-hover/90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {imgLoading ? "Generating…" : "Generate Image"}
                       </button>
                     </div>
                     {imgError ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">{imgError}</p>
+                      <p className="text-sm text-error">{imgError}</p>
                     ) : null}
                     {imgLoading ? (
-                      <div className="flex flex-col items-center gap-3 rounded-lg border border-zinc-200/80 bg-zinc-50/50 py-8 dark:border-zinc-800/70 dark:bg-zinc-950/30">
+                      <div className="flex flex-col items-center gap-3 rounded-lg border border-border/80 bg-bg-base/50 py-8">
                         <div
-                          className="h-9 w-9 animate-spin rounded-full border-2 border-zinc-300 border-t-amber-600 dark:border-zinc-700 dark:border-t-amber-400"
+                          className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-accent"
                           aria-hidden
                         />
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        <p className="text-sm text-text-secondary">
                           Generating your image...
                         </p>
                       </div>
@@ -594,24 +594,24 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                       placeholder="Ask a question about what you've read so far..."
                       rows={4}
                       disabled={qaLoading}
-                      className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-100 dark:placeholder:text-zinc-600"
+                      className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
                     />
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => void submitQuestion()}
                         disabled={qaLoading || !question.trim()}
-                        className="rounded-lg border border-amber-700/50 bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 transition hover:bg-amber-200/90 disabled:cursor-not-allowed disabled:opacity-50 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-100/95 dark:hover:bg-amber-950/50"
+                        className="rounded-lg border border-accent/35 bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent-hover/90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {qaLoading ? "Asking…" : "Ask"}
                       </button>
                     </div>
                     {qaError ? (
-                      <p className="text-sm text-red-600 dark:text-red-400">{qaError}</p>
+                      <p className="text-sm text-error">{qaError}</p>
                     ) : null}
                     {lastAnswer && !qaLoading ? (
-                      <div className="rounded-lg border border-zinc-200/90 bg-zinc-50/90 px-3 py-3 dark:border-zinc-700/90 dark:bg-zinc-950/40">
-                        <div className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-100 [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:font-serif [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:font-serif [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1">
+                      <div className="rounded-lg border border-border bg-bg-base/90 px-3 py-3">
+                        <div className="text-sm leading-relaxed text-text-primary [&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:font-serif [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:font-serif [&_h2]:text-lg [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:font-semibold [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_strong]:font-semibold [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_li]:my-1">
                           <ReactMarkdown>{lastAnswer}</ReactMarkdown>
                         </div>
                       </div>
@@ -621,23 +621,23 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
             </div>
           </section>
 
-          <section className="mt-4 space-y-2 rounded-xl border border-zinc-200/90 bg-white/50 p-4 dark:border-zinc-800/80 dark:bg-zinc-900/20">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+          <section className="mt-4 space-y-2 rounded-xl border border-border bg-bg-surface/50 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
               {activeAiTab === "imagine" ? "Previous image generations" : "Previous questions"}
             </p>
             {activeAiTab === "imagine" ? (
               imageHistoryLoading ? (
-                <p className="text-xs text-zinc-500">Loading…</p>
+                <p className="text-xs text-text-muted">Loading…</p>
               ) : imageHistoryError ? (
-                <p className="text-xs text-red-600 dark:text-red-400/90">{imageHistoryError}</p>
+                <p className="text-xs text-error">{imageHistoryError}</p>
               ) : imageHistory.length === 0 ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-500">No images yet.</p>
+                <p className="text-xs text-text-muted">No images yet.</p>
               ) : (
                 <ul className="flex gap-3 overflow-x-auto pb-1">
                   {imageHistory.map((item) => (
                     <li
                       key={item.id}
-                      className="w-36 shrink-0 overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/50 dark:border-zinc-800/70 dark:bg-zinc-950/30 sm:w-40"
+                      className="w-36 shrink-0 overflow-hidden rounded-lg border border-border/80 bg-bg-base/50 sm:w-40"
                     >
                       <button
                         type="button"
@@ -655,10 +655,10 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                         />
                       </button>
                       <div className="space-y-1 p-2">
-                        <p className="line-clamp-2 text-xs text-zinc-700 dark:text-zinc-300">
+                        <p className="line-clamp-2 text-xs text-text-secondary">
                           {item.userPrompt}
                         </p>
-                        <p className="text-[10px] text-zinc-400 dark:text-zinc-600">
+                        <p className="text-[10px] text-text-secondary">
                           Chapter {item.chapterNumberAtTime}
                         </p>
                         <div className="pt-1">
@@ -668,8 +668,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                             disabled={!!shareUpdatingIds[item.id] || item.id.startsWith("temp-")}
                             className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                               item.isPublic
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
-                                : "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                                ? "border-success/30 bg-success/10 text-success"
+                                : "border-border bg-bg-surface text-text-secondary"
                             }`}
                           >
                             {shareUpdatingIds[item.id]
@@ -685,22 +685,22 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                 </ul>
               )
             ) : historyLoading ? (
-              <p className="text-xs text-zinc-500">Loading…</p>
+              <p className="text-xs text-text-muted">Loading…</p>
             ) : historyError ? (
-              <p className="text-xs text-red-600 dark:text-red-400/90">{historyError}</p>
+              <p className="text-xs text-error">{historyError}</p>
             ) : historyQueries.length === 0 ? (
-              <p className="text-xs text-zinc-500 dark:text-zinc-500">No questions yet.</p>
+              <p className="text-xs text-text-muted">No questions yet.</p>
             ) : (
-              <ul className="max-h-80 space-y-0 divide-y divide-zinc-200/80 overflow-y-auto dark:divide-zinc-800/80">
+              <ul className="max-h-80 space-y-0 divide-y divide-border/80 overflow-y-auto">
                 {historyQueries.map((q) => (
                   <li key={q.id} className="py-3 first:pt-0">
-                    <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                    <p className="text-sm font-semibold text-text-primary">
                       {q.questionText}
                     </p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+                    <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
                       {q.responseText}
                     </p>
-                    <p className="mt-2 text-[11px] text-zinc-400 dark:text-zinc-600">
+                    <p className="mt-2 text-[11px] text-text-secondary">
                       Chapter {q.chapterNumberAtTime} ·{" "}
                       {new Date(q.createdAt).toLocaleString(undefined, {
                         dateStyle: "short",
@@ -718,19 +718,19 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
 
       {selectedHistoryImage ? (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay/70 p-4"
           role="dialog"
           aria-modal="true"
           aria-label="Generated image details"
           onClick={() => setSelectedHistoryImage(null)}
         >
           <div
-            className="flex h-[min(92vh,48rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-200/90 bg-white p-3 shadow-2xl dark:border-zinc-800/80 dark:bg-zinc-900 sm:p-4"
+            className="flex h-[min(92vh,48rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface p-3 shadow-2xl sm:p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-2 flex shrink-0 items-center justify-between">
               <div className="flex items-center gap-2">
-                <p className="text-[11px] text-zinc-500 dark:text-zinc-400 sm:text-xs">
+                <p className="text-[11px] text-text-muted sm:text-xs">
                   Chapter {selectedHistoryImage.chapterNumberAtTime} ·{" "}
                   {new Date(selectedHistoryImage.createdAt).toLocaleString(undefined, {
                     dateStyle: "short",
@@ -751,8 +751,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                   }
                   className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     selectedHistoryImage.isPublic
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
-                      : "border-zinc-300 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300"
+                      ? "border-success/30 bg-success/10 text-success"
+                      : "border-border bg-bg-surface text-text-secondary"
                   }`}
                 >
                   {shareUpdatingIds[selectedHistoryImage.id]
@@ -765,7 +765,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
               <button
                 type="button"
                 onClick={() => setSelectedHistoryImage(null)}
-                className="rounded-md px-2 py-1 text-[11px] font-medium text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 sm:text-xs"
+                className="rounded-md px-2 py-1 text-[11px] font-medium text-text-muted hover:bg-bg-surface sm:text-xs"
               >
                 Close
               </button>
@@ -778,22 +778,22 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                 width={1200}
                 height={900}
                 unoptimized
-                className="h-full w-full rounded-lg border border-zinc-200/90 object-contain dark:border-zinc-800/80"
+                className="h-full w-full rounded-lg border border-border object-contain"
               />
             </div>
 
             <div className="mt-3 shrink-0">
               <div className="space-y-4">
-                <details className="rounded-md border border-zinc-200/90 bg-zinc-50/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-950/30">
+                <details className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
                   <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted sm:text-[11px]">
                       Original Prompt
                     </span>
                     <button
                       type="button"
                       title="Copy original prompt"
                       aria-label="Copy original prompt"
-                      className="shrink-0 rounded p-1 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700/80 dark:hover:text-zinc-100"
+                      className="shrink-0 rounded p-1 text-text-muted transition hover:bg-bg-raised/80 hover:text-text-primary"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -802,26 +802,26 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       {promptCopied === "original" ? (
-                        <CheckIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <CheckIcon className="h-3.5 w-3.5 text-success" />
                       ) : (
                         <CopyIcon className="h-3.5 w-3.5" />
                       )}
                     </button>
                   </summary>
-                  <p className="mt-2 text-xs text-zinc-800 dark:text-zinc-200 sm:text-sm">
+                  <p className="mt-2 text-xs text-text-primary sm:text-sm">
                     {selectedHistoryImage.userPrompt}
                   </p>
                 </details>
-                <details className="rounded-md border border-zinc-200/90 bg-zinc-50/60 px-3 py-2 dark:border-zinc-800/80 dark:bg-zinc-950/30">
+                <details className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
                   <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400 sm:text-[11px]">
+                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted sm:text-[11px]">
                       Generated Prompt
                     </span>
                     <button
                       type="button"
                       title="Copy generated prompt"
                       aria-label="Copy generated prompt"
-                      className="shrink-0 rounded p-1 text-zinc-500 transition hover:bg-zinc-200/80 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700/80 dark:hover:text-zinc-100"
+                      className="shrink-0 rounded p-1 text-text-muted transition hover:bg-bg-raised/80 hover:text-text-primary"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -830,13 +830,13 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                       onMouseDown={(e) => e.stopPropagation()}
                     >
                       {promptCopied === "generated" ? (
-                        <CheckIcon className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <CheckIcon className="h-3.5 w-3.5 text-success" />
                       ) : (
                         <CopyIcon className="h-3.5 w-3.5" />
                       )}
                     </button>
                   </summary>
-                  <p className="mt-2 text-xs leading-relaxed text-zinc-700 dark:text-zinc-300 sm:text-sm">
+                  <p className="mt-2 text-xs leading-relaxed text-text-secondary sm:text-sm">
                     {selectedHistoryImage.fullPrompt}
                   </p>
                 </details>

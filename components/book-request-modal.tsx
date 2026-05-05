@@ -8,8 +8,8 @@ type Props = {
 };
 
 const inputClass =
-  "mt-1 w-full rounded-md border border-zinc-600 bg-zinc-900/80 px-3 py-2 text-sm text-zinc-100 outline-none ring-amber-500/20 transition placeholder:text-zinc-600 focus:border-amber-500/60 focus:ring-2 focus:ring-amber-500/25";
-const labelClass = "block text-sm font-medium text-zinc-300";
+  "mt-1 w-full rounded-md border border-border bg-bg-surface/80 px-3 py-2 text-sm text-text-primary outline-none ring-accent/20 transition placeholder:text-text-muted focus:border-accent/60 focus:ring-2 focus:ring-accent/25";
+const labelClass = "block text-sm font-medium text-text-secondary";
 
 export function BookRequestModal({ open, onClose }: Props) {
   const [bookTitle, setBookTitle] = useState("");
@@ -70,7 +70,7 @@ export function BookRequestModal({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-overlay/70 p-4 backdrop-blur-sm"
       role="presentation"
       onClick={() => (pending ? null : handleClose())}
     >
@@ -78,16 +78,16 @@ export function BookRequestModal({ open, onClose }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="book-request-title"
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-border bg-bg-base p-6 shadow-2xl"
         onClick={(ev) => ev.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3">
-          <h2 id="book-request-title" className="font-serif text-xl font-semibold text-zinc-50">
+          <h2 id="book-request-title" className="font-serif text-xl font-semibold text-text-primary">
             Request a Book
           </h2>
           <button
             type="button"
-            className="rounded-md px-2 py-1 text-sm text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            className="rounded-md px-2 py-1 text-sm text-text-secondary transition hover:bg-bg-raised hover:text-text-primary"
             onClick={() => handleClose()}
             aria-label="Close"
           >
@@ -97,13 +97,13 @@ export function BookRequestModal({ open, onClose }: Props) {
 
         {done ? (
           <div className="mt-6 space-y-4">
-            <p className="text-sm leading-relaxed text-zinc-300">
+            <p className="text-sm leading-relaxed text-text-secondary">
               Thanks! We&apos;ve recorded your request. We share real demand data with publishers to help prioritise
               new titles.
             </p>
             <button
               type="button"
-              className="rounded-lg bg-amber-500/20 px-4 py-2 text-sm font-medium text-amber-100 ring-1 ring-amber-500/40 transition hover:bg-amber-500/30"
+              className="rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-accent-text ring-1 ring-accent/40 transition hover:bg-accent/30"
               onClick={() => handleClose()}
             >
               Close
@@ -113,7 +113,7 @@ export function BookRequestModal({ open, onClose }: Props) {
           <form className="mt-6 space-y-4" onSubmit={(e) => void onSubmit(e)}>
             <div>
               <label htmlFor="br-title" className={labelClass}>
-                Book title <span className="text-red-400">*</span>
+                Book title <span className="text-error">*</span>
               </label>
               <input
                 id="br-title"
@@ -128,7 +128,7 @@ export function BookRequestModal({ open, onClose }: Props) {
             </div>
             <div>
               <label htmlFor="br-author" className={labelClass}>
-                Author name <span className="text-red-400">*</span>
+                Author name <span className="text-error">*</span>
               </label>
               <input
                 id="br-author"
@@ -144,7 +144,7 @@ export function BookRequestModal({ open, onClose }: Props) {
             <div>
               <label htmlFor="br-msg" className={labelClass}>
                 Why would you like this book on NovelViz?{" "}
-                <span className="font-normal text-zinc-500">(optional)</span>
+                <span className="font-normal text-text-muted">(optional)</span>
               </label>
               <textarea
                 id="br-msg"
@@ -157,14 +157,14 @@ export function BookRequestModal({ open, onClose }: Props) {
               />
             </div>
             {error ? (
-              <p className="text-sm text-red-400" role="alert">
+              <p className="text-sm text-error" role="alert">
                 {error}
               </p>
             ) : null}
             <div className="flex flex-wrap justify-end gap-3 pt-2">
               <button
                 type="button"
-                className="rounded-lg border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+                className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-text-secondary transition hover:bg-bg-raised"
                 onClick={() => handleClose()}
                 disabled={pending}
               >
@@ -173,7 +173,7 @@ export function BookRequestModal({ open, onClose }: Props) {
               <button
                 type="submit"
                 disabled={pending}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950 transition hover:bg-amber-400 disabled:opacity-50"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-inverse transition hover:bg-accent disabled:opacity-50"
               >
                 {pending ? "Submitting…" : "Submit"}
               </button>

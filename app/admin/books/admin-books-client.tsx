@@ -31,94 +31,86 @@ function filterClassName(key: FilterKey, active: boolean): string {
   const base = "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ring-1";
   if (key === "all") {
     return active
-      ? `${base} bg-amber-100/95 text-amber-950 ring-amber-500/50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/40`
-      : `${base} bg-zinc-100 text-zinc-600 ring-zinc-300 hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-800 dark:hover:text-zinc-200`;
+      ? `${base} bg-accent-muted text-accent-text ring-accent/50`
+      : `${base} bg-bg-surface text-text-muted ring-border hover:text-text-primary`;
   }
 
-  const palette: Record<BookStatus | "deleted", { light: string; dark: string }> = {
-    draft: {
-      light: "border-sky-400/80 bg-sky-100 text-sky-950 ring-sky-400/70 hover:bg-sky-200/80",
-      dark: "dark:border-sky-700/50 dark:bg-sky-950/35 dark:text-sky-100 dark:ring-sky-700/60 dark:hover:bg-sky-950/55",
-    },
-    pending_review: {
-      light: "border-indigo-400/80 bg-indigo-100 text-indigo-950 ring-indigo-400/70 hover:bg-indigo-200/80",
-      dark: "dark:border-indigo-700/50 dark:bg-indigo-950/35 dark:text-indigo-100 dark:ring-indigo-700/60 dark:hover:bg-indigo-950/55",
-    },
-    rejected: {
-      light: "border-red-400/80 bg-red-100 text-red-950 ring-red-400/70 hover:bg-red-200/80",
-      dark: "dark:border-red-700/50 dark:bg-red-950/35 dark:text-red-100 dark:ring-red-700/60 dark:hover:bg-red-950/55",
-    },
-    processing: {
-      light: "border-blue-400/80 bg-blue-100 text-blue-950 ring-blue-400/70 hover:bg-blue-200/80",
-      dark: "dark:border-blue-700/50 dark:bg-blue-950/35 dark:text-blue-100 dark:ring-blue-700/60 dark:hover:bg-blue-950/55",
-    },
-    published: {
-      light: "border-emerald-500/80 bg-emerald-100 text-emerald-950 ring-emerald-500/70 hover:bg-emerald-200/80",
-      dark: "dark:border-emerald-700/50 dark:bg-emerald-950/35 dark:text-emerald-100 dark:ring-emerald-700/60 dark:hover:bg-emerald-950/55",
-    },
-    unlisted: {
-      light: "border-orange-400/80 bg-orange-100 text-orange-950 ring-orange-400/70 hover:bg-orange-200/80",
-      dark: "dark:border-orange-700/50 dark:bg-orange-950/35 dark:text-orange-100 dark:ring-orange-700/60 dark:hover:bg-orange-950/55",
-    },
-    deleted: {
-      light: "border-red-500/80 bg-red-100 text-red-950 ring-red-500/70 hover:bg-red-200/80",
-      dark: "dark:border-red-700/50 dark:bg-red-950/35 dark:text-red-100 dark:ring-red-700/60 dark:hover:bg-red-950/55",
-    },
+  const activeStyle: Record<BookStatus | "deleted", string> = {
+    draft: `${base} border border-status-draft bg-status-draft/35 text-text-primary ring-status-draft/50`,
+    pending_review: `${base} border border-status-ready bg-status-ready/30 text-text-primary ring-status-ready/45`,
+    rejected: `${base} border border-status-rejected bg-status-rejected/30 text-text-primary ring-status-rejected/45`,
+    processing: `${base} border border-status-processing bg-status-processing/30 text-text-primary ring-status-processing/45`,
+    published: `${base} border border-status-published bg-status-published/30 text-text-primary ring-status-published/45`,
+    unlisted: `${base} border border-status-unlisted bg-status-unlisted/30 text-text-primary ring-status-unlisted/45`,
+    deleted: `${base} border border-status-rejected bg-status-rejected/30 text-text-primary ring-status-rejected/45`,
   };
 
-  const colors = palette[key];
-  if (!colors) {
-    return `${base} bg-zinc-100 text-zinc-600 ring-zinc-300 hover:text-zinc-900 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-800 dark:hover:text-zinc-200`;
+  const inactiveBorder: Record<BookStatus | "deleted", string> = {
+    draft: "border-status-draft/50",
+    pending_review: "border-status-ready/50",
+    rejected: "border-status-rejected/50",
+    processing: "border-status-processing/50",
+    published: "border-status-published/50",
+    unlisted: "border-status-unlisted/50",
+    deleted: "border-status-rejected/50",
+  };
+
+  const style = activeStyle[key];
+  const ib = inactiveBorder[key];
+  if (!style || !ib) {
+    return `${base} bg-bg-surface text-text-muted ring-border hover:text-text-primary`;
   }
 
   if (active) {
-    return `${base} ${colors.light} ${colors.dark}`;
+    return style;
   }
-  return `${base} bg-white text-zinc-700 ring-zinc-300 hover:bg-zinc-50 dark:bg-zinc-950/60 dark:text-zinc-300 dark:ring-zinc-800 dark:hover:bg-zinc-900/60 border ${colors.light.split(" ").find((token) => token.startsWith("border-")) ?? "border-zinc-300"} ${colors.dark.split(" ").find((token) => token.startsWith("dark:border-")) ?? "dark:border-zinc-700"}`;
+  return `${base} border bg-bg-surface text-text-secondary ring-border hover:bg-bg-raised ${ib}`;
 }
 
 export function StatusBadge({ status, isDeleted = false }: { status: BookStatus; isDeleted?: boolean }) {
   const base =
     "inline-flex w-[8.0625rem] shrink-0 items-center justify-center whitespace-nowrap rounded-full px-1.5 py-1 text-xs font-medium leading-none tracking-tight";
   if (isDeleted) {
-    return <span className={`${base} bg-red-700 text-red-50`}>Deleted</span>;
+    return (
+      <span className={`${base} bg-status-rejected text-text-primary`}>Deleted</span>
+    );
   }
   switch (status) {
     case "draft":
       return (
-        <span className={`${base} bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200`}>
+        <span className={`${base} bg-status-draft text-text-primary`}>
           draft
         </span>
       );
     case "pending_review":
       return (
-        <span className={`${base} bg-indigo-600 text-indigo-50`}>
+        <span className={`${base} bg-status-pending text-text-primary`}>
           Pending Review
         </span>
       );
     case "rejected":
       return (
-        <span className={`${base} bg-red-600 text-red-50`}>
+        <span className={`${base} bg-status-rejected text-text-primary`}>
           rejected
         </span>
       );
     case "processing":
       return (
         <span
-          className={`${base} animate-pulse bg-blue-600 text-blue-50 ring-2 ring-blue-400/40`}
+          className={`${base} animate-pulse bg-status-processing text-text-primary ring-2 ring-status-processing/40`}
         >
           processing
         </span>
       );
     case "published":
       return (
-        <span className={`${base} bg-emerald-600 text-emerald-50`}>
+        <span className={`${base} bg-status-published text-text-primary`}>
           published
         </span>
       );
     case "unlisted":
       return (
-        <span className={`${base} bg-orange-600 text-orange-50`}>unlisted</span>
+        <span className={`${base} bg-status-unlisted text-text-primary`}>unlisted</span>
       );
     default:
       return <span className={base}>{status}</span>;
@@ -303,18 +295,18 @@ export function AdminBooksClient({
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <h1 className="font-serif text-2xl font-semibold text-amber-900 dark:text-amber-100/95">
+          <h1 className="font-serif text-2xl font-semibold text-accent-text">
             Books
           </h1>
           <Link
             href="/partner/books/new"
-            className="inline-flex w-fit rounded-lg bg-amber-100/90 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/35 transition hover:bg-amber-200/80 dark:bg-amber-200/10 dark:text-amber-100 dark:ring-amber-400/30 dark:hover:bg-amber-200/15"
+            className="inline-flex w-fit rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/35 transition hover:bg-accent-hover/80"
           >
             New book
           </Link>
         </div>
         {actionErr ? (
-          <p className="text-sm text-red-600 dark:text-red-400">{actionErr}</p>
+          <p className="text-sm text-error">{actionErr}</p>
         ) : null}
         <div className="flex flex-wrap gap-2">
           {FILTERS.map(({ key, label }) => (
@@ -332,10 +324,10 @@ export function AdminBooksClient({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-zinc-200/90 bg-white/90 dark:border-zinc-800/80 dark:bg-zinc-900/40">
+      <div className="overflow-x-auto rounded-xl border border-border bg-bg-surface/90">
         <table className="w-full min-w-[800px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-600 dark:border-zinc-800 dark:text-zinc-500">
+            <tr className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
               <th className="px-4 py-3 font-medium">Cover</th>
               <th className="px-4 py-3 font-medium">Title</th>
               <th className="px-4 py-3 font-medium">Author</th>
@@ -351,7 +343,7 @@ export function AdminBooksClient({
               <tr>
                 <td
                   colSpan={8}
-                  className="px-4 py-8 text-center text-zinc-600 dark:text-zinc-500"
+                  className="px-4 py-8 text-center text-text-muted"
                 >
                   Loading…
                 </td>
@@ -360,7 +352,7 @@ export function AdminBooksClient({
               <tr>
                 <td
                   colSpan={8}
-                  className="px-4 py-8 text-center text-zinc-600 dark:text-zinc-500"
+                  className="px-4 py-8 text-center text-text-muted"
                 >
                   No books match this filter.
                 </td>
@@ -369,10 +361,10 @@ export function AdminBooksClient({
               books.map((book) => (
                 <tr
                   key={book.id}
-                  className="border-b border-zinc-200/80 last:border-0 dark:border-zinc-800/60"
+                  className="border-b border-border/80 last:border-0"
                 >
                   <td className="px-4 py-2 align-middle">
-                    <div className="relative h-14 w-10 overflow-hidden rounded border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
+                    <div className="relative h-14 w-10 overflow-hidden rounded border border-border bg-bg-surface">
                       {book.coverImageUrl ? (
                         <Image
                           src={book.coverImageUrl}
@@ -382,26 +374,26 @@ export function AdminBooksClient({
                           sizes="40px"
                         />
                       ) : (
-                        <div className="flex h-full items-center justify-center text-[10px] text-zinc-500 dark:text-zinc-600">
+                        <div className="flex h-full items-center justify-center text-[10px] text-text-muted">
                           —
                         </div>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+                  <td className="px-4 py-3 font-medium text-text-primary">
                     {book.title}
                   </td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{book.author}</td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                  <td className="px-4 py-3 text-text-secondary">{book.author}</td>
+                  <td className="px-4 py-3 text-text-secondary">
                     {book.ownerLabel ?? "Unassigned"}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <StatusBadge status={book.status} isDeleted={book.isDeleted} />
                   </td>
-                  <td className="px-4 py-3 text-center tabular-nums text-zinc-800 dark:text-zinc-300">
+                  <td className="px-4 py-3 text-center tabular-nums text-text-primary">
                     {book.chapterCount}
                   </td>
-                  <td className="px-4 py-3 tabular-nums text-zinc-600 dark:text-zinc-500">
+                  <td className="px-4 py-3 tabular-nums text-text-muted">
                     {book.createdAtLabel}
                   </td>
                   <td className="px-4 py-3">
@@ -410,7 +402,7 @@ export function AdminBooksClient({
                         <>
                           <Link
                             href={`/admin/books/${book.id}`}
-                            className="inline-flex rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-amber-950 ring-1 ring-zinc-400 transition hover:bg-zinc-300 hover:ring-amber-700/40 dark:bg-zinc-800/80 dark:text-amber-100/90 dark:ring-zinc-700 dark:hover:bg-zinc-800 dark:hover:ring-amber-500/30"
+                            className="inline-flex rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised hover:ring-accent/40"
                           >
                             Manage
                           </Link>
@@ -422,7 +414,7 @@ export function AdminBooksClient({
                                 catalogueWithdrawId === book.id || deletingId === book.id
                               }
                               onClick={() => void removeFromCatalogue(book)}
-                              className="inline-flex rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-orange-50 transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="inline-flex rounded-lg bg-status-unlisted px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-status-unlisted disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               {catalogueWithdrawId === book.id ? "Removing…" : "Remove from catalogue"}
                             </button>
@@ -432,7 +424,7 @@ export function AdminBooksClient({
                             aria-label={`Delete ${book.title}`}
                             disabled={deletingId === book.id}
                             onClick={() => void deleteBook(book)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-300/80 bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-900/60"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-error/35 bg-error/15 text-error transition hover:bg-error/25 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -456,7 +448,7 @@ export function AdminBooksClient({
                           type="button"
                           disabled={restoringId === book.id}
                           onClick={() => void restoreBook(book)}
-                          className="inline-flex rounded-lg border border-red-300/90 bg-red-100 px-3 py-1.5 text-xs font-medium text-red-800 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/50 dark:text-red-200 dark:hover:bg-red-900/60"
+                          className="inline-flex rounded-lg border border-error/35 bg-error/15 px-3 py-1.5 text-xs font-medium text-error transition hover:bg-error/25 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {restoringId === book.id ? "Restoring..." : "Restore"}
                         </button>
@@ -476,13 +468,13 @@ export function AdminBooksClient({
             type="button"
             disabled={loadingMore}
             onClick={() => void loadMore()}
-            className="rounded-lg bg-zinc-200 px-5 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-600 dark:hover:bg-zinc-700"
+            className="rounded-lg bg-bg-raised px-5 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loadingMore ? "Loading…" : `Load next ${pageSize}`}
           </button>
         </div>
       ) : !filterLoading && books.length > 0 ? (
-        <p className="pt-4 text-center text-xs text-zinc-500 dark:text-zinc-500">End of list</p>
+        <p className="pt-4 text-center text-xs text-text-muted">End of list</p>
       ) : null}
     </div>
   );

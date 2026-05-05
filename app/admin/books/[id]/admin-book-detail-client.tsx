@@ -32,19 +32,19 @@ type TabKey = "overview" | "edit";
 function actionRowGradientClass(status: BookStatus): string {
   switch (status) {
     case "draft":
-      return "bg-gradient-to-r from-zinc-400/16 via-zinc-400/7 to-transparent dark:from-zinc-500/28 dark:via-zinc-500/12";
+      return "bg-gradient-to-r from-text-muted/16 via-text-muted/7 to-transparent";
     case "processing":
-      return "bg-gradient-to-r from-blue-500/16 via-blue-500/7 to-transparent dark:from-blue-500/26 dark:via-blue-500/12";
+      return "bg-gradient-to-r from-status-processing/16 via-status-processing/7 to-transparent";
     case "pending_review":
-      return "bg-gradient-to-r from-indigo-500/16 via-indigo-500/7 to-transparent dark:from-indigo-500/26 dark:via-indigo-500/12";
+      return "bg-gradient-to-r from-info/16 via-info/7 to-transparent";
     case "rejected":
-      return "bg-gradient-to-r from-rose-500/14 via-rose-500/7 to-transparent dark:from-rose-500/24 dark:via-rose-500/10";
+      return "bg-gradient-to-r from-rose-500/14 via-rose-500/7 to-transparent";
     case "published":
-      return "bg-gradient-to-r from-emerald-500/14 via-emerald-500/6 to-transparent dark:from-emerald-500/24 dark:via-emerald-500/10";
+      return "bg-gradient-to-r from-success/14 via-success/6 to-transparent";
     case "unlisted":
-      return "bg-gradient-to-r from-orange-500/14 via-orange-500/6 to-transparent dark:from-orange-500/24 dark:via-orange-500/10";
+      return "bg-gradient-to-r from-status-unlisted/14 via-status-unlisted/6 to-transparent";
     default:
-      return "bg-gradient-to-r from-zinc-400/10 via-zinc-400/4 to-transparent dark:from-zinc-500/14 dark:via-zinc-500/6";
+      return "bg-gradient-to-r from-text-muted/10 via-text-muted/4 to-transparent";
   }
 }
 
@@ -424,7 +424,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   return (
     <div className="space-y-6">
       <div
-        className="flex gap-1 border-b border-zinc-200/90 dark:border-zinc-800/80"
+        className="flex gap-1 border-b border-border"
         role="tablist"
         aria-label="Admin book tabs"
       >
@@ -435,8 +435,8 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           onClick={() => setActiveTab("overview")}
           className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
             activeTab === "overview"
-              ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+              ? "border-b-2 border-accent text-text-primary"
+              : "text-text-muted hover:text-text-primary"
           }`}
         >
           Overview
@@ -448,8 +448,8 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           onClick={() => setActiveTab("edit")}
           className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
             activeTab === "edit"
-              ? "border-b-2 border-amber-600 text-zinc-900 dark:border-amber-400 dark:text-zinc-100"
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-500 dark:hover:text-zinc-300"
+              ? "border-b-2 border-accent text-text-primary"
+              : "text-text-muted hover:text-text-primary"
           }`}
         >
           Edit
@@ -457,7 +457,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
       </div>
 
       <div
-        className="sticky top-0 z-20 space-y-2 rounded-xl border border-zinc-200/90 bg-white/95 p-3 shadow-sm backdrop-blur-sm dark:border-zinc-800/80 dark:bg-zinc-950/90"
+        className="sticky top-0 z-20 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
         aria-label="Book actions"
       >
         <div
@@ -474,7 +474,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                       setRejectErr(null);
                       setRejectOpen(true);
                     }}
-                    className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-rose-700 disabled:opacity-50"
+                    className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-rose-700 disabled:opacity-50"
                   >
                     Reject
                   </button>
@@ -487,7 +487,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                       ? void transitionStatus("unlisted", { successMessage: "Book unlisted." })
                       : void promoteToPublished()
                   }
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                  className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
                 >
                   {promotingBusy
                     ? "Updating…"
@@ -504,7 +504,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               aria-label={`Delete ${book.title}`}
               disabled={deleteBusy || statusBusy || ingestBusy || promotingBusy || rejectBusy}
               onClick={() => void deleteBook()}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-300/80 bg-red-100 text-red-700 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/70 dark:bg-red-950/60 dark:text-red-300 dark:hover:bg-red-900/60"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-error/35 bg-error/15 text-error transition hover:bg-error/25 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -527,15 +527,15 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           <div
             className={`rounded-lg px-3 py-2 text-sm ${
               actionFeedback.kind === "success"
-                ? "bg-emerald-100/95 text-emerald-950 ring-1 ring-emerald-600/35 dark:bg-emerald-950/55 dark:text-emerald-50 dark:ring-emerald-500/30"
-                : "bg-red-100/95 text-red-950 ring-1 ring-red-600/35 dark:bg-red-950/50 dark:text-red-50 dark:ring-red-500/35"
+                ? "bg-success/15 text-text-primary ring-1 ring-success/35"
+                : "bg-error/15 text-text-primary ring-1 ring-error/35"
             }`}
           >
             {actionFeedback.message}
           </div>
         ) : null}
         {statusErr || publishErr || deleteErr ? (
-          <div className="space-y-1 text-right text-sm text-red-600 dark:text-red-400">
+          <div className="space-y-1 text-right text-sm text-error">
             {statusErr ? <p>{statusErr}</p> : null}
             {publishErr ? <p>{publishErr}</p> : null}
             {deleteErr ? <p>{deleteErr}</p> : null}
@@ -545,17 +545,17 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
       {activeTab === "overview" ? (
         <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-xl border border-zinc-200/90 p-6 dark:border-zinc-800/80">
+          <div className="relative overflow-hidden rounded-xl border border-border p-6">
             <div
               className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
               aria-hidden
             />
-            <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-white/80 p-1 dark:bg-zinc-900/55">
-              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
+              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
                 {book.coverImageUrl ? (
                   <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
                 ) : (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
+                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
                     No cover image
                   </div>
                 )}
@@ -590,7 +590,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
       {activeTab === "edit" ? (
         <section className="space-y-4">
           {showReviewToggle ? (
-            <div className="rounded-lg border border-zinc-200/90 bg-zinc-50/80 p-3 dark:border-zinc-800/80 dark:bg-zinc-900/40">
+            <div className="rounded-lg border border-border bg-bg-base/80 p-3">
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
                   type="button"
@@ -605,8 +605,8 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                   }
                   className={
                     book.status === "pending_review"
-                      ? "rounded-lg bg-zinc-200 px-3 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
-                      : "rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-indigo-50 transition hover:bg-indigo-700 disabled:opacity-50"
+                      ? "rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
+                      : "rounded-lg bg-info px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-info disabled:opacity-50"
                   }
                 >
                   {statusBusy ? "Updating..." : book.status === "pending_review" ? "Withdraw Review" : "Submit Review"}
@@ -615,14 +615,14 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
             </div>
           ) : null}
 
-          <div className="relative overflow-hidden rounded-xl border border-zinc-200/90 p-6 dark:border-zinc-800/80">
+          <div className="relative overflow-hidden rounded-xl border border-border p-6">
             <div
               className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
               aria-hidden
             />
             <form
               onSubmit={saveMetadata}
-              className="relative z-10 space-y-4 rounded-lg bg-white/80 p-1 dark:bg-zinc-900/55"
+              className="relative z-10 space-y-4 rounded-lg bg-bg-surface/80 p-1"
             >
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
                 <div className="w-36 space-y-2">
@@ -652,7 +652,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     type="button"
                     disabled={coverUploadBusy}
                     onClick={() => !coverUploadBusy && coverUploadRef.current?.click()}
-                    className="group relative block h-52 w-full overflow-hidden rounded-lg border border-zinc-300 bg-zinc-100 p-0 text-left outline-none ring-amber-500/0 transition hover:ring-2 hover:ring-amber-500/40 focus-visible:ring-2 focus-visible:ring-amber-500/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:ring-amber-400/35 dark:focus-visible:ring-amber-400/40"
+                    className="group relative block h-52 w-full overflow-hidden rounded-lg border border-border bg-bg-surface p-0 text-left outline-none ring-accent/0 transition hover:ring-2 hover:ring-accent/40 focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label={coverUploadBusy ? "Uploading cover" : "Change cover image"}
                   >
                     {book.coverImageUrl ? (
@@ -664,12 +664,12 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                         sizes="144px"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center px-2 text-center text-xs text-zinc-500 dark:text-zinc-600">
+                      <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
                         No cover image
                       </div>
                     )}
-                    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-black/65 via-black/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                      <span className="mb-3 rounded-md bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white ring-1 ring-white/20 backdrop-blur-[2px]">
+                    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-bg-overlay/65 via-bg-overlay/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+                      <span className="mb-3 rounded-md bg-bg-base/55 px-2.5 py-1 text-[11px] font-medium text-text-primary ring-1 ring-white/20 backdrop-blur-[2px]">
                         {coverUploadBusy ? "Uploading…" : "Change cover"}
                       </span>
                     </span>
@@ -678,7 +678,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     type="button"
                     disabled={ingestBusy}
                     onClick={() => ingestFileRef.current?.click()}
-                    className="w-full rounded-lg bg-zinc-200 px-2 py-2 text-center text-xs font-medium leading-snug text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:opacity-50 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-700 dark:hover:bg-zinc-800/90"
+                    className="w-full rounded-lg bg-bg-raised px-2 py-2 text-center text-xs font-medium leading-snug text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
                   >
                     {ingestBusy ? "Uploading…" : "Re-upload EPUB"}
                   </button>
@@ -687,18 +687,18 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                     onClick={() => setApplyEpubMetadata((v) => !v)}
                     className={
                       applyEpubMetadata
-                        ? "w-full rounded-lg bg-emerald-600 px-2 py-2 text-center text-[11px] font-semibold leading-snug text-white shadow-sm ring-1 ring-emerald-700/40 transition hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                        : "w-full rounded-lg bg-red-600 px-2 py-2 text-center text-[11px] font-semibold leading-snug text-white shadow-sm ring-1 ring-red-800/35 transition hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500"
+                        ? "w-full rounded-lg bg-success px-2 py-2 text-center text-[11px] font-semibold leading-snug text-text-primary shadow-sm ring-1 ring-success/40 transition hover:bg-success"
+                        : "w-full rounded-lg bg-error px-2 py-2 text-center text-[11px] font-semibold leading-snug text-text-primary shadow-sm ring-1 ring-error/35 transition hover:bg-error"
                     }
                   >
                     {applyEpubMetadata ? "Update data from EPUB" : "Do not update data from EPUB"}
                   </button>
-                  {ingestErr ? <p className="text-xs text-red-600 dark:text-red-400">{ingestErr}</p> : null}
+                  {ingestErr ? <p className="text-xs text-error">{ingestErr}</p> : null}
                   {coverUploadMsg ? (
-                    <p className="text-xs text-emerald-700 dark:text-emerald-400/90">{coverUploadMsg}</p>
+                    <p className="text-xs text-success">{coverUploadMsg}</p>
                   ) : null}
                   {coverUploadErr ? (
-                    <p className="text-xs text-red-600 dark:text-red-400">{coverUploadErr}</p>
+                    <p className="text-xs text-error">{coverUploadErr}</p>
                   ) : null}
                 </div>
 
@@ -710,13 +710,13 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                   </div>
                   <div className="space-y-3">
                     <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
                         Genre
                       </span>
                       <select
                         value={genre}
                         onChange={(e) => setGenre(e.target.value as BookGenre | "")}
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                       >
                         <option value="">Select genre</option>
                         {GENRE_OPTIONS.map((opt) => (
@@ -727,46 +727,46 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                       </select>
                     </label>
                     <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
                         Year
                       </span>
                       <input
                         type="number"
                         value={publishedYear}
                         onChange={(e) => setPublishedYear(e.target.value)}
-                        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                       />
                     </label>
                   </div>
                 </div>
                 <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+                  <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
                     Description
                   </span>
                   <textarea
                     rows={6}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+                    className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                   />
                 </label>
                 <div className="w-36 space-y-2">
                   <button
                     type="submit"
                     disabled={saving}
-                    className="w-full rounded-lg bg-amber-100/95 px-4 py-2 text-sm font-medium text-amber-950 ring-1 ring-amber-600/40 transition hover:bg-amber-200/90 disabled:opacity-50 dark:bg-amber-200/15 dark:text-amber-100 dark:ring-amber-400/35 dark:hover:bg-amber-200/20"
+                    className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
                   >
                     {saving ? "Saving..." : "Save"}
                   </button>
-                  {saveMsg ? <p className="text-sm text-emerald-700 dark:text-emerald-400/90">{saveMsg}</p> : null}
-                  {saveErr ? <p className="text-sm text-red-600 dark:text-red-400">{saveErr}</p> : null}
+                  {saveMsg ? <p className="text-sm text-success">{saveMsg}</p> : null}
+                  {saveErr ? <p className="text-sm text-error">{saveErr}</p> : null}
                 </div>
               </div>
               </div>
             </form>
           </div>
 
-          <div className="mt-10 border-t border-zinc-200/90 pt-8 dark:border-zinc-800/80">
+          <div className="mt-10 border-t border-border pt-8">
             <ChapterManagerClient bookId={book.id} status={book.status} />
           </div>
         </section>
@@ -774,7 +774,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
       {rejectOpen ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-bg-overlay/50 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="admin-reject-book-title"
@@ -787,17 +787,17 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           }}
         >
           <div
-            className="w-full max-w-lg rounded-xl border border-zinc-200 bg-white p-6 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-full max-w-lg rounded-xl border border-border bg-bg-surface p-6 shadow-xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <h2 id="admin-reject-book-title" className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+            <h2 id="admin-reject-book-title" className="text-lg font-semibold text-text-primary">
               Reject Book
             </h2>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-text-secondary">
               This will notify the partner and set the book back to draft
             </p>
             <label className="mt-4 block space-y-1.5">
-              <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+              <span className="text-sm font-medium text-text-primary">
                 Reason for rejection
               </span>
               <textarea
@@ -805,16 +805,16 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                 value={rejectReason}
                 autoFocus
                 onChange={(e) => setRejectReason(e.target.value)}
-                className="w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100"
+                className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                 placeholder="Explain what needs to change (minimum 20 characters)."
               />
             </label>
-            <p className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+            <p className="mt-1 text-xs text-text-secondary">
               {rejectReason.trim().length < 20
                 ? `${20 - rejectReason.trim().length} more character${20 - rejectReason.trim().length === 1 ? "" : "s"} required`
                 : "Ready to confirm"}
             </p>
-            {rejectErr ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{rejectErr}</p> : null}
+            {rejectErr ? <p className="mt-2 text-sm text-error">{rejectErr}</p> : null}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -824,7 +824,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                   setRejectReason("");
                   setRejectErr(null);
                 }}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-zinc-800 ring-1 ring-zinc-300 transition hover:bg-zinc-50 disabled:opacity-50 dark:text-zinc-200 dark:ring-zinc-600 dark:hover:bg-zinc-800/90"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-base disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -832,7 +832,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                 type="button"
                 disabled={rejectBusy}
                 onClick={() => void confirmRejection()}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm ring-1 ring-red-700/30 transition hover:bg-red-700 disabled:pointer-events-none disabled:opacity-50"
+                className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-text-primary shadow-sm ring-1 ring-error/35 transition hover:bg-error disabled:pointer-events-none disabled:opacity-50"
               >
                 {rejectBusy ? "Rejecting…" : "Confirm Rejection"}
               </button>
@@ -855,8 +855,8 @@ function InfoRow({
 }) {
   return (
     <div className={`${multiline ? "" : "min-h-[1.75rem]"}`}>
-      <p className={`text-sm text-zinc-900 dark:text-zinc-100 ${multiline ? "whitespace-pre-wrap leading-relaxed" : ""}`}>
-        <span className="mr-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
+      <p className={`text-sm text-text-primary ${multiline ? "whitespace-pre-wrap leading-relaxed" : ""}`}>
+        <span className="mr-2 text-xs font-medium uppercase tracking-wide text-text-muted">
           {label}:
         </span>
         {value}
@@ -878,14 +878,14 @@ function Field({
 }) {
   return (
     <label className="flex items-center gap-2">
-      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-500">
+      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
         {label}
       </span>
       <input
         required={required}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-amber-600/50 focus:ring-2 focus:ring-amber-400/25 dark:border-zinc-800 dark:bg-zinc-950/80 dark:text-zinc-100 dark:focus:border-amber-500/40 dark:focus:ring-amber-400/20"
+        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
       />
     </label>
   );

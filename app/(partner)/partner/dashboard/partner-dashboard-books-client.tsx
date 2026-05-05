@@ -58,7 +58,7 @@ export function PartnerDashboardBooksClient({
 
   if (books.length === 0) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-zinc-600 dark:text-zinc-400">
+      <div className="px-6 py-10 text-center text-sm text-text-secondary">
         You haven&apos;t uploaded any books yet.
       </div>
     );
@@ -67,12 +67,12 @@ export function PartnerDashboardBooksClient({
   return (
     <div className="space-y-4">
       {loadErr ? (
-        <p className="px-6 pt-4 text-sm text-red-600 dark:text-red-400">{loadErr}</p>
+        <p className="px-6 pt-4 text-sm text-error">{loadErr}</p>
       ) : null}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-zinc-200 text-xs uppercase tracking-wide text-zinc-600 dark:border-zinc-800 dark:text-zinc-500">
+            <tr className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
               <th className="px-4 py-3 font-medium">Cover</th>
               <th className="px-4 py-3 font-medium">Book</th>
               <th className="px-4 py-3 font-medium">Status</th>
@@ -87,10 +87,10 @@ export function PartnerDashboardBooksClient({
             {books.map((book) => (
               <tr
                 key={book.id}
-                className="border-b border-zinc-200/80 last:border-0 dark:border-zinc-800/60"
+                className="border-b border-border/80 last:border-0"
               >
                 <td className="px-4 py-2">
-                  <div className="relative h-14 w-10 overflow-hidden rounded border border-zinc-300 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950">
+                  <div className="relative h-14 w-10 overflow-hidden rounded border border-border bg-bg-surface">
                     {book.coverImageUrl ? (
                       <Image
                         src={book.coverImageUrl}
@@ -100,35 +100,35 @@ export function PartnerDashboardBooksClient({
                         sizes="40px"
                       />
                     ) : (
-                      <div className="flex h-full items-center justify-center text-[10px] text-zinc-500 dark:text-zinc-600">
+                      <div className="flex h-full items-center justify-center text-[10px] text-text-muted">
                         -
                       </div>
                     )}
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="font-medium text-zinc-900 dark:text-zinc-100">{book.title}</div>
-                  <div className="text-zinc-600 dark:text-zinc-400">{book.author}</div>
+                  <div className="font-medium text-text-primary">{book.title}</div>
+                  <div className="text-text-secondary">{book.author}</div>
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge status={book.status} />
                 </td>
-                <td className="px-4 py-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                <td className="px-4 py-3 tabular-nums text-text-secondary">
                   {book.chapterCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                <td className="px-4 py-3 tabular-nums text-text-secondary">
                   {book.readerCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                <td className="px-4 py-3 tabular-nums text-text-secondary">
                   {book.queryCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-zinc-700 dark:text-zinc-300">
+                <td className="px-4 py-3 tabular-nums text-text-secondary">
                   {book.imageCount}
                 </td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/partner/books/${book.id}`}
-                    className="inline-flex rounded-lg bg-zinc-200 px-3 py-1.5 text-xs font-medium text-amber-950 ring-1 ring-zinc-400 transition hover:bg-zinc-300 hover:ring-amber-700/40 dark:bg-zinc-800/80 dark:text-amber-100/90 dark:ring-zinc-700 dark:hover:bg-zinc-800 dark:hover:ring-amber-500/30"
+                    className="inline-flex rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised hover:ring-accent/40"
                   >
                     Manage
                   </Link>
@@ -145,13 +145,13 @@ export function PartnerDashboardBooksClient({
             type="button"
             disabled={loadingMore}
             onClick={() => void loadMore()}
-            className="rounded-lg bg-zinc-200 px-5 py-2 text-sm font-medium text-zinc-900 ring-1 ring-zinc-400 transition hover:bg-zinc-300 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-800 dark:text-zinc-100 dark:ring-zinc-600 dark:hover:bg-zinc-700"
+            className="rounded-lg bg-bg-raised px-5 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60"
           >
             {loadingMore ? "Loading…" : `Load next ${pageSize}`}
           </button>
         </div>
       ) : (
-        <p className="pb-6 text-center text-xs text-zinc-500 dark:text-zinc-500">End of list</p>
+        <p className="pb-6 text-center text-xs text-text-muted">End of list</p>
       )}
     </div>
   );

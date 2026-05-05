@@ -48,7 +48,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     <div className="space-y-8">
       <Link
         href="/admin/books"
-        className="inline-flex text-sm font-medium text-zinc-400 transition hover:text-amber-200/90"
+        className="inline-flex text-sm font-medium text-text-secondary transition hover:text-accent-text/90"
       >
         ← Back to books
       </Link>

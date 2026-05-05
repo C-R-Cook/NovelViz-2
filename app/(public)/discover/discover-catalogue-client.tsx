@@ -116,7 +116,7 @@ function FeaturedCarouselCard({
         onMouseEnter={() => finePointer && setHover(true)}
         onMouseLeave={onMouseLeave}
         onMouseMove={onMouseMove}
-        className="group block cursor-pointer outline-none transition-[transform,opacity] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-amber-500/50"
+        className="group block cursor-pointer outline-none transition-[transform,opacity] duration-300 ease-out focus-visible:ring-2 focus-visible:ring-accent/50"
         style={{
           transform: `translateZ(0) scale(${scale})`,
           zIndex: z,
@@ -143,13 +143,13 @@ function FeaturedCarouselCard({
                 background: `radial-gradient(ellipse 85% 70% at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.06) 35%, transparent 58%)`,
               }}
             />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black via-black/38 to-transparent" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/25 to-transparent opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-base via-bg-overlay/40 to-transparent" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-overlay/50 via-bg-overlay/25 to-transparent opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 p-3 pt-10">
-              <p className="line-clamp-2 text-sm font-semibold leading-snug text-white drop-shadow-md">
+              <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-primary drop-shadow-md">
                 {book.title}
               </p>
-              <p className="mt-1 line-clamp-1 text-xs text-zinc-300">{book.author}</p>
+              <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{book.author}</p>
               <div
                 className={`mt-2 flex justify-center transition-all duration-300 ease-out ${
                   finePointer
@@ -157,7 +157,7 @@ function FeaturedCarouselCard({
                     : "hidden"
                 }`}
               >
-                <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white ring-1 ring-white/25 backdrop-blur-sm">
+                <span className="rounded-full bg-bg-overlay/55 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-text-primary ring-1 ring-text-primary/20 backdrop-blur-sm">
                   View book
                 </span>
               </div>
@@ -309,24 +309,24 @@ export function DiscoverCatalogueClient({
   const genreEnterDelayMs = showFeatured ? featured.length * 50 + 280 : 100;
 
   const gridHoverClass = finePointer
-    ? "hover:scale-[1.04] hover:shadow-xl hover:shadow-black/55 focus-visible:scale-[1.04] focus-visible:shadow-xl"
+    ? "hover:scale-[1.04] hover:shadow-xl hover:shadow-bg-overlay/55 focus-visible:scale-[1.04] focus-visible:shadow-xl"
     : "active:scale-[0.99]";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pb-20 pt-6 text-zinc-100 sm:pt-10">
+    <div className="min-h-screen bg-bg-base pb-20 pt-6 text-text-primary sm:pt-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
         <header className="mb-10 sm:mb-12">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
             Discover
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
             Browse published titles with covers. Add what you love to your library.
           </p>
         </header>
 
         {showFeatured ? (
           <section className="mb-14 sm:mb-16">
-            <h2 className="mb-5 px-1 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
+            <h2 className="mb-5 px-1 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">
               Featured
             </h2>
             <div
@@ -372,8 +372,8 @@ export function DiscoverCatalogueClient({
                     finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
                   } ${
                     active
-                      ? `bg-amber-500/25 text-amber-100 ring-1 ring-amber-400/55 ${!reducedMotion ? "discover-pill-pulse" : ""}`
-                      : "bg-zinc-800/60 text-zinc-400 ring-1 ring-transparent hover:bg-zinc-800 hover:text-zinc-200"
+                      ? `bg-accent text-text-inverse ring-1 ring-accent/55 ${!reducedMotion ? "discover-pill-pulse" : ""}`
+                      : "border border-border bg-bg-raised text-text-secondary ring-1 ring-border hover:bg-bg-raised hover:text-text-primary"
                   }`}
                 >
                   {pill.label}
@@ -384,21 +384,21 @@ export function DiscoverCatalogueClient({
         </section>
 
         {loadError ? (
-          <p className="mb-6 text-center text-sm text-red-400/90">{loadError}</p>
+          <p className="mb-6 text-center text-sm text-error/90">{loadError}</p>
         ) : null}
 
         <section aria-busy={gridLoading}>
           {gridLoading ? (
             <div className="flex min-h-[40vh] items-center justify-center">
               <div
-                className="h-9 w-9 rounded-full border-2 border-zinc-700 border-t-amber-400/90 animate-spin"
+                className="h-9 w-9 rounded-full border-2 border-border border-t-accent animate-spin"
                 aria-label="Loading"
               />
             </div>
           ) : showEmpty ? (
             <div className="mx-auto max-w-md py-20 text-center">
-              <p className="font-serif text-xl text-zinc-300">No books here</p>
-              <p className="mt-3 text-sm text-zinc-500">
+              <p className="font-serif text-xl text-text-secondary">No books here</p>
+              <p className="mt-3 text-sm text-text-muted">
                 Nothing published with a cover matches this genre yet. Try another filter.
               </p>
             </div>
@@ -409,7 +409,7 @@ export function DiscoverCatalogueClient({
                   <Link
                     key={book.id}
                     href={`/discover/${book.id}`}
-                    className={`group relative aspect-[2/3] cursor-pointer overflow-hidden rounded-md shadow-sm shadow-black/20 outline-none transition-all duration-200 ease-out ${gridHoverClass} focus-visible:ring-2 focus-visible:ring-amber-500/50 ${
+                    className={`group relative aspect-[2/3] cursor-pointer overflow-hidden rounded-md shadow-sm shadow-bg-overlay/20 outline-none transition-all duration-200 ease-out ${gridHoverClass} focus-visible:ring-2 focus-visible:ring-accent/50 ${
                       !reducedMotion ? "discover-animate-in" : ""
                     }`}
                     style={!reducedMotion ? { animationDelay: `${i * 50}ms` } : undefined}
@@ -423,10 +423,10 @@ export function DiscoverCatalogueClient({
                       }`}
                       sizes="(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
                     />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent" />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-overlay via-bg-overlay/30 to-transparent" />
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-overlay/60 via-bg-overlay/25 to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100" />
                     {book.genre ? (
-                      <div className="absolute right-2 top-2 max-w-[55%] truncate rounded-full bg-black/50 px-2 py-0.5 text-[10px] font-medium text-white/90 backdrop-blur-sm">
+                      <div className="absolute right-2 top-2 max-w-[55%] truncate rounded-full bg-bg-overlay/50 px-2 py-0.5 text-[10px] font-medium text-text-primary/90 backdrop-blur-sm">
                         {formatGenre(book.genre)}
                       </div>
                     ) : null}
@@ -435,10 +435,10 @@ export function DiscoverCatalogueClient({
                         finePointer ? "group-hover:-translate-y-1" : ""
                       }`}
                     >
-                      <p className="line-clamp-2 text-xs font-bold leading-snug text-white drop-shadow sm:text-sm">
+                      <p className="line-clamp-2 text-xs font-bold leading-snug text-text-primary drop-shadow sm:text-sm">
                         {book.title}
                       </p>
-                      <p className="mt-0.5 line-clamp-1 text-[10px] text-zinc-400 sm:text-xs">
+                      <p className="mt-0.5 line-clamp-1 text-[10px] text-text-secondary sm:text-xs">
                         {book.author}
                       </p>
                       <div
@@ -448,7 +448,7 @@ export function DiscoverCatalogueClient({
                             : "opacity-0"
                         }`}
                       >
-                        <span className="inline-block rounded-md bg-amber-500/25 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-100 ring-1 ring-amber-400/40">
+                        <span className="inline-block rounded-md bg-accent-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/40">
                           View book
                         </span>
                       </div>
@@ -462,28 +462,28 @@ export function DiscoverCatalogueClient({
               <div className="mt-8 flex min-h-[2.5rem] flex-col items-center justify-center gap-2">
                 {loadingMore ? (
                   <div
-                    className="h-8 w-8 rounded-full border-2 border-zinc-700 border-t-amber-400/90 animate-spin"
+                    className="h-8 w-8 rounded-full border-2 border-border border-t-accent animate-spin"
                     aria-label="Loading more"
                   />
                 ) : null}
                 {!nextCursor && books.length > 0 && !loadingMore ? (
-                  <p className="text-center text-xs text-zinc-600">No more books</p>
+                  <p className="text-center text-xs text-text-muted">No more books</p>
                 ) : null}
               </div>
             </>
           )}
         </section>
 
-        <section className="mt-16 border-t border-zinc-800/90 pt-12 sm:mt-20 sm:pt-16" aria-labelledby="book-request-cta">
-          <h2 id="book-request-cta" className="font-serif text-xl font-semibold text-zinc-100 sm:text-2xl">
+        <section className="mt-16 border-t border-border pt-12 sm:mt-20 sm:pt-16" aria-labelledby="book-request-cta">
+          <h2 id="book-request-cta" className="font-serif text-xl font-semibold text-text-primary sm:text-2xl">
             Can&apos;t find your book?
           </h2>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-zinc-500">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
             Let us know what you&apos;d like to read and we&apos;ll work with publishers to make it happen.
           </p>
           <button
             type="button"
-            className="mt-5 rounded-lg bg-amber-500/20 px-4 py-2.5 text-sm font-medium text-amber-100 ring-1 ring-amber-500/45 transition hover:bg-amber-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+            className="mt-5 rounded-lg bg-accent-muted px-4 py-2.5 text-sm font-medium text-accent-text ring-1 ring-accent/45 transition hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             onClick={() => setBookRequestOpen(true)}
           >
             Request a Book

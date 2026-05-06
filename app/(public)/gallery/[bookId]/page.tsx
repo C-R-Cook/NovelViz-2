@@ -1,10 +1,7 @@
-import { GalleryClient, type GalleryImageCard } from "./gallery-client";
+import { GalleryClient, type GalleryImageCard } from "../gallery-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-
-export const metadata = {
-  title: "Gallery | NovelViz",
-};
+import { notFound } from "next/navigation";
 
 type GeneratedImageForGallery = {
   id: string;
@@ -18,30 +15,36 @@ type GeneratedImageForGallery = {
   user: { username: string | null; name: string | null };
 };
 
-export default async function GalleryPage() {
+export async function generateMetadata({ params }: { params: Promise<{ bookId: string }> }) {
+  const { bookId } = await params;
+  const book = await prisma.book.findFirst({
+    where: { id: bookId, deletedAt: null, status: "published" },
+    select: { title: true },
+  });
+  if (!book) return { title: "Gallery | NovelViz" };
+  return { title: `${book.title} — Gallery | NovelViz` };
+}
+
+export default async function GalleryBookPage({ params }: { params: Promise<{ bookId: string }> }) {
+  const { bookId } = await params;
+
+  const book = await prisma.book.findFirst({
+    where: { id: bookId, deletedAt: null, status: "published" },
+    select: { id: true, title: true, author: true },
+  });
+  if (!book) notFound();
+
   const session = await getCurrentUser();
   const isLoggedIn = !!session;
   const isAdmin = session?.role === "admin";
 
-  let userLibraryBookIds: string[] = [];
-  if (session) {
-    const userBooks = await prisma.userBook.findMany({
-      where: { userId: session.id, isActive: true },
-      select: { bookId: true },
-    });
-    userLibraryBookIds = userBooks.map((row) => row.bookId);
-  }
-
-  // Used for spoiler unlock logic for logged-in users.
   const progressByBookId = new Map<string, number>();
-  if (session && userLibraryBookIds.length > 0) {
-    const progresses = await prisma.readingProgress.findMany({
-      where: { userId: session.id, bookId: { in: userLibraryBookIds } },
-      select: { bookId: true, currentChapterNumber: true },
+  if (session) {
+    const progress = await prisma.readingProgress.findUnique({
+      where: { userId_bookId: { userId: session.id, bookId } },
+      select: { currentChapterNumber: true },
     });
-    for (const row of progresses) {
-      progressByBookId.set(row.bookId, row.currentChapterNumber);
-    }
+    if (progress) progressByBookId.set(bookId, progress.currentChapterNumber);
   }
 
   const baseSelect = {
@@ -66,34 +69,12 @@ export default async function GalleryPage() {
     },
   };
 
-  const libraryImagesPromise: Promise<GeneratedImageForGallery[]> = session
-    ? prisma.generatedImage.findMany({
-        where: { isPublic: true, bookId: { in: userLibraryBookIds } },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        select: baseSelect,
-      })
-    : Promise.resolve([]);
-
-  const trendingImagesPromise: Promise<GeneratedImageForGallery[]> = prisma.generatedImage.findMany({
-    where: { isPublic: true },
-    orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
-    take: 20,
-    select: baseSelect,
-  });
-
-  const discoverImagesPromise: Promise<GeneratedImageForGallery[]> = prisma.generatedImage.findMany({
-    where: session ? { isPublic: true, bookId: { notIn: userLibraryBookIds } } : { isPublic: true },
+  const images = await prisma.generatedImage.findMany({
+    where: { bookId, isPublic: true },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: 100,
     select: baseSelect,
   });
-
-  const [libraryImages, trendingImages, discoverImages] = await Promise.all([
-    libraryImagesPromise,
-    trendingImagesPromise,
-    discoverImagesPromise,
-  ]);
 
   function toCard(image: GeneratedImageForGallery): GalleryImageCard {
     let spoilerLevel: GalleryImageCard["spoilerLevel"];
@@ -125,9 +106,10 @@ export default async function GalleryPage() {
 
   return (
     <GalleryClient
-      fromLibraryImages={libraryImages.map(toCard)}
-      trendingImages={trendingImages.map(toCard)}
-      discoverImages={discoverImages.map(toCard)}
+      bookGallery={{ title: book.title, author: book.author }}
+      fromLibraryImages={[]}
+      trendingImages={images.map(toCard)}
+      discoverImages={[]}
       isLoggedIn={isLoggedIn}
       isAdmin={isAdmin}
     />

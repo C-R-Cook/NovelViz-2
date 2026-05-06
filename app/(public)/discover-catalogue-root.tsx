@@ -1,20 +1,36 @@
 import { DiscoverCatalogueClient } from "./discover/discover-catalogue-client";
-import {
-  getDiscoverBooksPage,
-  getDiscoverFeaturedBooks,
-} from "@/lib/discover-catalogue";
+import { getDiscoverFeaturedBooks } from "@/lib/discover-catalogue";
+import { prisma } from "@/lib/prisma";
 
 export async function DiscoverCatalogueRoot() {
-  const [featured, firstPage] = await Promise.all([
+  const [featured, allBooks] = await Promise.all([
     getDiscoverFeaturedBooks(),
-    getDiscoverBooksPage({}),
+    prisma.book.findMany({
+      where: {
+        status: "published",
+        deletedAt: null,
+      },
+      orderBy: [{ title: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        genre: true,
+        coverImageUrl: true,
+      },
+    }),
   ]);
 
   return (
     <DiscoverCatalogueClient
       featured={featured}
-      initialBooks={firstPage.books}
-      initialNextCursor={firstPage.nextCursor}
+      allBooks={allBooks.map((book) => ({
+        id: book.id,
+        title: book.title,
+        author: book.author,
+        genre: book.genre,
+        coverImageUrl: book.coverImageUrl ?? "",
+      }))}
     />
   );
 }

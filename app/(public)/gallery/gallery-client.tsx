@@ -2,15 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
-export type GallerySpoilerLevel = "none" | "chapter" | "unstarted";
+export type GallerySpoilerLevel = "none" | "spoiler" | "unstarted" | "public";
 
 export type GalleryImageCard = {
   id: string;
   imageUrl: string;
   userPrompt: string;
-  fullPrompt: string;
   chapterNumberAtTime: number;
   createdAt: string;
   likeCount: number;
@@ -21,12 +20,14 @@ export type GalleryImageCard = {
   spoilerLevel: GallerySpoilerLevel;
 };
 
-type GalleryMainTab = "my-books" | "featured" | "all";
-
 type Props = {
-  images: GalleryImageCard[];
-  userLibraryBookIds: string[];
+  fromLibraryImages: GalleryImageCard[];
+  trendingImages: GalleryImageCard[];
+  discoverImages: GalleryImageCard[];
   isLoggedIn: boolean;
+  isAdmin: boolean;
+  /** When set, only the book’s image carousel is shown (used by `/gallery/[bookId]`). Main gallery omits this. */
+  bookGallery?: { title: string; author: string } | null;
 };
 
 function LockIcon({ className }: { className?: string }) {
@@ -48,336 +49,597 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-export function GalleryClient({ images, userLibraryBookIds, isLoggedIn }: Props) {
-  const [imageList, setImageList] = useState<GalleryImageCard[]>(images);
-
-  useEffect(() => {
-    setImageList(images);
-  }, [images]);
-  const [mainTab, setMainTab] = useState<GalleryMainTab>(() =>
-    isLoggedIn ? "my-books" : "featured",
+function HeartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+      />
+    </svg>
   );
-  const [bookQuery, setBookQuery] = useState("");
-  const [activeBookFilterId, setActiveBookFilterId] = useState<string | null>(null);
-  const [bookSuggestOpen, setBookSuggestOpen] = useState(false);
+}
+
+function ArrowLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+function formatCardDate(iso: string) {
+  const d = new Date(iso);
+  // Keep formatting locale-friendly and stable (no custom tokens).
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+export function GalleryClient({
+  fromLibraryImages,
+  trendingImages,
+  discoverImages,
+  isLoggedIn,
+  isAdmin,
+  bookGallery = null,
+}: Props) {
+  const initialImagesById = useMemo(() => {
+    const all = [...fromLibraryImages, ...trendingImages, ...discoverImages];
+    const deduped = new Map<string, GalleryImageCard>();
+    for (const img of all) deduped.set(img.id, img);
+    return Object.fromEntries(deduped.entries());
+  }, [discoverImages, fromLibraryImages, trendingImages]);
+
+  const [imagesById, setImagesById] = useState<Record<string, GalleryImageCard>>(initialImagesById);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
-  const [gridOpacity, setGridOpacity] = useState(1);
-  const filterTransitionReadyRef = useRef(false);
   const [revealedImageIds, setRevealedImageIds] = useState<Record<string, boolean>>({});
-
-  const tabBaseImages = useMemo(() => {
-    if (mainTab === "my-books") {
-      const lib = new Set(userLibraryBookIds);
-      return imageList.filter((img) => lib.has(img.bookId));
-    }
-    if (mainTab === "featured") {
-      return [...imageList]
-        .sort((a, b) => {
-          if (b.likeCount !== a.likeCount) return b.likeCount - a.likeCount;
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        })
-        .slice(0, 20);
-    }
-    return [...imageList].sort(
-      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-    );
-  }, [imageList, mainTab, userLibraryBookIds]);
-
-  const booksInTab = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const img of tabBaseImages) {
-      if (!map.has(img.bookId)) map.set(img.bookId, img.bookTitle);
-    }
-    return Array.from(map.entries())
-      .map(([bookId, bookTitle]) => ({ bookId, bookTitle }))
-      .sort((a, b) => a.bookTitle.localeCompare(b.bookTitle));
-  }, [tabBaseImages]);
-
-  const bookSuggestions = useMemo(() => {
-    const q = bookQuery.trim().toLowerCase();
-    if (!q) return booksInTab;
-    return booksInTab.filter((b) => b.bookTitle.toLowerCase().includes(q));
-  }, [bookQuery, booksInTab]);
-
-  const visibleImages = useMemo(() => {
-    if (!activeBookFilterId) return tabBaseImages;
-    return tabBaseImages.filter((img) => img.bookId === activeBookFilterId);
-  }, [tabBaseImages, activeBookFilterId]);
+  const [modalState, setModalState] = useState<{ carouselIds: string[]; index: number } | null>(null);
 
   useEffect(() => {
-    if (!filterTransitionReadyRef.current) {
-      filterTransitionReadyRef.current = true;
-      return;
-    }
-    setGridOpacity(0.55);
-    const id = window.setTimeout(() => setGridOpacity(1), 30);
-    return () => window.clearTimeout(id);
-  }, [mainTab, activeBookFilterId]);
+    setImagesById(initialImagesById);
+    setRevealedImageIds({});
+    setModalState(null);
+  }, [initialImagesById]);
 
-  useEffect(() => {
-    setActiveBookFilterId(null);
-    setBookQuery("");
-    setBookSuggestOpen(false);
-  }, [mainTab]);
+  const fromLibraryResolved = useMemo(
+    () => fromLibraryImages.map((img) => imagesById[img.id] ?? img),
+    [fromLibraryImages, imagesById],
+  );
+  const trendingResolved = useMemo(
+    () => trendingImages.map((img) => imagesById[img.id] ?? img),
+    [trendingImages, imagesById],
+  );
+  const discoverResolved = useMemo(
+    () => discoverImages.map((img) => imagesById[img.id] ?? img),
+    [discoverImages, imagesById],
+  );
+
+  function isImageLocked(image: GalleryImageCard): boolean {
+    if (isAdmin) return false;
+    if (image.spoilerLevel === "none") return false;
+    if (image.spoilerLevel === "unstarted") return true;
+    if (image.spoilerLevel === "public") return true;
+    // spoiler => locked until user chooses "Show anyway"
+    return !revealedImageIds[image.id];
+  }
 
   async function likeImage(imageId: string) {
+    if (!isLoggedIn && !isAdmin) return;
     if (likingIds[imageId]) return;
 
     setLikingIds((prev) => ({ ...prev, [imageId]: true }));
-    setImageList((prev) =>
-      prev.map((image) =>
-        image.id === imageId ? { ...image, likeCount: image.likeCount + 1 } : image,
-      ),
-    );
+    setImagesById((prev) => {
+      const img = prev[imageId];
+      if (!img) return prev;
+      return { ...prev, [imageId]: { ...img, likeCount: img.likeCount + 1 } };
+    });
 
     try {
       const res = await fetch(`/api/gallery/${imageId}/like`, { method: "POST" });
       const data = (await res.json().catch(() => ({}))) as { likeCount?: number };
       if (!res.ok || typeof data.likeCount !== "number") {
-        setImageList((prev) =>
-          prev.map((image) =>
-            image.id === imageId ? { ...image, likeCount: Math.max(0, image.likeCount - 1) } : image,
-          ),
-        );
+        setImagesById((prev) => {
+          const img = prev[imageId];
+          if (!img) return prev;
+          return { ...prev, [imageId]: { ...img, likeCount: Math.max(0, img.likeCount - 1) } };
+        });
         return;
       }
-      const nextLikeCount = data.likeCount;
 
-      setImageList((prev) =>
-        prev.map((image) => (image.id === imageId ? { ...image, likeCount: nextLikeCount } : image)),
-      );
+      setImagesById((prev) => {
+        const img = prev[imageId];
+        if (!img) return prev;
+        return { ...prev, [imageId]: { ...img, likeCount: data.likeCount! } };
+      });
     } catch {
-      setImageList((prev) =>
-        prev.map((image) =>
-          image.id === imageId ? { ...image, likeCount: Math.max(0, image.likeCount - 1) } : image,
-        ),
-      );
+      setImagesById((prev) => {
+        const img = prev[imageId];
+        if (!img) return prev;
+        return { ...prev, [imageId]: { ...img, likeCount: Math.max(0, img.likeCount - 1) } };
+      });
     } finally {
       setLikingIds((prev) => ({ ...prev, [imageId]: false }));
     }
   }
 
-  function isImageLocked(image: GalleryImageCard): boolean {
-    if (!isLoggedIn) return true;
-    if (image.spoilerLevel === "none") return false;
-    if (image.spoilerLevel === "unstarted") return true;
-    return !revealedImageIds[image.id];
+  function openModal(carouselIds: string[], index: number) {
+    setModalState({ carouselIds, index });
   }
 
-  const tabPillBase =
-    "shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors duration-200 ease-out";
-
-  function tabPillClasses(active: boolean) {
-    return active
-      ? "border-accent/45 bg-accent-muted text-accent-text shadow-[inset_0_1px_0_0_color-mix(in_srgb,var(--accent)_14%,transparent)]"
-      : "border-border/90 bg-bg-surface/90 text-text-muted hover:border-border hover:bg-bg-raised/80 hover:text-text-primary";
+  function closeModal() {
+    setModalState(null);
   }
 
-  function selectBookFromSearch(bookId: string, title: string) {
-    setActiveBookFilterId(bookId);
-    setBookQuery(title);
-    setBookSuggestOpen(false);
-  }
+  useEffect(() => {
+    if (!modalState) return;
 
-  function clearBookFilter() {
-    setActiveBookFilterId(null);
-    setBookQuery("");
-    setBookSuggestOpen(false);
-  }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeModal();
+        return;
+      }
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
-  const showMyBooksEmpty =
-    isLoggedIn && mainTab === "my-books" && tabBaseImages.length === 0 && !activeBookFilterId;
+      e.preventDefault();
+      setModalState((prev) => {
+        if (!prev) return prev;
+        const delta = e.key === "ArrowRight" ? 1 : -1;
+        const nextIndex = prev.index + delta;
+        if (nextIndex < 0 || nextIndex >= prev.carouselIds.length) return prev;
+        return { ...prev, index: nextIndex };
+      });
+    }
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
-      <header className="space-y-2">
-        <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-          Gallery
-        </h1>
-        <p className="text-sm text-text-secondary">Images created by readers</p>
-      </header>
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalState]);
 
-      <div className="mt-6 flex flex-col gap-4 border-b border-border/80 pb-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-        <div className="flex flex-wrap gap-2">
-          {isLoggedIn ? (
-            <button
-              type="button"
-              onClick={() => setMainTab("my-books")}
-              className={`${tabPillBase} ${tabPillClasses(mainTab === "my-books")}`}
-            >
-              My Books
-            </button>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setMainTab("featured")}
-            className={`${tabPillBase} ${tabPillClasses(mainTab === "featured")}`}
-          >
-            Featured
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab("all")}
-            className={`${tabPillBase} ${tabPillClasses(mainTab === "all")}`}
-          >
-            All
-          </button>
+  const modalActiveId = modalState ? modalState.carouselIds[modalState.index] : null;
+  const modalActiveImage = modalActiveId ? imagesById[modalActiveId] : null;
+
+  function SectionHeader({
+    heading,
+    subtitle,
+    right,
+  }: {
+    heading: string;
+    subtitle: string;
+    right?: ReactNode;
+  }) {
+    return (
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted">
+            {heading}
+          </div>
+          <div className="mt-2 text-sm text-text-secondary">{subtitle}</div>
         </div>
+        {right}
+      </div>
+    );
+  }
 
-        <div className="relative w-full min-w-0 sm:max-w-xs sm:shrink-0">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={bookQuery}
-              onChange={(e) => {
-                setBookQuery(e.target.value);
-                setActiveBookFilterId(null);
-                setBookSuggestOpen(true);
-              }}
-              onFocus={() => setBookSuggestOpen(true)}
-              onBlur={() => {
-                window.setTimeout(() => setBookSuggestOpen(false), 150);
-              }}
-              placeholder="Filter by book..."
-              className="min-w-0 flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-secondary focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-              aria-autocomplete="list"
-              aria-expanded={bookSuggestOpen}
-              aria-controls="gallery-book-suggestions"
-            />
-            {activeBookFilterId || bookQuery.trim() ? (
+  function SeeAllLink() {
+    return (
+      <a
+        href="#"
+        className="text-sm font-medium text-text-muted transition hover:text-accent-text hover:underline decoration-accent/35 underline-offset-2"
+        onClick={(e) => e.preventDefault()}
+      >
+        See all
+      </a>
+    );
+  }
+
+  function GallerySquareCard({
+    image,
+    carouselIds,
+    index,
+  }: {
+    image: GalleryImageCard;
+    carouselIds: string[];
+    index: number;
+  }) {
+    const locked = isImageLocked(image);
+
+    const displayUserName = image.userName?.trim() || "Anonymous reader";
+    const likeDisabled = !isLoggedIn || !!likingIds[image.id];
+
+    return (
+      <article
+        tabIndex={0}
+        role="button"
+        aria-label={`Open image: ${image.bookTitle}`}
+        className="group outline-none"
+        onClick={() => openModal(carouselIds, index)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") openModal(carouselIds, index);
+        }}
+      >
+        <div
+          data-gallery-card
+          className="relative w-[66vw] min-w-[66vw] md:w-[180px] md:min-w-[180px] lg:w-[200px] lg:min-w-[200px] xl:w-[220px] xl:min-w-[220px] aspect-square overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm transition-transform duration-200 ease-out md:group-hover:scale-[1.03]"
+        >
+          <Image
+            src={image.imageUrl}
+            alt={image.userPrompt}
+            fill
+            unoptimized
+            className={`object-cover transition-[filter] duration-200 ease-out ${
+              locked ? "blur-[24px]" : "blur-0"
+            }`}
+            sizes="(max-width: 767px) 66vw, (min-width: 768px) 180px, (min-width: 1024px) 200px, 220px"
+          />
+
+          {/* Prompt tooltip (desktop) */}
+          {image.userPrompt ? (
+            <div className="pointer-events-none absolute inset-x-2 bottom-16 z-30 opacity-0 transition-opacity duration-200 md:group-hover:opacity-100">
+              <div className="rounded-lg border border-border/70 bg-bg-overlay/75 p-2.5 text-xs text-text-primary backdrop-blur-sm">
+                <p className="line-clamp-3">{image.userPrompt}</p>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Bottom gradient band */}
+          <div className="absolute inset-x-0 bottom-0 z-10">
+            <div className="h-2/5 bg-gradient-to-t from-bg-overlay/90 to-bg-overlay/0" />
+            <div className="absolute inset-x-0 bottom-0 p-3">
+              <div className="pr-14">
+                <p className="text-xs font-medium text-text-muted line-clamp-1">{image.bookTitle}</p>
+                <p className="mt-1 text-[11px] text-text-secondary line-clamp-1">{displayUserName}</p>
+              </div>
+
               <button
                 type="button"
-                onClick={clearBookFilter}
-                className="shrink-0 rounded-lg border border-border bg-bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition hover:bg-bg-raised"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void likeImage(image.id);
+                }}
+                disabled={likeDisabled}
+                className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/70 px-2 py-1 text-xs font-medium text-text-primary opacity-80 transition duration-200 ease-out hover:opacity-100 md:group-hover:opacity-100 md:group-hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={`Like ${image.likeCount} times`}
               >
-                Clear
+                <HeartIcon className="h-3.5 w-3.5" />
+                <span>{image.likeCount}</span>
               </button>
-            ) : null}
+            </div>
           </div>
-          {bookSuggestOpen && bookSuggestions.length > 0 ? (
-            <ul
-              id="gallery-book-suggestions"
-              role="listbox"
-              className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-border/95 bg-bg-surface py-1 shadow-lg"
-            >
-              {bookSuggestions.map((b) => (
-                <li key={b.bookId} role="option">
+
+          {/* Spoiler / lock overlay */}
+          {locked ? (
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg-overlay/45 px-4 text-center">
+              <LockIcon className="h-9 w-9 text-accent-text/95" />
+
+              {image.spoilerLevel === "unstarted" ? (
+                <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
+                  Start reading {image.bookTitle}
+                </p>
+              ) : null}
+
+              {image.spoilerLevel === "public" ? (
+                <div className="flex flex-col items-center gap-2">
+                  <p className="text-sm font-medium leading-snug text-text-primary">Sign in to unlock</p>
+                  <Link
+                    href="/sign-in"
+                    className="rounded-md border border-border/80 bg-bg-surface/70 px-3 py-1.5 text-xs font-medium text-accent-text transition duration-200 hover:bg-bg-raised"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Sign in
+                  </Link>
+                </div>
+              ) : null}
+
+              {image.spoilerLevel === "spoiler" ? (
+                <>
+                  <p className="text-sm font-medium leading-snug text-text-primary">Chapter {image.chapterNumberAtTime}</p>
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-surface"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectBookFromSearch(b.bookId, b.bookTitle)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setRevealedImageIds((prev) => ({ ...prev, [image.id]: true }));
+                    }}
+                    className="rounded-md border border-accent/35 bg-status-pending/50 px-3 py-1.5 text-xs font-medium text-accent-text transition duration-200 hover:bg-status-pending/60"
                   >
-                    {b.bookTitle}
+                    Show anyway
                   </button>
-                </li>
-              ))}
-            </ul>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
+
+  function CarouselRow({ title, images }: { title: string; images: GalleryImageCard[] }) {
+    const scrollRef = useRef<HTMLDivElement | null>(null);
+    const [canLeft, setCanLeft] = useState(false);
+    const [canRight, setCanRight] = useState(true);
+
+    function updateScrollState() {
+      const el = scrollRef.current;
+      if (!el) return;
+      const maxScrollLeft = el.scrollWidth - el.clientWidth;
+      setCanLeft(el.scrollLeft > 2);
+      setCanRight(el.scrollLeft < maxScrollLeft - 2);
+    }
+
+    useEffect(() => {
+      updateScrollState();
+      const el = scrollRef.current;
+      if (!el) return;
+
+      const onScroll = () => updateScrollState();
+      el.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", updateScrollState);
+      return () => {
+        el.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", updateScrollState);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [images.length]);
+
+    function scrollByCards(dir: -1 | 1) {
+      const el = scrollRef.current;
+      if (!el) return;
+      const card = el.querySelector("[data-gallery-card]") as HTMLElement | null;
+      if (!card) return;
+      const cardRect = card.getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(el).gap || "0");
+      const step = cardRect.width + gap;
+      el.scrollBy({ left: dir * step * 3, behavior: "smooth" });
+    }
+
+    const carouselIds = images.map((i) => i.id);
+
+    return (
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto pb-2 pr-4 scroll-smooth touch-pan-x overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          aria-label={title}
+        >
+          {images.map((image, idx) => (
+            <GallerySquareCard key={image.id} image={image} carouselIds={carouselIds} index={idx} />
+          ))}
+        </div>
+
+        {/* Desktop arrows */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 hidden md:flex items-center">
+          {canLeft ? (
+            <button
+              type="button"
+              className="pointer-events-auto ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-bg-surface/75 text-text-primary shadow-sm transition duration-200 ease-out hover:bg-bg-raised"
+              aria-label="Scroll left"
+              onClick={() => scrollByCards(-1)}
+            >
+              <ArrowLeftIcon className="h-5 w-5" />
+            </button>
+          ) : null}
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden md:flex items-center justify-end">
+          {canRight ? (
+            <button
+              type="button"
+              className="pointer-events-auto mr-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-bg-surface/75 text-text-primary shadow-sm transition duration-200 ease-out hover:bg-bg-raised"
+              aria-label="Scroll right"
+              onClick={() => scrollByCards(1)}
+            >
+              <ArrowRightIcon className="h-5 w-5" />
+            </button>
           ) : null}
         </div>
       </div>
+    );
+  }
 
-      {showMyBooksEmpty ? (
-        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
-          You haven&apos;t added any books to your library yet.{" "}
-          <Link
-            href="/discover"
-            className="font-medium text-accent-text underline decoration-accent/40 underline-offset-2 hover:text-accent-text"
-          >
-            Discover books
-          </Link>
-        </p>
-      ) : visibleImages.length === 0 ? (
-        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
-          No images match this filter.
-        </p>
-      ) : (
-        <section
-          style={{ opacity: gridOpacity }}
-          className="mt-6 grid grid-cols-2 gap-4 transition-opacity duration-300 ease-out sm:grid-cols-3 lg:grid-cols-4"
-        >
-          {visibleImages.map((image) => {
-            const locked = isImageLocked(image);
-            return (
-              <article
-                key={image.id}
-                className="overflow-hidden rounded-lg border border-border bg-bg-surface shadow-sm shadow-bg-overlay/5"
+  const noImagesSignedIn = (message: string) => (
+    <p className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-3 text-sm text-text-secondary">
+      {message}{" "}
+      <Link
+        href="/library"
+        className="font-medium text-accent-text underline decoration-accent/40 underline-offset-2 hover:text-accent-text"
+      >
+        View your library
+      </Link>
+    </p>
+  );
+
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
+      {bookGallery ? (
+        <>
+          <header className="space-y-2">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="min-w-0 space-y-1">
+                <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+                  {bookGallery.title}
+                </h1>
+                <p className="text-sm text-text-secondary">{bookGallery.author}</p>
+              </div>
+              <Link
+                href="/gallery"
+                className="shrink-0 text-sm font-medium text-accent-text underline-offset-2 transition duration-200 hover:underline"
               >
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-bg-base">
-                  {mainTab === "featured" ? (
-                    <span className="absolute left-2 top-2 z-10 rounded border border-accent/40 bg-bg-base/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-text/95 shadow-sm">
-                      Featured
-                    </span>
-                  ) : null}
+                ← All gallery
+              </Link>
+            </div>
+            <p className="text-sm text-text-muted">Public images from this book</p>
+          </header>
+
+          <div className="mt-8 space-y-10">
+            <section className="space-y-4">
+              <SectionHeader heading="IMAGES" subtitle="Reader-generated artwork" right={<SeeAllLink />} />
+              <CarouselRow title="Book gallery" images={trendingResolved} />
+            </section>
+          </div>
+        </>
+      ) : (
+        <>
+          <header className="space-y-2">
+            <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
+              Gallery
+            </h1>
+            <p className="text-sm text-text-secondary">Images created by readers, chapter by chapter</p>
+          </header>
+
+          <div className="mt-8 space-y-10">
+            {/* Carousel 1 */}
+            <section className="space-y-4">
+              <SectionHeader
+                heading="FROM YOUR LIBRARY"
+                subtitle="Images from books you're reading"
+                right={<SeeAllLink />}
+              />
+
+              {!isLoggedIn ? (
+                <div className="rounded-lg border border-border/90 bg-bg-base/70 p-4">
+                  <p className="text-sm font-medium text-text-primary">Sign in to unlock your library gallery.</p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    See images from the books you&apos;re currently reading, chapter by chapter.
+                  </p>
+                  <div className="mt-3">
+                    <Link
+                      href="/sign-in"
+                      className="inline-flex items-center rounded-md border border-border bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary transition duration-200 ease-out hover:bg-bg-raised/80"
+                    >
+                      Sign in
+                    </Link>
+                  </div>
+                </div>
+              ) : fromLibraryResolved.length === 0 ? (
+                noImagesSignedIn("No images yet from your books. Start reading and generate your first!")
+              ) : (
+                <CarouselRow title="From your library" images={fromLibraryResolved} />
+              )}
+            </section>
+
+            {/* Carousel 2 */}
+            <section className="space-y-4">
+              <SectionHeader
+                heading="TRENDING NOW"
+                subtitle="Most loved images this week"
+                right={<SeeAllLink />}
+              />
+              <CarouselRow title="Trending now" images={trendingResolved} />
+            </section>
+
+            {/* Carousel 3 */}
+            <section className="space-y-4">
+              <SectionHeader
+                heading="DISCOVER"
+                subtitle="Images from books you haven't explored yet"
+                right={<SeeAllLink />}
+              />
+              <CarouselRow title="Discover gallery" images={discoverResolved} />
+            </section>
+          </div>
+        </>
+      )}
+
+      {/* Image modal */}
+      {modalState && modalActiveImage ? (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-bg-overlay/70 backdrop-blur-sm"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) closeModal();
+            }}
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative flex max-h-[90vh] w-full max-w-[800px] flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="absolute right-3 top-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-surface/80 text-text-primary transition duration-200 ease-out hover:bg-bg-raised"
+              onClick={closeModal}
+              aria-label="Close modal"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+
+            <div className="flex min-h-0 max-h-[90vh] w-full flex-1 flex-col overflow-hidden sm:pt-1">
+              <div className="relative flex h-[min(55vh,calc(90vh-12rem))] max-h-[55vh] w-full flex-shrink-0 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
+                <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border bg-bg-base">
                   <Image
-                    src={image.imageUrl}
-                    alt={image.userPrompt}
+                    src={modalActiveImage.imageUrl}
+                    alt={modalActiveImage.userPrompt}
                     fill
                     unoptimized
-                    sizes="(min-width: 1024px) 22vw, (min-width: 640px) 30vw, 45vw"
-                    className={`object-cover transition-[filter,transform] duration-300 ease-out ${
-                      locked ? "scale-105 blur-[24px]" : "scale-100 blur-0"
-                    }`}
+                    className="object-contain object-center"
+                    sizes="(max-width: 800px) 100vw, 800px"
+                    priority
                   />
-                  {locked ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-bg-overlay/70 px-3 text-center">
-                      <LockIcon className="h-8 w-8 text-accent-text/90" />
-                      {!isLoggedIn ? (
-                        <p className="text-sm font-medium text-text-primary">Sign in to unlock</p>
-                      ) : image.spoilerLevel === "unstarted" ? (
-                        <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
-                          Start reading {image.bookTitle} to unlock
-                        </p>
-                      ) : (
-                        <>
-                          <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
-                            Contains content from Chapter {image.chapterNumberAtTime}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setRevealedImageIds((prev) => ({ ...prev, [image.id]: true }))
-                            }
-                            className="rounded-md border border-accent/35 bg-status-pending/50 px-3 py-1.5 text-xs font-medium text-accent-text transition hover:bg-status-pending/60"
-                          >
-                            Show anyway
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : null}
                 </div>
-                <div className="space-y-2 p-3">
-                  <p className="text-xs text-text-muted">
-                    <Link
-                      href={`/discover/${image.bookId}`}
-                      className="transition-colors hover:text-accent-text hover:underline decoration-accent/35 underline-offset-2"
-                    >
-                      {image.bookTitle} · {image.bookAuthor}
-                    </Link>
-                  </p>
-                  <p className="line-clamp-3 text-sm text-text-primary">{image.userPrompt}</p>
-                  <div className="flex items-center justify-between text-xs text-text-muted">
-                    <span>Chapter {image.chapterNumberAtTime}</span>
-                    <span>{image.userName?.trim() || "Anonymous reader"}</span>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
+                <div className="space-y-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-text-primary">{modalActiveImage.bookTitle}</h2>
+                    <p className="mt-1 text-sm text-text-secondary">{modalActiveImage.bookAuthor}</p>
                   </div>
-                  <div className="pt-1">
+
+                  <p className="text-sm text-text-muted">
+                    Generated at Chapter {modalActiveImage.chapterNumberAtTime}
+                  </p>
+
+                  <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
+                    <p className="text-sm font-medium text-text-muted">Your prompt</p>
+                    <p className="mt-1 text-sm text-text-primary whitespace-pre-wrap">{modalActiveImage.userPrompt}</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-4">
                     <button
                       type="button"
-                      onClick={() => void likeImage(image.id)}
-                      disabled={!!likingIds[image.id]}
-                      className="inline-flex items-center gap-1 rounded-md border border-rose-200/90 bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => void likeImage(modalActiveImage.id)}
+                      disabled={!isLoggedIn || !!likingIds[modalActiveImage.id]}
+                      className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-primary transition duration-200 ease-out hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label="Like this image"
                     >
-                      <span aria-hidden>♡</span>
-                      <span>{image.likeCount}</span>
+                      <HeartIcon className="h-4 w-4" />
+                      <span>{modalActiveImage.likeCount}</span>
                     </button>
+
+                    <div className="text-sm text-text-muted">
+                      <span>{modalActiveImage.userName?.trim() || "Anonymous reader"}</span>
+                      <span className="mx-2 text-text-secondary/80" aria-hidden>
+                        •
+                      </span>
+                      <span>{formatCardDate(modalActiveImage.createdAt)}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border/80 pt-3">
+                    <Link
+                      href={`/gallery/${modalActiveImage.bookId}`}
+                      className="text-sm text-accent-text/90 underline-offset-2 transition duration-200 hover:text-accent-text hover:underline"
+                    >
+                      View all {modalActiveImage.bookTitle} images
+                    </Link>
                   </div>
                 </div>
-              </article>
-            );
-          })}
-        </section>
-      )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

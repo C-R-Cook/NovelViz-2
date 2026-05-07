@@ -2,9 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
+import type { SpoilerProtection } from "@db";
 
-export type GallerySpoilerLevel = "none" | "spoiler" | "unstarted" | "public";
+export type GalleryLockKind = "none" | "chapter" | "unstarted" | "guest_blur";
 
 export type GalleryImageCard = {
   id: string;
@@ -17,18 +20,30 @@ export type GalleryImageCard = {
   bookTitle: string;
   bookAuthor: string;
   userName: string | null;
-  spoilerLevel: GallerySpoilerLevel;
+  currentChapterNumber?: number;
+  spoilerSetting?: SpoilerProtection;
+  /** Server-computed; guest featured carousel ignores locking UI on purpose */
+  isLocked: boolean;
+  lockKind: GalleryLockKind;
 };
 
-type Props = {
-  fromLibraryImages: GalleryImageCard[];
-  trendingImages: GalleryImageCard[];
-  discoverImages: GalleryImageCard[];
-  isLoggedIn: boolean;
-  isAdmin: boolean;
-  /** When set, only the book’s image carousel is shown (used by `/gallery/[bookId]`). Main gallery omits this. */
-  bookGallery?: { title: string; author: string } | null;
-};
+export type GalleryClientProps =
+  | {
+      layout: "guest";
+      latestFeatured: GalleryImageCard[];
+      libraryBlur: GalleryImageCard[];
+    }
+  | {
+      layout: "member";
+      isAdmin: boolean;
+      globalSpoilerProtection: boolean;
+      library:
+        | { kind: "no_books" }
+        | { kind: "no_images" }
+        | { kind: "images"; images: GalleryImageCard[] };
+      featured: GalleryImageCard[];
+      spoilerSettingsByBookId: Record<string, SpoilerProtection>;
+    };
 
 function LockIcon({ className }: { className?: string }) {
   return (
@@ -79,60 +94,63 @@ function ArrowRightIcon({ className }: { className?: string }) {
 
 function formatCardDate(iso: string) {
   const d = new Date(iso);
-  // Keep formatting locale-friendly and stable (no custom tokens).
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function GalleryClient({
-  fromLibraryImages,
-  trendingImages,
-  discoverImages,
-  isLoggedIn,
-  isAdmin,
-  bookGallery = null,
-}: Props) {
+export function GalleryClient(props: GalleryClientProps) {
+  const router = useRouter();
+  const isMember = props.layout === "member";
+  const isLoggedIn = isMember;
+  const isAdmin = isMember && props.isAdmin;
+  const canLike = isLoggedIn || isAdmin;
+
+  const cardSources = useMemo(() => {
+    if (props.layout === "guest") {
+      return [...props.latestFeatured, ...props.libraryBlur];
+    }
+    const lib =
+      props.library.kind === "images"
+        ? props.library.images
+        : [];
+    return [...lib, ...props.featured];
+  }, [props]);
+
   const initialImagesById = useMemo(() => {
-    const all = [...fromLibraryImages, ...trendingImages, ...discoverImages];
     const deduped = new Map<string, GalleryImageCard>();
-    for (const img of all) deduped.set(img.id, img);
+    for (const img of cardSources) deduped.set(img.id, img);
     return Object.fromEntries(deduped.entries());
-  }, [discoverImages, fromLibraryImages, trendingImages]);
+  }, [cardSources]);
 
   const [imagesById, setImagesById] = useState<Record<string, GalleryImageCard>>(initialImagesById);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
-  const [revealedImageIds, setRevealedImageIds] = useState<Record<string, boolean>>({});
   const [modalState, setModalState] = useState<{ carouselIds: string[]; index: number } | null>(null);
+  const [spoilerSettingsByBookId, setSpoilerSettingsByBookId] = useState<Record<string, SpoilerProtection>>(
+    props.layout === "member" ? props.spoilerSettingsByBookId : {},
+  );
 
   useEffect(() => {
     setImagesById(initialImagesById);
-    setRevealedImageIds({});
     setModalState(null);
+    if (props.layout === "member") {
+      setSpoilerSettingsByBookId(props.spoilerSettingsByBookId);
+    }
   }, [initialImagesById]);
 
-  const fromLibraryResolved = useMemo(
-    () => fromLibraryImages.map((img) => imagesById[img.id] ?? img),
-    [fromLibraryImages, imagesById],
-  );
-  const trendingResolved = useMemo(
-    () => trendingImages.map((img) => imagesById[img.id] ?? img),
-    [trendingImages, imagesById],
-  );
-  const discoverResolved = useMemo(
-    () => discoverImages.map((img) => imagesById[img.id] ?? img),
-    [discoverImages, imagesById],
-  );
+  const resolveList = (list: GalleryImageCard[]) => list.map((img) => imagesById[img.id] ?? img);
+
+  const latestFeaturedResolved = props.layout === "guest" ? resolveList(props.latestFeatured) : [];
+  const libraryBlurResolved = props.layout === "guest" ? resolveList(props.libraryBlur) : [];
+  const fromLibraryResolved =
+    props.layout === "member" && props.library.kind === "images" ? resolveList(props.library.images) : [];
+  const featuredResolved = props.layout === "member" ? resolveList(props.featured) : [];
 
   function isImageLocked(image: GalleryImageCard): boolean {
     if (isAdmin) return false;
-    if (image.spoilerLevel === "none") return false;
-    if (image.spoilerLevel === "unstarted") return true;
-    if (image.spoilerLevel === "public") return true;
-    // spoiler => locked until user chooses "Show anyway"
-    return !revealedImageIds[image.id];
+    return image.isLocked;
   }
 
   async function likeImage(imageId: string) {
-    if (!isLoggedIn && !isAdmin) return;
+    if (!canLike) return;
     if (likingIds[imageId]) return;
 
     setLikingIds((prev) => ({ ...prev, [imageId]: true }));
@@ -205,6 +223,11 @@ export function GalleryClient({
 
   const modalActiveId = modalState ? modalState.carouselIds[modalState.index] : null;
   const modalActiveImage = modalActiveId ? imagesById[modalActiveId] : null;
+  const modalLocked = modalActiveImage ? isImageLocked(modalActiveImage) : false;
+  const chapterGap =
+    modalActiveImage && modalLocked
+      ? Math.max(1, modalActiveImage.chapterNumberAtTime - (modalActiveImage.currentChapterNumber ?? 0))
+      : null;
 
   function SectionHeader({
     heading,
@@ -218,25 +241,11 @@ export function GalleryClient({
     return (
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted">
-            {heading}
-          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted">{heading}</div>
           <div className="mt-2 text-sm text-text-secondary">{subtitle}</div>
         </div>
         {right}
       </div>
-    );
-  }
-
-  function SeeAllLink() {
-    return (
-      <a
-        href="#"
-        className="text-sm font-medium text-text-muted transition hover:text-accent-text hover:underline decoration-accent/35 underline-offset-2"
-        onClick={(e) => e.preventDefault()}
-      >
-        See all
-      </a>
     );
   }
 
@@ -250,9 +259,8 @@ export function GalleryClient({
     index: number;
   }) {
     const locked = isImageLocked(image);
-
     const displayUserName = image.userName?.trim() || "Anonymous reader";
-    const likeDisabled = !isLoggedIn || !!likingIds[image.id];
+    const likeDisabled = !canLike || !!likingIds[image.id];
 
     return (
       <article
@@ -274,13 +282,10 @@ export function GalleryClient({
             alt={image.userPrompt}
             fill
             unoptimized
-            className={`object-cover transition-[filter] duration-200 ease-out ${
-              locked ? "blur-[24px]" : "blur-0"
-            }`}
+            className={`object-cover transition-[filter] duration-200 ease-out ${locked ? "blur-[24px]" : "blur-0"}`}
             sizes="(max-width: 767px) 66vw, (min-width: 768px) 180px, (min-width: 1024px) 200px, 220px"
           />
 
-          {/* Prompt tooltip (desktop) */}
           {image.userPrompt ? (
             <div className="pointer-events-none absolute inset-x-2 bottom-16 z-30 opacity-0 transition-opacity duration-200 md:group-hover:opacity-100">
               <div className="rounded-lg border border-border/70 bg-bg-overlay/75 p-2.5 text-xs text-text-primary backdrop-blur-sm">
@@ -289,7 +294,6 @@ export function GalleryClient({
             </div>
           ) : null}
 
-          {/* Bottom gradient band */}
           <div className="absolute inset-x-0 bottom-0 z-10">
             <div className="h-2/5 bg-gradient-to-t from-bg-overlay/90 to-bg-overlay/0" />
             <div className="absolute inset-x-0 bottom-0 p-3">
@@ -314,44 +318,20 @@ export function GalleryClient({
             </div>
           </div>
 
-          {/* Spoiler / lock overlay */}
           {locked ? (
-            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-bg-overlay/45 px-4 text-center">
+            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-4 text-center">
               <LockIcon className="h-9 w-9 text-accent-text/95" />
 
-              {image.spoilerLevel === "unstarted" ? (
-                <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">
-                  Start reading {image.bookTitle}
-                </p>
+              {image.lockKind === "unstarted" ? (
+                <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">Start reading {image.bookTitle}</p>
               ) : null}
 
-              {image.spoilerLevel === "public" ? (
-                <div className="flex flex-col items-center gap-2">
-                  <p className="text-sm font-medium leading-snug text-text-primary">Sign in to unlock</p>
-                  <Link
-                    href="/sign-in"
-                    className="rounded-md border border-border/80 bg-bg-surface/70 px-3 py-1.5 text-xs font-medium text-accent-text transition duration-200 hover:bg-bg-raised"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    Sign in
-                  </Link>
-                </div>
+              {image.lockKind === "chapter" ? (
+                <p className="text-sm font-medium leading-snug text-text-primary">Chapter {image.chapterNumberAtTime}</p>
               ) : null}
 
-              {image.spoilerLevel === "spoiler" ? (
-                <>
-                  <p className="text-sm font-medium leading-snug text-text-primary">Chapter {image.chapterNumberAtTime}</p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setRevealedImageIds((prev) => ({ ...prev, [image.id]: true }));
-                    }}
-                    className="rounded-md border border-accent/35 bg-status-pending/50 px-3 py-1.5 text-xs font-medium text-accent-text transition duration-200 hover:bg-status-pending/60"
-                  >
-                    Show anyway
-                  </button>
-                </>
+              {image.lockKind === "guest_blur" ? (
+                <span className="sr-only">Preview locked — create an account to unlock your library gallery</span>
               ) : null}
             </div>
           ) : null}
@@ -413,7 +393,6 @@ export function GalleryClient({
           ))}
         </div>
 
-        {/* Desktop arrows */}
         <div className="pointer-events-none absolute inset-y-0 left-0 hidden md:flex items-center">
           {canLeft ? (
             <button
@@ -442,111 +421,126 @@ export function GalleryClient({
     );
   }
 
-  const noImagesSignedIn = (message: string) => (
-    <p className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-3 text-sm text-text-secondary">
-      {message}{" "}
-      <Link
-        href="/library"
-        className="font-medium text-accent-text underline decoration-accent/40 underline-offset-2 hover:text-accent-text"
+  async function toggleGlobalSpoiler() {
+    if (props.layout !== "member") return;
+    const next = !props.globalSpoilerProtection;
+    await fetch("/api/user/spoiler-protection", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: next }),
+    });
+    router.refresh();
+  }
+
+  async function unlockBookSpoilers(bookId: string) {
+    const res = await fetch(`/api/user-books/${bookId}/spoiler-protection`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ setting: "UNLOCKED" }),
+    });
+    if (!res.ok) return;
+    closeModal();
+    router.refresh();
+  }
+
+  function GlobalSpoilerPill() {
+    if (props.layout !== "member") return null;
+    const on = props.globalSpoilerProtection;
+    return (
+      <button
+        type="button"
+        onClick={() => void toggleGlobalSpoiler()}
+        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 ${
+          on
+            ? "border-error/35 bg-error/10 text-error"
+            : "border-success/35 bg-success/10 text-success"
+        }`}
       >
-        View your library
-      </Link>
-    </p>
-  );
+        {on ? "Spoilers hidden" : "Showing everything"}
+      </button>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
-      {bookGallery ? (
-        <>
-          <header className="space-y-2">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div className="min-w-0 space-y-1">
-                <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-                  {bookGallery.title}
-                </h1>
-                <p className="text-sm text-text-secondary">{bookGallery.author}</p>
-              </div>
-              <Link
-                href="/gallery"
-                className="shrink-0 text-sm font-medium text-accent-text underline-offset-2 transition duration-200 hover:underline"
-              >
-                ← All gallery
-              </Link>
-            </div>
-            <p className="text-sm text-text-muted">Public images from this book</p>
-          </header>
+      <header className="space-y-2">
+        <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Gallery</h1>
+        <p className="text-sm text-text-secondary">Images created by readers, chapter by chapter</p>
+      </header>
 
-          <div className="mt-8 space-y-10">
-            <section className="space-y-4">
-              <SectionHeader heading="IMAGES" subtitle="Reader-generated artwork" right={<SeeAllLink />} />
-              <CarouselRow title="Book gallery" images={trendingResolved} />
-            </section>
-          </div>
-        </>
-      ) : (
-        <>
-          <header className="space-y-2">
-            <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">
-              Gallery
-            </h1>
-            <p className="text-sm text-text-secondary">Images created by readers, chapter by chapter</p>
-          </header>
+      {props.layout === "guest" ? (
+        <div className="mt-8 space-y-10">
+          <section className="space-y-4">
+            <SectionHeader
+              heading="LATEST FEATURED"
+              subtitle="Hand-picked images from our community"
+            />
+            <CarouselRow title="Latest featured" images={latestFeaturedResolved} />
+          </section>
 
-          <div className="mt-8 space-y-10">
-            {/* Carousel 1 */}
-            <section className="space-y-4">
-              <SectionHeader
-                heading="FROM YOUR LIBRARY"
-                subtitle="Images from books you're reading"
-                right={<SeeAllLink />}
+          <section className="relative space-y-4">
+            <SectionHeader heading="YOUR LIBRARY" subtitle="Images from books you're reading" />
+            <div className="relative">
+              <CarouselRow title="Library preview" images={libraryBlurResolved} />
+              <div
+                className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-bg-overlay/55 px-4 backdrop-blur-[2px]"
+                aria-hidden
               />
-
-              {!isLoggedIn ? (
-                <div className="rounded-lg border border-border/90 bg-bg-base/70 p-4">
-                  <p className="text-sm font-medium text-text-primary">Sign in to unlock your library gallery.</p>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    See images from the books you&apos;re currently reading, chapter by chapter.
-                  </p>
-                  <div className="mt-3">
+              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4">
+                <div className="pointer-events-auto max-w-md rounded-xl border border-border/90 bg-bg-surface/95 px-6 py-5 text-center shadow-lg backdrop-blur-md">
+                  <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-bg-base">
+                    <LockIcon className="h-5 w-5 text-accent-text" />
+                  </div>
+                  <p className="text-sm font-medium text-text-primary">Create a free account to unlock your personalised gallery</p>
+                  <div className="mt-4">
                     <Link
-                      href="/sign-in"
-                      className="inline-flex items-center rounded-md border border-border bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary transition duration-200 ease-out hover:bg-bg-raised/80"
+                      href="/sign-up"
+                      className="inline-flex items-center justify-center rounded-md border border-accent/40 bg-accent/15 px-4 py-2.5 text-sm font-semibold text-accent-text transition hover:bg-accent/25"
                     >
-                      Sign in
+                      Get Started
                     </Link>
                   </div>
                 </div>
-              ) : fromLibraryResolved.length === 0 ? (
-                noImagesSignedIn("No images yet from your books. Start reading and generate your first!")
-              ) : (
-                <CarouselRow title="From your library" images={fromLibraryResolved} />
-              )}
-            </section>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : (
+        <div className="mt-8 space-y-10">
+          <section className="space-y-4">
+            <SectionHeader heading="FROM YOUR LIBRARY" subtitle="Images from books you're reading" />
+            {props.library.kind === "no_books" ? (
+              <div className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-6 text-center">
+                <p className="text-sm text-text-secondary">Add books to your library to see images from what you&apos;re reading.</p>
+                <div className="mt-4">
+                  <Link
+                    href="/discover"
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-bg-raised px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-raised/80"
+                  >
+                    Discover Books
+                  </Link>
+                </div>
+              </div>
+            ) : props.library.kind === "no_images" ? (
+              <p className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-3 text-sm text-text-secondary">
+                No community images yet from your library books. Check back soon, or explore the featured carousel below.
+              </p>
+            ) : (
+              <CarouselRow title="From your library" images={fromLibraryResolved} />
+            )}
+          </section>
 
-            {/* Carousel 2 */}
-            <section className="space-y-4">
-              <SectionHeader
-                heading="TRENDING NOW"
-                subtitle="Most loved images this week"
-                right={<SeeAllLink />}
-              />
-              <CarouselRow title="Trending now" images={trendingResolved} />
-            </section>
-
-            {/* Carousel 3 */}
-            <section className="space-y-4">
-              <SectionHeader
-                heading="DISCOVER"
-                subtitle="Images from books you haven't explored yet"
-                right={<SeeAllLink />}
-              />
-              <CarouselRow title="Discover gallery" images={discoverResolved} />
-            </section>
-          </div>
-        </>
+          <section className="space-y-4">
+            <SectionHeader
+              heading="FEATURED"
+              subtitle="Beloved images from across the catalogue"
+              right={<GlobalSpoilerPill />}
+            />
+            <CarouselRow title="Featured" images={featuredResolved} />
+          </section>
+        </div>
       )}
 
-      {/* Image modal */}
       {modalState && modalActiveImage ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div
@@ -582,10 +576,16 @@ export function GalleryClient({
                     alt={modalActiveImage.userPrompt}
                     fill
                     unoptimized
-                    className="object-contain object-center"
+                    className={`object-contain object-center ${modalLocked ? "blur-[24px]" : ""}`}
                     sizes="(max-width: 800px) 100vw, 800px"
                     priority
                   />
+                  {modalLocked ? (
+                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-overlay/45 px-4 text-center">
+                      <LockIcon className="h-10 w-10 text-accent-text/95" />
+                      <p className="text-sm font-medium text-text-primary">Locked until you unlock this book</p>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -596,20 +596,20 @@ export function GalleryClient({
                     <p className="mt-1 text-sm text-text-secondary">{modalActiveImage.bookAuthor}</p>
                   </div>
 
-                  <p className="text-sm text-text-muted">
-                    Generated at Chapter {modalActiveImage.chapterNumberAtTime}
-                  </p>
+                  <p className="text-sm text-text-muted">Generated at Chapter {modalActiveImage.chapterNumberAtTime}</p>
 
-                  <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
-                    <p className="text-sm font-medium text-text-muted">Your prompt</p>
-                    <p className="mt-1 text-sm text-text-primary whitespace-pre-wrap">{modalActiveImage.userPrompt}</p>
-                  </div>
+                  {!modalLocked ? (
+                    <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
+                      <p className="text-sm font-medium text-text-muted">Your prompt</p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">{modalActiveImage.userPrompt}</p>
+                    </div>
+                  ) : null}
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <button
                       type="button"
                       onClick={() => void likeImage(modalActiveImage.id)}
-                      disabled={!isLoggedIn || !!likingIds[modalActiveImage.id]}
+                      disabled={!canLike || !!likingIds[modalActiveImage.id]}
                       className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-primary transition duration-200 ease-out hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60"
                       aria-label="Like this image"
                     >
@@ -626,13 +626,52 @@ export function GalleryClient({
                     </div>
                   </div>
 
+                  {modalLocked ? (
+                    <div className="space-y-3 rounded-lg border border-border/90 bg-bg-base/60 p-3">
+                      {chapterGap ? (
+                        <p className="text-sm text-text-secondary">
+                          You&apos;re {chapterGap} {chapterGap === 1 ? "chapter" : "chapters"} away
+                        </p>
+                      ) : null}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => void unlockBookSpoilers(modalActiveImage.bookId)}
+                          className="inline-flex items-center rounded-md border border-success/35 bg-success/10 px-3 py-2 text-sm font-semibold text-success transition hover:brightness-110 active:scale-95"
+                        >
+                          Unlock all {modalActiveImage.bookTitle} images
+                        </button>
+                        <Link
+                          href={`/reader/${modalActiveImage.bookId}`}
+                          onClick={() => closeModal()}
+                          className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
+                        >
+                          Continue reading →
+                        </Link>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="border-t border-border/80 pt-3">
-                    <Link
-                      href={`/gallery/${modalActiveImage.bookId}`}
-                      className="text-sm text-accent-text/90 underline-offset-2 transition duration-200 hover:text-accent-text hover:underline"
-                    >
-                      View all {modalActiveImage.bookTitle} images
-                    </Link>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <Link
+                        href={`/gallery/${modalActiveImage.bookId}`}
+                        className="text-sm text-accent-text/90 underline-offset-2 transition duration-200 hover:text-accent-text hover:underline"
+                      >
+                        View all {modalActiveImage.bookTitle} images →
+                      </Link>
+                      {props.layout === "member" ? (
+                        <SpoilerToggle
+                          bookId={modalActiveImage.bookId}
+                          currentSetting={spoilerSettingsByBookId[modalActiveImage.bookId] ?? "INHERIT"}
+                          globalSetting={props.globalSpoilerProtection}
+                          onUpdate={(next) => {
+                            setSpoilerSettingsByBookId((prev) => ({ ...prev, [modalActiveImage.bookId]: next }));
+                            router.refresh();
+                          }}
+                        />
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,8 @@
-import { GalleryClient, type GalleryImageCard } from "./gallery-client";
+import { GalleryClient, type GalleryImageCard, type GalleryLockKind } from "./gallery-client";
 import { getCurrentUser } from "@/lib/auth";
+import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
 import { prisma } from "@/lib/prisma";
+import type { SpoilerProtection } from "@db";
 
 export const metadata = {
   title: "Gallery | NovelViz",
@@ -18,6 +20,88 @@ type GeneratedImageForGallery = {
   user: { username: string | null; name: string | null };
 };
 
+const baseSelect = {
+  id: true,
+  imageUrl: true,
+  userPrompt: true,
+  chapterNumberAtTime: true,
+  createdAt: true,
+  likeCount: true,
+  bookId: true,
+  book: {
+    select: {
+      title: true,
+      author: true,
+    },
+  },
+  user: {
+    select: {
+      username: true,
+      name: true,
+    },
+  },
+};
+
+function baseFields(image: GeneratedImageForGallery): Omit<GalleryImageCard, "isLocked" | "lockKind"> {
+  return {
+    id: image.id,
+    imageUrl: image.imageUrl,
+    userPrompt: image.userPrompt,
+    chapterNumberAtTime: image.chapterNumberAtTime,
+    createdAt: image.createdAt.toISOString(),
+    likeCount: image.likeCount,
+    bookId: image.bookId,
+    bookTitle: image.book.title,
+    bookAuthor: image.book.author,
+    userName: image.user.username ?? image.user.name ?? null,
+  };
+}
+
+function toGuestFeaturedCard(image: GeneratedImageForGallery): GalleryImageCard {
+  return {
+    ...baseFields(image),
+    isLocked: false,
+    lockKind: "none",
+  };
+}
+
+function toGuestBlurCard(image: GeneratedImageForGallery): GalleryImageCard {
+  return {
+    ...baseFields(image),
+    isLocked: true,
+    lockKind: "guest_blur",
+  };
+}
+
+function memberLock(
+  image: GeneratedImageForGallery,
+  opts: {
+    isAdmin: boolean;
+    globalSpoilerProtection: boolean;
+    spoilerByBookId: Map<string, SpoilerProtection | undefined>;
+    progressByBookId: Map<string, number>;
+  },
+): Pick<GalleryImageCard, "isLocked" | "lockKind"> {
+  if (opts.isAdmin) {
+    return { isLocked: false, lockKind: "none" };
+  }
+
+  const bookSpoiler = opts.spoilerByBookId.get(image.bookId);
+  const mode = effectiveChapterGateMode(bookSpoiler, opts.globalSpoilerProtection);
+  const currentChapter = opts.progressByBookId.get(image.bookId);
+  const behind = isChapterBehindLock(mode, currentChapter, image.chapterNumberAtTime);
+  if (!behind) {
+    return { isLocked: false, lockKind: "none" };
+  }
+
+  let lockKind: GalleryLockKind = "chapter";
+  if (currentChapter === undefined) {
+    lockKind = "unstarted";
+  }
+
+  return { isLocked: true, lockKind };
+}
+
 export default async function GalleryPage() {
   const session = await getCurrentUser();
   const isLoggedIn = !!session;
@@ -32,104 +116,121 @@ export default async function GalleryPage() {
     userLibraryBookIds = userBooks.map((row) => row.bookId);
   }
 
-  // Used for spoiler unlock logic for logged-in users.
-  const progressByBookId = new Map<string, number>();
-  if (session && userLibraryBookIds.length > 0) {
-    const progresses = await prisma.readingProgress.findMany({
-      where: { userId: session.id, bookId: { in: userLibraryBookIds } },
-      select: { bookId: true, currentChapterNumber: true },
-    });
-    for (const row of progresses) {
-      progressByBookId.set(row.bookId, row.currentChapterNumber);
-    }
-  }
-
-  const baseSelect = {
-    id: true,
-    imageUrl: true,
-    userPrompt: true,
-    chapterNumberAtTime: true,
-    createdAt: true,
-    likeCount: true,
-    bookId: true,
-    book: {
-      select: {
-        title: true,
-        author: true,
-      },
-    },
-    user: {
-      select: {
-        username: true,
-        name: true,
-      },
-    },
-  };
-
-  const libraryImagesPromise: Promise<GeneratedImageForGallery[]> = session
-    ? prisma.generatedImage.findMany({
-        where: { isPublic: true, bookId: { in: userLibraryBookIds } },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-        select: baseSelect,
-      })
-    : Promise.resolve([]);
-
-  const trendingImagesPromise: Promise<GeneratedImageForGallery[]> = prisma.generatedImage.findMany({
+  const guestLatestFeatured = prisma.generatedImage.findMany({
     where: { isPublic: true },
     orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
     take: 20,
     select: baseSelect,
   });
 
-  const discoverImagesPromise: Promise<GeneratedImageForGallery[]> = prisma.generatedImage.findMany({
-    where: session ? { isPublic: true, bookId: { notIn: userLibraryBookIds } } : { isPublic: true },
+  const guestLibraryBlur = prisma.generatedImage.findMany({
+    where: { isPublic: true },
     orderBy: { createdAt: "desc" },
+    take: 5,
+    select: baseSelect,
+  });
+
+  if (!session) {
+    const [latest, blur] = await Promise.all([guestLatestFeatured, guestLibraryBlur]);
+    return (
+      <GalleryClient
+        layout="guest"
+        latestFeatured={latest.map(toGuestFeaturedCard)}
+        libraryBlur={blur.map(toGuestBlurCard)}
+      />
+    );
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { globalSpoilerProtection: true },
+  });
+  const globalSpoilerProtection = dbUser?.globalSpoilerProtection ?? true;
+
+  const userBookRows = await prisma.userBook.findMany({
+    where: { userId: session.id, isActive: true },
+    select: { bookId: true, spoilerProtection: true },
+  });
+  const spoilerByBookId = new Map<string, SpoilerProtection | undefined>(
+    userBookRows.map((r) => [r.bookId, r.spoilerProtection]),
+  );
+  const spoilerSettingsByBookId = Object.fromEntries(
+    userBookRows.map((r) => [r.bookId, r.spoilerProtection]),
+  ) as Record<string, SpoilerProtection>;
+
+  const allProgress = await prisma.readingProgress.findMany({
+    where: { userId: session.id },
+    select: { bookId: true, currentChapterNumber: true },
+  });
+  const progressByBookId = new Map<string, number>(allProgress.map((p) => [p.bookId, p.currentChapterNumber]));
+
+  const lockCtx = {
+    isAdmin: !!isAdmin,
+    globalSpoilerProtection,
+    spoilerByBookId,
+    progressByBookId,
+  };
+
+  const featuredPromise = prisma.generatedImage.findMany({
+    where: { isPublic: true },
+    orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
     take: 20,
     select: baseSelect,
   });
 
-  const [libraryImages, trendingImages, discoverImages] = await Promise.all([
-    libraryImagesPromise,
-    trendingImagesPromise,
-    discoverImagesPromise,
+  if (userLibraryBookIds.length === 0) {
+    const featured = await featuredPromise;
+    const featuredCards = featured.map((img) => ({
+      ...baseFields(img),
+      currentChapterNumber: progressByBookId.get(img.bookId),
+      spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
+      ...memberLock(img, lockCtx),
+    }));
+
+    return (
+      <GalleryClient
+        layout="member"
+        isAdmin={!!isAdmin}
+        globalSpoilerProtection={globalSpoilerProtection}
+        library={{ kind: "no_books" }}
+        featured={featuredCards}
+        spoilerSettingsByBookId={spoilerSettingsByBookId}
+      />
+    );
+  }
+
+  const [libraryRows, featured] = await Promise.all([
+    prisma.generatedImage.findMany({
+      where: { isPublic: true, bookId: { in: userLibraryBookIds } },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: baseSelect,
+    }),
+    featuredPromise,
   ]);
 
-  function toCard(image: GeneratedImageForGallery): GalleryImageCard {
-    let spoilerLevel: GalleryImageCard["spoilerLevel"];
-    if (isAdmin) {
-      spoilerLevel = "none";
-    } else if (!isLoggedIn) {
-      spoilerLevel = "public";
-    } else {
-      const currentChapter = progressByBookId.get(image.bookId);
-      if (currentChapter === undefined) spoilerLevel = "unstarted";
-      else if (currentChapter >= image.chapterNumberAtTime) spoilerLevel = "none";
-      else spoilerLevel = "spoiler";
-    }
+  const libraryCards = libraryRows.map((img) => ({
+    ...baseFields(img),
+    currentChapterNumber: progressByBookId.get(img.bookId),
+    spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
+    ...memberLock(img, lockCtx),
+  }));
 
-    return {
-      id: image.id,
-      imageUrl: image.imageUrl,
-      userPrompt: image.userPrompt,
-      chapterNumberAtTime: image.chapterNumberAtTime,
-      createdAt: image.createdAt.toISOString(),
-      likeCount: image.likeCount,
-      bookId: image.bookId,
-      bookTitle: image.book.title,
-      bookAuthor: image.book.author,
-      userName: image.user.username ?? image.user.name ?? null,
-      spoilerLevel,
-    };
-  }
+  const featuredCards = featured.map((img) => ({
+    ...baseFields(img),
+    currentChapterNumber: progressByBookId.get(img.bookId),
+    spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
+    ...memberLock(img, lockCtx),
+  }));
 
   return (
     <GalleryClient
-      fromLibraryImages={libraryImages.map(toCard)}
-      trendingImages={trendingImages.map(toCard)}
-      discoverImages={discoverImages.map(toCard)}
-      isLoggedIn={isLoggedIn}
-      isAdmin={isAdmin}
+      layout="member"
+      isAdmin={!!isAdmin}
+      globalSpoilerProtection={globalSpoilerProtection}
+      library={libraryRows.length === 0 ? { kind: "no_images" } : { kind: "images", images: libraryCards }}
+      featured={featuredCards}
+      spoilerSettingsByBookId={spoilerSettingsByBookId}
     />
   );
 }

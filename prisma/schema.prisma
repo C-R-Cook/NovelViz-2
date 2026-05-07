@@ -70,6 +70,12 @@ enum UserRole {
   admin
 }
 
+enum SpoilerProtection {
+  INHERIT
+  PROTECTED
+  UNLOCKED
+}
+
 model Book {
   id                           String     @id @default(cuid())
   title                        String
@@ -152,6 +158,8 @@ model User {
   country                 String?
   ageRange                AgeRange?
   genrePreferences        String[]  @default([])
+  /// When true (default), spoiler-style images are hidden until reading progress catches up unless overridden per book.
+  globalSpoilerProtection Boolean   @default(true)
 
   userBooks       UserBook[]
   ownedBooks      Book[]    @relation("OwnedBooks")
@@ -170,6 +178,7 @@ model UserBook {
   bookId   String
   addedAt  DateTime @default(now())
   isActive Boolean  @default(true)
+  spoilerProtection SpoilerProtection @default(INHERIT)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)

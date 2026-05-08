@@ -40,6 +40,16 @@ export async function GET(request: Request, context: RouteContext) {
 
   const user = await getCurrentUser();
 
+  const imageIds = images.map((i) => i.id);
+  const viewerLikedIds = new Set<string>();
+  if (user !== null && imageIds.length > 0) {
+    const likedRows = await prisma.like.findMany({
+      where: { userId: user.id, imageId: { in: imageIds } },
+      select: { imageId: true },
+    });
+    for (const row of likedRows) viewerLikedIds.add(row.imageId);
+  }
+
   if (!user) {
     return NextResponse.json({
       bookId: book.id,
@@ -55,6 +65,7 @@ export async function GET(request: Request, context: RouteContext) {
         userId: img.userId,
         username: img.user.username ?? img.user.name ?? "",
         likeCount: img.likeCount,
+        likedByViewer: viewerLikedIds.has(img.id),
         isLocked: false,
         bookId: book.id,
         bookTitle: book.title,
@@ -78,6 +89,7 @@ export async function GET(request: Request, context: RouteContext) {
         userId: img.userId,
         username: img.user.username ?? img.user.name ?? "",
         likeCount: img.likeCount,
+        likedByViewer: viewerLikedIds.has(img.id),
         isLocked: false,
         bookId: book.id,
         bookTitle: book.title,
@@ -105,6 +117,7 @@ export async function GET(request: Request, context: RouteContext) {
         userId: img.userId,
         username: img.user.username ?? img.user.name ?? "",
         likeCount: img.likeCount,
+        likedByViewer: viewerLikedIds.has(img.id),
         isLocked: false,
         bookId: book.id,
         bookTitle: book.title,
@@ -146,6 +159,7 @@ export async function GET(request: Request, context: RouteContext) {
       userId: img.userId,
       username: img.user.username ?? img.user.name ?? "",
       likeCount: img.likeCount,
+      likedByViewer: viewerLikedIds.has(img.id),
       isLocked: isChapterBehindLock(mode, currentChapter, img.chapterNumberAtTime),
       bookId: book.id,
       bookTitle: book.title,

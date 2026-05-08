@@ -55,6 +55,7 @@ export default async function GalleryBookPage({ params }: { params: Promise<{ bo
       userBookSpoiler={userBook?.spoilerProtection ?? null}
       isLoggedIn={isLoggedIn}
       isAdmin={!!isAdmin}
+      viewerUserId={session?.id ?? null}
     />
   );
 }

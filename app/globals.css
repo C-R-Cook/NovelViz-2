@@ -81,7 +81,12 @@ body.palette-candlelight {
   --border-subtle: #241e16;
 }
 
-/* Palette D — Moonlight Silver */
+/* Palette D — Moonlight Silver
+ * (Body class wired in dev: components/palette-switcher.tsx → applyPaletteToBody;
+ * SSR early palette: lib/dev-palette-hydration-script.ts / localStorage "dev_palette".)
+ *
+ * --accent/--accent-hover are light silver. Control labels must use dark ink on filled
+ * accent surfaces — see MOONLIGHT_BTN_FG_AUDIT at EOF (do not scatter one-off overrides). */
 body.palette-moonlight {
   --bg-base: #080c12;
   --bg-surface: #0e1420;
@@ -90,6 +95,8 @@ body.palette-moonlight {
   --text-primary: #e8eef5;
   --text-secondary: #8fa8c0;
   --text-muted: #4a6070;
+  /* Dark label for utilities like text-text-inverse on solid bg-accent (genre pills, nav blob, submit). */
+  --text-inverse: #1a1a2e;
   --accent: #c0c8d8;
   --accent-hover: #d0d8e8;
   --accent-muted: rgba(192, 200, 216, 0.15);
@@ -209,4 +216,70 @@ body {
   .discover-pill-pulse {
     animation: none !important;
   }
+}
+
+/*
+ * MOONLIGHT_BTN_FG_AUDIT
+ * ────────────────────────
+ * Where Moonlight Silver “button colours” ultimately come from:
+ *
+ * | Source | Role |
+ * |--------|------|
+ * | This file → `body.palette-moonlight { … }` (Palette D, ~above) | --accent*, --text-*, `--text-inverse` |
+ * | This file → `@theme inline` | Maps `--color-*` utilities (e.g. `text-text-primary`, `bg-accent`) |
+ * | components/palette-switcher.tsx | Adds `palette-moonlight` to `<body>` in dev |
+ * | lib/dev-palette-hydration-script.ts | Re-applies palette class before paint (hydration) |
+ * | `data-active-tab` on dashboard tabs | Opt-out from border+accent-text overrides (see EOF outline block) |
+ *
+ * BUG WE FIX: substring `[class*="bg-accent"]` also matched tokens like `bg-accent-muted`,
+ * hover-only `hover:bg-accent/…`, etc., and still lost specificity to Tailwind utilities such as
+ * `text-text-primary` on `bg-accent` (see e.g. app/(reader)/(app)/dashboard/dashboard-client.tsx).
+ *
+ * RULES BELOW — `body.palette-moonlight …` ONLY. Other palettes unchanged.
+ * Loaded last in this sheet so overrides win over generated utilities (+ !important for label colour).
+ */
+
+/* ── Primary filled: solid or high-opacity accent background ─────────────── */
+body.palette-moonlight :is(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    a[href],
+    summary
+  )[class~="bg-accent"],
+body.palette-moonlight [role="button"][class~="bg-accent"] {
+  color: #1a1a2e !important;
+}
+
+body.palette-moonlight :is(
+    button,
+    input[type="button"],
+    input[type="submit"],
+    input[type="reset"],
+    a[href],
+    summary
+  ):is([class~="bg-accent/95"], [class~="bg-accent/90"], [class~="bg-accent/85"], [class~="bg-accent/80"]),
+body.palette-moonlight [role="button"]:is([class~="bg-accent/95"], [class~="bg-accent/90"], [class~="bg-accent/85"], [class~="bg-accent/80"]) {
+  color: #1a1a2e !important;
+}
+
+/* ── Hover / focus accent wash on controls (muted + hover:bg-accent/25|30) ──── */
+body.palette-moonlight :is(button, a[href], [role="button"], summary):hover.hover\:bg-accent\/25,
+body.palette-moonlight :is(button, a[href], [role="button"], summary):hover.hover\:bg-accent\/30 {
+  color: #1a1a2e !important;
+}
+
+/* ── Outline / bordered + accent label — dark ink on accent stroke CTA ──────
+ * Exclude [data-active-tab] — dashboard tab strip (app/(reader)/(app)/dashboard/dashboard-client.tsx)
+ * uses border-accent/80 + text-accent-text for the selected tab; keep default accent-text there. */
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/35.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/40.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/45.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/50.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/60.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/70.text-accent-text:not([data-active-tab]),
+body.palette-moonlight :is(button, a[href], [role="button"], summary).border-accent\/80.text-accent-text:not([data-active-tab]) {
+  color: #1a1a2e !important;
 }

@@ -23,6 +23,7 @@
     "dotenv": "^17.4.1",
     "fast-xml-parser": "^5.7.1",
     "jszip": "^3.10.1",
+    "lucide-react": "^1.14.0",
     "next": "16.2.2",
     "openai": "^6.34.0",
     "react": "19.2.4",

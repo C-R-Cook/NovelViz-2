@@ -10,9 +10,20 @@ export type SpoilerToggleProps = {
   currentSetting: SpoilerProtection;
   globalSetting: boolean;
   onUpdate: (next: SpoilerProtection) => void;
+  /**
+   * `modal` matches the gallery image modal action row (`h-9`, `text-sm`).
+   * Default stays compact for toolbars and permanent settings rows.
+   */
+  size?: "compact" | "modal";
 };
 
-export function SpoilerToggle({ bookId, currentSetting, globalSetting, onUpdate }: SpoilerToggleProps) {
+export function SpoilerToggle({
+  bookId,
+  currentSetting,
+  globalSetting,
+  onUpdate,
+  size = "compact",
+}: SpoilerToggleProps) {
   const [pending, setPending] = useState(false);
 
   async function cycle() {
@@ -34,8 +45,9 @@ export function SpoilerToggle({ bookId, currentSetting, globalSetting, onUpdate 
 
   const effectiveHidden = currentSetting === "PROTECTED" || (currentSetting === "INHERIT" && globalSetting);
 
-  let pillClass =
-    "inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
+  const sizeClass = size === "modal" ? "h-9 justify-center px-3 text-sm" : "px-3 py-1.5 text-xs";
+
+  let pillClass = `inline-flex cursor-pointer items-center rounded-md border font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${sizeClass}`;
   const title = effectiveHidden ? "Show everything" : "Hide spoilers";
 
   if (effectiveHidden) {

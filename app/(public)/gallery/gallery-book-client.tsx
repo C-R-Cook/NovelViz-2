@@ -1,12 +1,14 @@
 "use client";
 
-import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
+import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
+import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
 import { effectiveChapterGateMode } from "@/lib/gallery-spoiler";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SpoilerProtection } from "@db";
 
@@ -21,6 +23,7 @@ type ApiImage = {
   userId: string;
   username: string;
   likeCount: number;
+  isPublic: boolean;
   likedByViewer: boolean;
   isLocked: boolean;
   bookId: string;
@@ -118,6 +121,7 @@ export function GalleryBookClient({
   viewerUserId,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [images, setImages] = useState<ApiImage[]>([]);
   const [currentChapterNumber, setCurrentChapterNumber] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -126,10 +130,13 @@ export function GalleryBookClient({
   const [sessionUnlock, setSessionUnlock] = useState(false);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
   const [modalIndex, setModalIndex] = useState<number | null>(null);
+  const [modalSlideDir, setModalSlideDir] = useState<-1 | 0 | 1>(0);
+  const [modalSwipeBusy, setModalSwipeBusy] = useState(false);
   const [modalCtaError, setModalCtaError] = useState<string | null>(null);
   const [modalUnlockPending, setModalUnlockPending] = useState(false);
   const [addLibraryPending, setAddLibraryPending] = useState(false);
   const [permanentSettingsOpen, setPermanentSettingsOpen] = useState(false);
+  const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
 
   const gateModeForSession = useMemo(
     () => effectiveChapterGateMode(userBookSpoiler !== null ? spoilerSetting : undefined, globalSpoilerProtection),
@@ -276,7 +283,33 @@ export function GalleryBookClient({
       ? Math.max(1, modalImage.chapterNumberAtTime - (currentChapterNumber ?? 0))
       : null;
 
+  function openModalAtGridIndex(index: number) {
+    setModalSlideDir(0);
+    setModalSwipeBusy(false);
+    setModalIndex(index);
+  }
+
+  function dismissModalImage() {
+    setModalIndex(null);
+    setModalSlideDir(0);
+    setModalSwipeBusy(false);
+  }
+
+  const bumpModalIndex = useCallback(
+    (delta: number) => {
+      if (modalIndex === null || modalSwipeBusy) return;
+      const nextIndex = modalIndex + delta;
+      if (nextIndex < 0 || nextIndex >= images.length) return;
+      setModalSlideDir(delta > 0 ? 1 : -1);
+      setModalIndex(nextIndex);
+    },
+    [modalIndex, modalSwipeBusy, images.length],
+  );
+
   const bookInLibrary = isLoggedIn && userBookSpoiler !== null;
+  const from = searchParams.get("from");
+  const backHref = from === "reader" ? `/reader/${bookId}` : "/gallery";
+  const backLabel = from === "reader" ? "Back to your book" : "Back to gallery";
 
   useEffect(() => {
     setModalCtaError(null);
@@ -295,7 +328,7 @@ export function GalleryBookClient({
       const readErr = async () => ((await res.json().catch(() => ({}))) as { error?: string }).error ?? null;
 
       if (res.ok) {
-        setModalIndex(null);
+        dismissModalImage();
         router.refresh();
         await fetchImages(sessionUnlock);
         return;
@@ -309,7 +342,7 @@ export function GalleryBookClient({
         });
         const payload = await create.json().catch(() => ({}));
         if (create.ok) {
-          setModalIndex(null);
+          dismissModalImage();
           router.refresh();
           await fetchImages(sessionUnlock);
           return;
@@ -344,11 +377,41 @@ export function GalleryBookClient({
         setModalCtaError(typeof payload.error === "string" ? payload.error : "Could not add to library.");
         return;
       }
-      setModalIndex(null);
+      dismissModalImage();
       if (then === "reader") router.push(`/reader/${bookId}`);
       else router.refresh();
     } finally {
       setAddLibraryPending(false);
+    }
+  }
+
+  async function setImagePublicState(imageId: string, isPublic: boolean) {
+    if (!imageId || shareUpdatingIds[imageId]) return;
+    const prior = images.find((i) => i.id === imageId);
+    if (!prior) return;
+
+    setShareUpdatingIds((prev) => ({ ...prev, [imageId]: true }));
+    setImages((prev) => prev.map((img) => (img.id === imageId ? { ...img, isPublic } : img)));
+    try {
+      const res = await fetch(`/api/gallery/${imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { image?: { isPublic?: boolean } };
+      if (!res.ok || typeof data.image?.isPublic !== "boolean") {
+        setImages((prev) => prev.map((img) => (img.id === imageId ? prior : img)));
+        return;
+      }
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId ? { ...img, isPublic: data.image!.isPublic! } : img,
+        ),
+      );
+    } catch {
+      setImages((prev) => prev.map((img) => (img.id === imageId ? prior : img)));
+    } finally {
+      setShareUpdatingIds((prev) => ({ ...prev, [imageId]: false }));
     }
   }
 
@@ -357,43 +420,35 @@ export function GalleryBookClient({
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
-        setModalIndex(null);
+        dismissModalImage();
         return;
       }
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
       e.preventDefault();
-      setModalIndex((i) => {
-        if (i === null) return i;
-        const delta = e.key === "ArrowRight" ? 1 : -1;
-        const next = i + delta;
-        if (next < 0 || next >= images.length) return i;
-        return next;
-      });
+      if (modalSwipeBusy) return;
+      const delta = e.key === "ArrowRight" ? 1 : -1;
+      bumpModalIndex(delta);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modalIndex, images.length]);
+  }, [modalIndex, modalSwipeBusy, bumpModalIndex]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
       <nav className="mb-6 text-sm text-text-muted" aria-label="Breadcrumb">
         <ol className="flex flex-wrap items-center gap-2">
           <li>
-            <Link href="/gallery" className="font-medium text-accent-text underline-offset-2 hover:underline">
-              Gallery
+            <Link href={backHref} className="font-medium text-accent-text underline-offset-2 hover:underline">
+              ← {backLabel}
             </Link>
           </li>
-          <li aria-hidden className="text-text-secondary/80">
-            /
-          </li>
-          <li className="text-text-primary">{bookTitle}</li>
         </ol>
       </nav>
 
       <header className="flex flex-col gap-6 border-b border-border/80 pb-8 sm:flex-row sm:items-start">
-        <div className="relative h-32 w-24 shrink-0 overflow-hidden rounded-lg border border-border bg-bg-base shadow-sm sm:h-40 sm:w-32">
+        <div className="relative aspect-[2/3] w-[6.75rem] shrink-0 overflow-hidden rounded-lg border border-border bg-bg-base shadow-sm sm:w-36">
           {coverImageUrl ? (
-            <Image src={coverImageUrl} alt="" fill className="object-cover" sizes="128px" />
+            <Image src={coverImageUrl} alt="" fill className="object-cover object-top" sizes="(max-width:640px) 108px, 144px" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-[10px] text-text-muted">No cover</div>
           )}
@@ -530,11 +585,11 @@ export function GalleryBookClient({
                   role="button"
                   tabIndex={0}
                   className="relative aspect-square w-full cursor-pointer overflow-hidden rounded-xl border border-border bg-bg-base text-left shadow-sm outline-none transition hover:border-border-subtle focus-visible:ring-2 focus-visible:ring-accent/40"
-                  onClick={() => setModalIndex(index)}
+                  onClick={() => openModalAtGridIndex(index)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setModalIndex(index);
+                      openModalAtGridIndex(index);
                     }
                   }}
                 >
@@ -607,7 +662,7 @@ export function GalleryBookClient({
           <div
             className="absolute inset-0 bg-bg-overlay/70 backdrop-blur-sm"
             onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setModalIndex(null);
+              if (e.target === e.currentTarget) dismissModalImage();
             }}
           />
           <div
@@ -619,7 +674,7 @@ export function GalleryBookClient({
             <button
               type="button"
               className="absolute right-3 top-3 z-20 inline-flex h-10 w-10 items-center justify-center rounded-md border border-border bg-bg-surface/80 text-text-primary transition hover:bg-bg-raised"
-              onClick={() => setModalIndex(null)}
+              onClick={() => dismissModalImage()}
               aria-label="Close modal"
             >
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
@@ -630,32 +685,37 @@ export function GalleryBookClient({
 
             <div className="flex min-h-0 max-h-[90vh] w-full flex-1 flex-col overflow-hidden sm:pt-1">
               <div className="relative flex h-[min(55vh,calc(90vh-12rem))] max-h-[55vh] w-full flex-shrink-0 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
-                <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border bg-bg-base">
-                  <Image
-                    src={modalImage.imageUrl}
-                    alt={modalImage.userPrompt}
-                    fill
-                    unoptimized
-                    className={`object-contain object-center ${modalLocked ? "blur-[24px]" : ""}`}
+                <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
+                  <ModalImageSwipeView
+                    slide={{
+                      id: modalImage.id,
+                      imageUrl: modalImage.imageUrl,
+                      userPrompt: modalImage.userPrompt,
+                      locked: modalLocked,
+                    }}
+                    direction={modalSlideDir}
+                    onDirectionConsumed={() => setModalSlideDir(0)}
+                    onAnimatingChange={setModalSwipeBusy}
                     sizes="(max-width: 800px) 100vw, 800px"
-                    priority
                   />
-                  {modalLocked ? (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-overlay/45 px-4 text-center">
-                      <LockIcon className="h-10 w-10 text-accent-text/95" />
-                      <p className="text-sm font-medium text-text-primary">Locked until you unlock this book</p>
-                    </div>
+                  {modalIndex !== null && images.length > 1 ? (
+                    <ModalImageNavArrows
+                      show
+                      canPrev={modalIndex > 0 && !modalSwipeBusy}
+                      canNext={modalIndex < images.length - 1 && !modalSwipeBusy}
+                      onPrev={() => bumpModalIndex(-1)}
+                      onNext={() => bumpModalIndex(1)}
+                    />
                   ) : null}
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
                 <div className="space-y-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-text-primary">{modalImage.bookTitle}</h2>
-                    <p className="mt-1 text-sm text-text-secondary">{modalImage.author}</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <h2 className="min-w-0 flex-1 text-lg font-semibold text-text-primary">{modalImage.bookTitle}</h2>
+                    <p className="shrink-0 text-sm text-text-muted">Generated at Chapter {modalImage.chapterNumberAtTime}</p>
                   </div>
-                  <p className="text-sm text-text-muted">Generated at Chapter {modalImage.chapterNumberAtTime}</p>
                   {!modalLocked ? (
                     <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
                       <p className="text-sm font-medium text-text-muted">Your prompt</p>
@@ -764,7 +824,7 @@ export function GalleryBookClient({
                             </button>
                             <Link
                               href={`/reader/${modalImage.bookId}`}
-                              onClick={() => setModalIndex(null)}
+                              onClick={() => dismissModalImage()}
                               className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
                             >
                               Continue reading →
@@ -774,24 +834,45 @@ export function GalleryBookClient({
                       ) : null}
                     </div>
                   ) : null}
-                  <div className="border-t border-border/80 pt-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <span className="text-sm text-text-muted">
-                        You&apos;re viewing this book&apos;s gallery — scroll up to browse all images.
-                      </span>
+                  {(viewerUserId !== null && modalImage.userId === viewerUserId) ||
+                  (isLoggedIn && userBookSpoiler !== null && !modalLocked) ? (
+                    <div className="flex w-full flex-wrap items-center gap-3">
+                      <div className="flex min-w-0 flex-wrap items-center gap-3">
+                        {viewerUserId !== null && modalImage.userId === viewerUserId ? (
+                          <button
+                            type="button"
+                            onClick={() => void setImagePublicState(modalImage.id, !modalImage.isPublic)}
+                            disabled={!!shareUpdatingIds[modalImage.id]}
+                            className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                              modalImage.isPublic
+                                ? "border-error/35 bg-error/10 text-error"
+                                : "border-success/35 bg-success/10 text-success"
+                            }`}
+                          >
+                            {shareUpdatingIds[modalImage.id]
+                              ? "Saving…"
+                              : modalImage.isPublic
+                                ? "Make private"
+                                : "Make public"}
+                          </button>
+                        ) : null}
+                      </div>
                       {isLoggedIn && userBookSpoiler !== null && !modalLocked ? (
-                        <SpoilerToggle
-                          bookId={bookId}
-                          currentSetting={spoilerSetting}
-                          globalSetting={globalSpoilerProtection}
-                          onUpdate={(next) => {
-                            setSpoilerSetting(next);
-                            router.refresh();
-                          }}
-                        />
+                        <div className="ml-auto flex shrink-0">
+                          <SpoilerToggle
+                            size="modal"
+                            bookId={bookId}
+                            currentSetting={spoilerSetting}
+                            globalSetting={globalSpoilerProtection}
+                            onUpdate={(next) => {
+                              setSpoilerSetting(next);
+                              router.refresh();
+                            }}
+                          />
+                        </div>
                       ) : null}
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               </div>
             </div>

@@ -15,6 +15,7 @@ type GeneratedImageForGallery = {
   chapterNumberAtTime: number;
   createdAt: Date;
   likeCount: number;
+  isPublic: boolean;
   bookId: string;
   userId: string;
   book: { title: string; author: string };
@@ -28,6 +29,7 @@ const baseSelect = {
   chapterNumberAtTime: true,
   createdAt: true,
   likeCount: true,
+  isPublic: true,
   bookId: true,
   userId: true,
   book: {
@@ -55,6 +57,7 @@ function baseFields(
     chapterNumberAtTime: image.chapterNumberAtTime,
     createdAt: image.createdAt.toISOString(),
     likeCount: image.likeCount,
+    isPublic: image.isPublic,
     likedByViewer,
     bookId: image.bookId,
     bookTitle: image.book.title,

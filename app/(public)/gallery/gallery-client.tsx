@@ -3,8 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
+import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
+import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
 import { HelpCircle, LockKeyholeOpen, Star } from "lucide-react";
@@ -19,6 +21,7 @@ export type GalleryImageCard = {
   chapterNumberAtTime: number;
   createdAt: string;
   likeCount: number;
+  isPublic: boolean;
   /** True once the viewer has liked this image (persists via API). Guests always false from server. */
   likedByViewer: boolean;
   bookId: string;
@@ -111,6 +114,10 @@ function formatCardDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
+
+/** Modal "View Gallery" — fixed height to match share + spoiler controls in the image modal */
+const modalViewGalleryButtonClass =
+  "inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-blue-600/50 bg-blue-600/15 px-3 text-sm font-medium text-blue-200 shadow-sm transition hover:border-blue-500/60 hover:bg-blue-600/25";
 
 const EMPTY_GALLERY_LIST: GalleryImageCard[] = [];
 
@@ -226,7 +233,13 @@ function GallerySquareCard({
           <div className="h-2/5 bg-gradient-to-t from-bg-overlay/90 to-bg-overlay/0" />
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="pr-14">
-              <p className="text-xs font-medium text-text-muted line-clamp-1">{image.bookTitle}</p>
+              <Link
+                href={`/gallery/${image.bookId}?from=gallery`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex max-w-full items-center gap-1 text-xs font-medium text-text-muted underline-offset-2 transition hover:text-accent-text hover:underline"
+              >
+                <span className="line-clamp-1">{image.bookTitle}</span>
+              </Link>
               <p className="mt-1 text-[11px] text-text-secondary line-clamp-1">{displayUserName}</p>
             </div>
 
@@ -437,9 +450,13 @@ export function GalleryClient(props: GalleryClientProps) {
   const [imagesById, setImagesById] = useState<Record<string, GalleryImageCard>>(serverImagesById);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
   const [modalState, setModalState] = useState<{ carouselIds: string[]; index: number } | null>(null);
+  /** Drives swipe transition when carousel index changes (−1 = previous, +1 = next). */
+  const [modalSlideDir, setModalSlideDir] = useState<-1 | 0 | 1>(0);
+  const [modalSwipeBusy, setModalSwipeBusy] = useState(false);
   const [modalCtaError, setModalCtaError] = useState<string | null>(null);
   const [modalUnlockPending, setModalUnlockPending] = useState(false);
   const [addLibraryPending, setAddLibraryPending] = useState(false);
+  const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
   const [legendOpen, setLegendOpen] = useState(false);
   const [spoilerSettingsByBookId, setSpoilerSettingsByBookId] = useState<Record<string, SpoilerProtection>>(
     props.layout === "member" ? props.spoilerSettingsByBookId : {},
@@ -545,13 +562,27 @@ export function GalleryClient(props: GalleryClientProps) {
   }
 
   function openModal(carouselIds: string[], index: number) {
+    setModalSlideDir(0);
     setModalState({ carouselIds, index });
   }
 
   function closeModal() {
     setModalState(null);
     setModalCtaError(null);
+    setModalSlideDir(0);
+    setModalSwipeBusy(false);
   }
+
+  const bumpModalCarousel = useCallback(
+    (delta: number) => {
+      if (!modalState || modalSwipeBusy) return;
+      const nextIndex = modalState.index + delta;
+      if (nextIndex < 0 || nextIndex >= modalState.carouselIds.length) return;
+      setModalSlideDir(delta > 0 ? 1 : -1);
+      setModalState({ ...modalState, index: nextIndex });
+    },
+    [modalState, modalSwipeBusy],
+  );
 
   const modalActiveId = modalState ? modalState.carouselIds[modalState.index] : null;
   const modalActiveImage = modalActiveId ? imagesById[modalActiveId] : null;
@@ -571,18 +602,14 @@ export function GalleryClient(props: GalleryClientProps) {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
 
       e.preventDefault();
-      setModalState((prev) => {
-        if (!prev) return prev;
-        const delta = e.key === "ArrowRight" ? 1 : -1;
-        const nextIndex = prev.index + delta;
-        if (nextIndex < 0 || nextIndex >= prev.carouselIds.length) return prev;
-        return { ...prev, index: nextIndex };
-      });
+      if (modalSwipeBusy) return;
+      const delta = e.key === "ArrowRight" ? 1 : -1;
+      bumpModalCarousel(delta);
     }
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [modalState]);
+  }, [modalState, modalSwipeBusy, bumpModalCarousel]);
 
   const modalLocked = modalActiveImage ? isImageLocked(modalActiveImage) : false;
   const chapterGap =
@@ -694,6 +721,41 @@ export function GalleryClient(props: GalleryClientProps) {
     }
   }
 
+  async function setImagePublicState(imageId: string, isPublic: boolean) {
+    if (!imageId || shareUpdatingIds[imageId]) return;
+    const prior = imagesById[imageId];
+    if (!prior) return;
+
+    setShareUpdatingIds((prev) => ({ ...prev, [imageId]: true }));
+    setImagesById((prev) => {
+      const img = prev[imageId];
+      if (!img) return prev;
+      return { ...prev, [imageId]: { ...img, isPublic } };
+    });
+
+    try {
+      const res = await fetch(`/api/gallery/${imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { image?: { isPublic?: boolean } };
+      if (!res.ok || typeof data.image?.isPublic !== "boolean") {
+        setImagesById((prev) => ({ ...prev, [imageId]: prior }));
+        return;
+      }
+      setImagesById((prev) => {
+        const img = prev[imageId];
+        if (!img) return prev;
+        return { ...prev, [imageId]: { ...img, isPublic: data.image!.isPublic! } };
+      });
+    } catch {
+      setImagesById((prev) => ({ ...prev, [imageId]: prior }));
+    } finally {
+      setShareUpdatingIds((prev) => ({ ...prev, [imageId]: false }));
+    }
+  }
+
   const carouselRowProps = {
     viewerUserId,
     isAdmin,
@@ -712,7 +774,7 @@ export function GalleryClient(props: GalleryClientProps) {
       <button
         type="button"
         onClick={() => void toggleGlobalSpoiler()}
-        className={`inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 ${
+        className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 ${
           hidden
             ? "border-error/35 bg-error/10 text-error"
             : "border-success/35 bg-success/10 text-success"
@@ -920,33 +982,37 @@ export function GalleryClient(props: GalleryClientProps) {
 
             <div className="flex min-h-0 max-h-[90vh] w-full flex-1 flex-col overflow-hidden sm:pt-1">
               <div className="relative flex h-[min(55vh,calc(90vh-12rem))] max-h-[55vh] w-full flex-shrink-0 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
-                <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden rounded-lg border border-border bg-bg-base">
-                  <Image
-                    src={modalActiveImage.imageUrl}
-                    alt={modalActiveImage.userPrompt}
-                    fill
-                    unoptimized
-                    className={`object-contain object-center ${modalLocked ? "blur-[24px]" : ""}`}
+                <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
+                  <ModalImageSwipeView
+                    slide={{
+                      id: modalActiveImage.id,
+                      imageUrl: modalActiveImage.imageUrl,
+                      userPrompt: modalActiveImage.userPrompt,
+                      locked: modalLocked,
+                    }}
+                    direction={modalSlideDir}
+                    onDirectionConsumed={() => setModalSlideDir(0)}
+                    onAnimatingChange={setModalSwipeBusy}
                     sizes="(max-width: 800px) 100vw, 800px"
-                    priority
                   />
-                  {modalLocked ? (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-bg-overlay/45 px-4 text-center">
-                      <LockIcon className="h-10 w-10 text-accent-text/95" />
-                      <p className="text-sm font-medium text-text-primary">Locked until you unlock this book</p>
-                    </div>
+                  {modalState.carouselIds.length > 1 ? (
+                    <ModalImageNavArrows
+                      show
+                      canPrev={modalState.index > 0 && !modalSwipeBusy}
+                      canNext={modalState.index < modalState.carouselIds.length - 1 && !modalSwipeBusy}
+                      onPrev={() => bumpModalCarousel(-1)}
+                      onNext={() => bumpModalCarousel(1)}
+                    />
                   ) : null}
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
                 <div className="space-y-3">
-                  <div>
-                    <h2 className="text-lg font-semibold text-text-primary">{modalActiveImage.bookTitle}</h2>
-                    <p className="mt-1 text-sm text-text-secondary">{modalActiveImage.bookAuthor}</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <h2 className="min-w-0 flex-1 text-lg font-semibold text-text-primary">{modalActiveImage.bookTitle}</h2>
+                    <p className="shrink-0 text-sm text-text-muted">Generated at Chapter {modalActiveImage.chapterNumberAtTime}</p>
                   </div>
-
-                  <p className="text-sm text-text-muted">Generated at Chapter {modalActiveImage.chapterNumberAtTime}</p>
 
                   {!modalLocked ? (
                     <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
@@ -1072,16 +1138,50 @@ export function GalleryClient(props: GalleryClientProps) {
                     </div>
                   ) : null}
 
-                  <div className="border-t border-border/80 pt-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <Link
-                        href={`/gallery/${modalActiveImage.bookId}`}
-                        className="text-sm text-accent-text/90 underline-offset-2 transition duration-200 hover:text-accent-text hover:underline"
-                      >
-                        View all {modalActiveImage.bookTitle} images →
-                      </Link>
-                      {props.layout === "member" && !modalLocked && bookInLibrary ? (
+                  <div className="flex w-full flex-wrap items-center gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-3">
+                      {viewerUserId !== null && modalActiveImage.userId === viewerUserId ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void setImagePublicState(modalActiveImage.id, !modalActiveImage.isPublic)
+                            }
+                            disabled={!!shareUpdatingIds[modalActiveImage.id]}
+                            className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                              modalActiveImage.isPublic
+                                ? "border-error/35 bg-error/10 text-error"
+                                : "border-success/35 bg-success/10 text-success"
+                            }`}
+                          >
+                            {shareUpdatingIds[modalActiveImage.id]
+                              ? "Saving…"
+                              : modalActiveImage.isPublic
+                                ? "Make private"
+                                : "Make public"}
+                          </button>
+                          <Link
+                            href={`/gallery/${modalActiveImage.bookId}?from=gallery`}
+                            onClick={() => closeModal()}
+                            className={modalViewGalleryButtonClass}
+                          >
+                            View Gallery
+                          </Link>
+                        </>
+                      ) : (
+                        <Link
+                          href={`/gallery/${modalActiveImage.bookId}?from=gallery`}
+                          onClick={() => closeModal()}
+                          className={modalViewGalleryButtonClass}
+                        >
+                          View Gallery
+                        </Link>
+                      )}
+                    </div>
+                    {props.layout === "member" && !modalLocked && bookInLibrary ? (
+                      <div className="ml-auto flex shrink-0">
                         <SpoilerToggle
+                          size="modal"
                           bookId={modalActiveImage.bookId}
                           currentSetting={spoilerSettingsByBookId[modalActiveImage.bookId] ?? "INHERIT"}
                           globalSetting={props.globalSpoilerProtection}
@@ -1090,8 +1190,8 @@ export function GalleryClient(props: GalleryClientProps) {
                             router.refresh();
                           }}
                         />
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               </div>

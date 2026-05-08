@@ -1,10 +1,13 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import type { SpoilerProtection } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ bookId: string }> };
 
-export async function POST(_request: Request, context: RouteContext) {
+const SPOILER: SpoilerProtection[] = ["INHERIT", "PROTECTED", "UNLOCKED"];
+
+export async function POST(request: Request, context: RouteContext) {
   const { bookId } = await context.params;
   const session = await getCurrentUser();
   if (!session) {
@@ -25,6 +28,19 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
+  let spoilerUpdate: SpoilerProtection | undefined;
+  const body = (await request.json().catch(() => null)) as { spoilerProtection?: unknown } | null;
+  const raw = body?.spoilerProtection;
+  if (raw !== undefined && raw !== null) {
+    if (!SPOILER.includes(raw as SpoilerProtection)) {
+      return NextResponse.json(
+        { error: "Invalid spoilerProtection — use INHERIT | PROTECTED | UNLOCKED" },
+        { status: 400 },
+      );
+    }
+    spoilerUpdate = raw as SpoilerProtection;
+  }
+
   const existing = await prisma.userBook.findUnique({
     where: {
       userId_bookId: { userId: dbUser.id, bookId },
@@ -34,7 +50,10 @@ export async function POST(_request: Request, context: RouteContext) {
   if (existing) {
     await prisma.userBook.update({
       where: { id: existing.id },
-      data: { isActive: true },
+      data: {
+        isActive: true,
+        ...(spoilerUpdate !== undefined ? { spoilerProtection: spoilerUpdate } : {}),
+      },
     });
   } else {
     await prisma.userBook.create({
@@ -42,6 +61,7 @@ export async function POST(_request: Request, context: RouteContext) {
         userId: dbUser.id,
         bookId,
         isActive: true,
+        ...(spoilerUpdate !== undefined ? { spoilerProtection: spoilerUpdate } : {}),
       },
     });
   }

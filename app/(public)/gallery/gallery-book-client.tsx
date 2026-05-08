@@ -1,6 +1,8 @@
 "use client";
 
 import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
+import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
+import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
 import { effectiveChapterGateMode } from "@/lib/gallery-spoiler";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,6 +21,7 @@ type ApiImage = {
   userId: string;
   username: string;
   likeCount: number;
+  likedByViewer: boolean;
   isLocked: boolean;
   bookId: string;
   bookTitle: string;
@@ -40,6 +43,7 @@ type Props = {
   userBookSpoiler: SpoilerProtection | null;
   isLoggedIn: boolean;
   isAdmin: boolean;
+  viewerUserId: string | null;
 };
 
 function LockIcon({ className }: { className?: string }) {
@@ -61,14 +65,19 @@ function LockIcon({ className }: { className?: string }) {
   );
 }
 
-function HeartIcon({ className }: { className?: string }) {
+function HeartIcon({ className, filled }: { className?: string; filled?: boolean }) {
+  const path =
+    "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z";
+  if (filled) {
+    return (
+      <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden>
+        <path d={path} />
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-      />
+      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
     </svg>
   );
 }
@@ -106,6 +115,7 @@ export function GalleryBookClient({
   userBookSpoiler,
   isLoggedIn,
   isAdmin,
+  viewerUserId,
 }: Props) {
   const router = useRouter();
   const [images, setImages] = useState<ApiImage[]>([]);
@@ -116,6 +126,10 @@ export function GalleryBookClient({
   const [sessionUnlock, setSessionUnlock] = useState(false);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
   const [modalIndex, setModalIndex] = useState<number | null>(null);
+  const [modalCtaError, setModalCtaError] = useState<string | null>(null);
+  const [modalUnlockPending, setModalUnlockPending] = useState(false);
+  const [addLibraryPending, setAddLibraryPending] = useState(false);
+  const [permanentSettingsOpen, setPermanentSettingsOpen] = useState(false);
 
   const gateModeForSession = useMemo(
     () => effectiveChapterGateMode(userBookSpoiler !== null ? spoilerSetting : undefined, globalSpoilerProtection),
@@ -145,7 +159,12 @@ export function GalleryBookClient({
           return;
         }
         const data = (await res.json()) as BookGalleryResponse;
-        setImages(data.images ?? []);
+        setImages(
+          (data.images ?? []).map((raw) => {
+            const img = raw as ApiImage & { likedByViewer?: boolean };
+            return { ...img, likedByViewer: img.likedByViewer ?? false };
+          }),
+        );
         setCurrentChapterNumber(data.currentChapterNumber ?? null);
       } catch {
         setLoadError("Could not load images.");
@@ -178,26 +197,71 @@ export function GalleryBookClient({
 
   async function likeImage(imageId: string) {
     if (!canLike || likingIds[imageId]) return;
+    const prior = images.find((i) => i.id === imageId);
+    if (!prior || prior.likedByViewer) return;
+    if (viewerUserId !== null && prior.userId === viewerUserId) return;
+    if (displayLocked(prior.isLocked)) return;
+
+    const beforeLikeCount = prior.likeCount;
+    const beforeLikedByViewer = prior.likedByViewer;
+
     setLikingIds((prev) => ({ ...prev, [imageId]: true }));
     setImages((prev) =>
-      prev.map((img) => (img.id === imageId ? { ...img, likeCount: img.likeCount + 1 } : img)),
+      prev.map((img) =>
+        img.id !== imageId
+          ? img
+          : viewerUserId !== null && img.userId === viewerUserId
+            ? img
+            : { ...img, likeCount: img.likeCount + 1, likedByViewer: true },
+      ),
     );
     try {
-      const res = await fetch(`/api/gallery/${imageId}/like`, { method: "POST" });
-      const data = (await res.json().catch(() => ({}))) as { likeCount?: number };
-      if (!res.ok || typeof data.likeCount !== "number") {
+      const body = sessionUnlock
+        ? JSON.stringify({ sessionBrowsingUnlockedBookIds: [bookId] })
+        : JSON.stringify({});
+      const res = await fetch(`/api/gallery/${imageId}/like`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        likeCount?: number;
+        error?: string;
+        code?: string;
+      };
+      const revertLike = () => {
         setImages((prev) =>
           prev.map((img) =>
-            img.id === imageId ? { ...img, likeCount: Math.max(0, img.likeCount - 1) } : img,
+            img.id !== imageId
+              ? img
+              : {
+                  ...img,
+                  likeCount: beforeLikeCount,
+                  likedByViewer: beforeLikedByViewer,
+                },
           ),
         );
+      };
+
+      if (!res.ok || typeof data.likeCount !== "number") {
+        revertLike();
         return;
       }
-      setImages((prev) => prev.map((img) => (img.id === imageId ? { ...img, likeCount: data.likeCount! } : img)));
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId ? { ...img, likeCount: data.likeCount!, likedByViewer: true } : img,
+        ),
+      );
     } catch {
       setImages((prev) =>
         prev.map((img) =>
-          img.id === imageId ? { ...img, likeCount: Math.max(0, img.likeCount - 1) } : img,
+          img.id !== imageId
+            ? img
+            : {
+                ...img,
+                likeCount: beforeLikeCount,
+                likedByViewer: beforeLikedByViewer,
+              },
         ),
       );
     } finally {
@@ -212,15 +276,80 @@ export function GalleryBookClient({
       ? Math.max(1, modalImage.chapterNumberAtTime - (currentChapterNumber ?? 0))
       : null;
 
+  const bookInLibrary = isLoggedIn && userBookSpoiler !== null;
+
+  useEffect(() => {
+    setModalCtaError(null);
+  }, [modalIndex]);
+
   async function unlockBookSpoilers() {
-    const res = await fetch(`/api/user-books/${bookId}/spoiler-protection`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ setting: "UNLOCKED" }),
-    });
-    if (!res.ok) return;
-    setModalIndex(null);
-    router.refresh();
+    setModalCtaError(null);
+    setModalUnlockPending(true);
+    try {
+      let res = await fetch(`/api/user-books/${bookId}/spoiler-protection`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ setting: "UNLOCKED" }),
+      });
+
+      const readErr = async () => ((await res.json().catch(() => ({}))) as { error?: string }).error ?? null;
+
+      if (res.ok) {
+        setModalIndex(null);
+        router.refresh();
+        await fetchImages(sessionUnlock);
+        return;
+      }
+
+      if (res.status === 404) {
+        const create = await fetch(`/api/library/${bookId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ spoilerProtection: "UNLOCKED" }),
+        });
+        const payload = await create.json().catch(() => ({}));
+        if (create.ok) {
+          setModalIndex(null);
+          router.refresh();
+          await fetchImages(sessionUnlock);
+          return;
+        }
+        const rawCreateErr = (payload as { error?: string }).error;
+        setModalCtaError(
+          typeof rawCreateErr === "string" && rawCreateErr.trim() !== ""
+            ? rawCreateErr
+            : "Could not add this book or unlock spoilers.",
+        );
+        return;
+      }
+
+      const errLine = await readErr();
+      setModalCtaError(typeof errLine === "string" && errLine.trim() !== "" ? errLine : "Could not unlock spoilers.");
+    } finally {
+      setModalUnlockPending(false);
+    }
+  }
+
+  async function addBookFromGalleryModal(then: "reader" | "stay") {
+    setModalCtaError(null);
+    setAddLibraryPending(true);
+    try {
+      const res = await fetch(`/api/library/${bookId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spoilerProtection: "PROTECTED" }),
+      });
+      const payload = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setModalCtaError(typeof payload.error === "string" ? payload.error : "Could not add to library.");
+        return;
+      }
+      setModalIndex(null);
+      if (then === "reader") router.push(`/reader/${bookId}`);
+      else router.refresh();
+    } finally {
+      setAddLibraryPending(false);
+    }
   }
 
   useEffect(() => {
@@ -279,8 +408,85 @@ export function GalleryBookClient({
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex flex-col gap-3">
             {isLoggedIn && userBookSpoiler !== null ? (
+              showSessionButton ? (
+                sessionUnlock ? null : (
+                  <div className="flex flex-col gap-2 sm:max-w-xl">
+                    <button
+                      type="button"
+                      onClick={() => toggleSessionUnlock()}
+                      className="inline-flex w-fit items-center rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
+                    >
+                      Show everything this session
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPermanentSettingsOpen((o) => !o)}
+                      className="w-fit text-left text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
+                    >
+                      Change permanent setting →
+                    </button>
+                    {permanentSettingsOpen ? (
+                      <SpoilerToggle
+                        bookId={bookId}
+                        currentSetting={spoilerSetting}
+                        globalSetting={globalSpoilerProtection}
+                        onUpdate={(next) => {
+                          setSpoilerSetting(next);
+                          router.refresh();
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                )
+              ) : (
+                <SpoilerToggle
+                  bookId={bookId}
+                  currentSetting={spoilerSetting}
+                  globalSetting={globalSpoilerProtection}
+                  onUpdate={(next) => {
+                    setSpoilerSetting(next);
+                    router.refresh();
+                  }}
+                />
+              )
+            ) : isLoggedIn ? (
+              <p className="max-w-xl text-sm text-text-secondary">
+                Add this book to your library to adjust spoiler settings for this gallery.{" "}
+                <Link href="/discover" className="font-medium text-accent-text underline-offset-2 hover:underline">
+                  Discover books
+                </Link>
+              </p>
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      {sessionUnlock && showSessionButton ? (
+        <div className="mt-6 space-y-4">
+          <div
+            className="rounded-lg border border-warning/45 bg-warning/10 px-4 py-3 text-sm text-text-primary"
+            role="status"
+          >
+            Showing all images this session — your protection setting is unchanged
+          </div>
+          <div className="flex flex-col gap-2 sm:max-w-xl">
+            <button
+              type="button"
+              onClick={() => toggleSessionUnlock()}
+              className="inline-flex w-fit items-center rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
+            >
+              Re-enable protection
+            </button>
+            <button
+              type="button"
+              onClick={() => setPermanentSettingsOpen((o) => !o)}
+              className="w-fit text-left text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
+            >
+              Change permanent setting →
+            </button>
+            {permanentSettingsOpen ? (
               <SpoilerToggle
                 bookId={bookId}
                 currentSetting={spoilerSetting}
@@ -290,34 +496,8 @@ export function GalleryBookClient({
                   router.refresh();
                 }}
               />
-            ) : isLoggedIn ? (
-              <p className="max-w-xl text-sm text-text-secondary">
-                Add this book to your library to adjust spoiler settings for this gallery.{" "}
-                <Link href="/discover" className="font-medium text-accent-text underline-offset-2 hover:underline">
-                  Discover books
-                </Link>
-              </p>
-            ) : null}
-
-            {showSessionButton ? (
-              <button
-                type="button"
-                onClick={() => toggleSessionUnlock()}
-                className="inline-flex items-center rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
-              >
-                {sessionUnlock ? "Restore spoiler protection" : "Show everything this session"}
-              </button>
             ) : null}
           </div>
-        </div>
-      </header>
-
-      {sessionUnlock && showSessionButton ? (
-        <div
-          className="mt-6 rounded-lg border border-warning/45 bg-warning/10 px-4 py-3 text-sm text-text-primary"
-          role="status"
-        >
-          Showing all images this session only — your spoiler protection is unchanged.
         </div>
       ) : null}
 
@@ -327,7 +507,21 @@ export function GalleryBookClient({
         {images.map((image, index) => {
           const locked = displayLocked(image.isLocked);
           const username = image.username?.trim() || "Anonymous reader";
-          const likeDisabled = !canLike || !!likingIds[image.id];
+          const alreadyLiked = image.likedByViewer;
+          const likeDisabled = !canLike || !!likingIds[image.id] || alreadyLiked || locked;
+          const isOwnImage = viewerUserId !== null && viewerUserId === image.userId;
+          const padlockVariant = sessionUnlock
+            ? (viewerUserId !== null && image.userId === viewerUserId ? "aqua" : null)
+            : resolveLibraryPadlockBadge({
+                viewerUserId,
+                isAdmin,
+                globalSpoilerProtection,
+                bookSpoilerSetting: spoilerSetting,
+                imageUserId: image.userId,
+                imageChapter: image.chapterNumberAtTime,
+                currentChapter: currentChapterNumber ?? undefined,
+                locked,
+              });
 
           return (
             <article key={image.id} className="group">
@@ -352,6 +546,9 @@ export function GalleryBookClient({
                     className={`object-cover transition-[filter] duration-200 ${locked ? "blur-[24px]" : "blur-0"}`}
                     sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   />
+                  {!locked && padlockVariant ? (
+                    <GalleryCardCornerBadge kind="library-padlock" variant={padlockVariant} />
+                  ) : null}
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-bg-overlay/90 to-transparent p-3 pt-8 pr-16">
                     <p className="text-xs font-medium text-text-muted">Chapter {image.chapterNumberAtTime}</p>
                     <p className="mt-0.5 text-[11px] text-text-secondary line-clamp-1">{username}</p>
@@ -363,20 +560,42 @@ export function GalleryBookClient({
                     </div>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  disabled={likeDisabled}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void likeImage(image.id);
-                  }}
-                  className="absolute bottom-2 right-2 z-30 inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-primary shadow-sm transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label={`Like ${image.likeCount} times`}
-                >
-                  <HeartIcon className="h-3.5 w-3.5" />
-                  <span>{image.likeCount}</span>
-                </button>
+                {isOwnImage ? (
+                  <span
+                    title="You created this"
+                    className="absolute bottom-2 right-2 z-30 inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
+                  >
+                    <HeartIcon className="h-3.5 w-3.5" />
+                    <span>{image.likeCount}</span>
+                  </span>
+                ) : locked ? (
+                  <span
+                    title={alreadyLiked ? "You liked this — unlock the image to interact" : "Unlock to like"}
+                    className="absolute bottom-2 right-2 z-30 inline-flex cursor-default items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
+                  >
+                    <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500/80" : ""}`} />
+                    <span>{image.likeCount}</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={likeDisabled}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void likeImage(image.id);
+                    }}
+                    className={`absolute bottom-2 right-2 z-30 inline-flex items-center gap-1 rounded-md border bg-bg-surface/90 px-2 py-1 text-xs font-medium shadow-sm transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-50 ${alreadyLiked ? "border-red-500/55 text-red-500" : "border-border/80 text-text-primary"}`}
+                    aria-label={
+                      alreadyLiked
+                        ? `You liked this (${image.likeCount})`
+                        : `Like — ${image.likeCount} likes so far`
+                    }
+                  >
+                    <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500" : ""}`} />
+                    <span>{image.likeCount}</span>
+                  </button>
+                )}
               </div>
             </article>
           );
@@ -444,17 +663,52 @@ export function GalleryBookClient({
                     </div>
                   ) : null}
                   <div className="flex flex-wrap items-center justify-between gap-4">
-                    <button
-                      type="button"
-                      onClick={() => void likeImage(modalImage.id)}
-                      disabled={!canLike || !!likingIds[modalImage.id]}
-                      className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:opacity-60"
-                    >
-                      <HeartIcon className="h-4 w-4" />
-                      <span>{modalImage.likeCount}</span>
-                    </button>
+                    {viewerUserId !== null && modalImage.userId === viewerUserId ? (
+                      <span
+                        title="You created this"
+                        className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
+                      >
+                        <HeartIcon className="h-4 w-4 shrink-0" />
+                        <span>{modalImage.likeCount}</span>
+                      </span>
+                    ) : modalLocked ? (
+                      <span
+                        title={
+                          modalImage.likedByViewer
+                            ? "You liked this — unlock the image to interact"
+                            : "Unlock to like"
+                        }
+                        className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
+                      >
+                        <HeartIcon
+                          filled={modalImage.likedByViewer}
+                          className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500/80" : ""}`}
+                        />
+                        <span>{modalImage.likeCount}</span>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void likeImage(modalImage.id)}
+                        disabled={!canLike || !!likingIds[modalImage.id] || modalImage.likedByViewer}
+                        className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60 ${modalImage.likedByViewer ? "border-red-500/55 text-red-500" : "border-border text-text-primary"}`}
+                        aria-label={
+                          modalImage.likedByViewer
+                            ? `You liked this (${modalImage.likeCount})`
+                            : "Like this image"
+                        }
+                      >
+                        <HeartIcon filled={modalImage.likedByViewer} className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500" : ""}`} />
+                        <span>{modalImage.likeCount}</span>
+                      </button>
+                    )}
                     <div className="text-sm text-text-muted">
                       <span>{modalImage.username?.trim() || "Anonymous reader"}</span>
+                      {viewerUserId !== null && modalImage.userId === viewerUserId ? (
+                        <span className="ml-2 inline-flex rounded-full border border-border bg-bg-base px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                          Your image
+                        </span>
+                      ) : null}
                       <span className="mx-2 text-text-secondary/80" aria-hidden>
                         •
                       </span>
@@ -463,27 +717,61 @@ export function GalleryBookClient({
                   </div>
                   {modalLocked ? (
                     <div className="space-y-3 rounded-lg border border-border/90 bg-bg-base/60 p-3">
-                      {chapterGap ? (
+                      {modalCtaError ? <p className="text-sm text-error">{modalCtaError}</p> : null}
+                      {!isLoggedIn ? (
                         <p className="text-sm text-text-secondary">
-                          You&apos;re {chapterGap} {chapterGap === 1 ? "chapter" : "chapters"} away
+                          Sign in to track reading progress and unlock gallery images tied to your library books.
                         </p>
+                      ) : isLoggedIn && !isAdmin && !bookInLibrary ? (
+                        <>
+                          <p className="text-sm text-text-secondary">
+                            Add this book to your library to track your progress
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              disabled={addLibraryPending}
+                              onClick={() => void addBookFromGalleryModal("reader")}
+                              className="inline-flex items-center rounded-md border border-accent/40 bg-accent-muted px-3 py-2 text-sm font-semibold text-text-primary ring-1 ring-accent/45 transition hover:bg-accent-hover/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Add to Library &amp; Start Reading
+                            </button>
+                            <button
+                              type="button"
+                              disabled={addLibraryPending}
+                              onClick={() => void addBookFromGalleryModal("stay")}
+                              className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline disabled:opacity-50"
+                            >
+                              Add to Library only
+                            </button>
+                          </div>
+                        </>
+                      ) : isLoggedIn && bookInLibrary ? (
+                        <>
+                          {chapterGap ? (
+                            <p className="text-sm text-text-secondary">
+                              You&apos;re {chapterGap} {chapterGap === 1 ? "chapter" : "chapters"} away
+                            </p>
+                          ) : null}
+                          <div className="flex flex-wrap items-center gap-3">
+                            <button
+                              type="button"
+                              disabled={modalUnlockPending}
+                              onClick={() => void unlockBookSpoilers()}
+                              className="inline-flex items-center rounded-md border border-success/35 bg-success/10 px-3 py-2 text-sm font-semibold text-success transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Unlock all {modalImage.bookTitle} images
+                            </button>
+                            <Link
+                              href={`/reader/${modalImage.bookId}`}
+                              onClick={() => setModalIndex(null)}
+                              className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
+                            >
+                              Continue reading →
+                            </Link>
+                          </div>
+                        </>
                       ) : null}
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => void unlockBookSpoilers()}
-                          className="inline-flex items-center rounded-md border border-success/35 bg-success/10 px-3 py-2 text-sm font-semibold text-success transition hover:brightness-110 active:scale-95"
-                        >
-                          Unlock all {modalImage.bookTitle} images
-                        </button>
-                        <Link
-                          href={`/reader/${modalImage.bookId}`}
-                          onClick={() => setModalIndex(null)}
-                          className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
-                        >
-                          Continue reading →
-                        </Link>
-                      </div>
                     </div>
                   ) : null}
                   <div className="border-t border-border/80 pt-3">
@@ -491,7 +779,7 @@ export function GalleryBookClient({
                       <span className="text-sm text-text-muted">
                         You&apos;re viewing this book&apos;s gallery — scroll up to browse all images.
                       </span>
-                      {isLoggedIn && userBookSpoiler !== null ? (
+                      {isLoggedIn && userBookSpoiler !== null && !modalLocked ? (
                         <SpoilerToggle
                           bookId={bookId}
                           currentSetting={spoilerSetting}

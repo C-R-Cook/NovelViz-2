@@ -135,20 +135,31 @@ export function DashboardClient({ role, reader, partner, admin }: DashboardClien
       </h1>
 
       <div className="mt-8 flex flex-wrap gap-1 border-b border-border">
-        <button type="button" className={`${tabBase} ${tab === "reader" ? tabActive : tabInactive}`} onClick={() => setTab("reader")}>
+        <button
+          type="button"
+          className={`${tabBase} ${tab === "reader" ? tabActive : tabInactive}`}
+          data-active-tab={tab === "reader" ? "true" : undefined}
+          onClick={() => setTab("reader")}
+        >
           Reader
         </button>
         {showPartnerTab ? (
           <button
             type="button"
             className={`${tabBase} ${tab === "partner" ? tabActive : tabInactive}`}
+            data-active-tab={tab === "partner" ? "true" : undefined}
             onClick={() => setTab("partner")}
           >
             Partner
           </button>
         ) : null}
         {showAdminTab ? (
-          <button type="button" className={`${tabBase} ${tab === "admin" ? tabActive : tabInactive}`} onClick={() => setTab("admin")}>
+          <button
+            type="button"
+            className={`${tabBase} ${tab === "admin" ? tabActive : tabInactive}`}
+            data-active-tab={tab === "admin" ? "true" : undefined}
+            onClick={() => setTab("admin")}
+          >
             Admin
           </button>
         ) : null}

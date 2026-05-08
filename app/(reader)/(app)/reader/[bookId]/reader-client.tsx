@@ -737,30 +737,9 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     timeStyle: "short",
                   })}
                 </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    void setImagePublicState(
-                      selectedHistoryImage.id,
-                      !selectedHistoryImage.isPublic,
-                    )
-                  }
-                  disabled={
-                    !!shareUpdatingIds[selectedHistoryImage.id] ||
-                    selectedHistoryImage.id.startsWith("temp-")
-                  }
-                  className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                    selectedHistoryImage.isPublic
-                      ? "border-success/30 bg-success/10 text-success"
-                      : "border-border bg-bg-surface text-text-secondary"
-                  }`}
-                >
-                  {shareUpdatingIds[selectedHistoryImage.id]
-                    ? "Saving…"
-                    : selectedHistoryImage.isPublic
-                      ? "Public"
-                      : "Private"}
-                </button>
+                <span className="inline-flex rounded-full border border-border bg-bg-base px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+                  Your image
+                </span>
               </div>
               <button
                 type="button"
@@ -784,6 +763,44 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
 
             <div className="mt-3 shrink-0">
               <div className="space-y-4">
+                {!selectedHistoryImage.isPublic ? (
+                  <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={() => void setImagePublicState(selectedHistoryImage.id, true)}
+                      disabled={
+                        !!shareUpdatingIds[selectedHistoryImage.id] ||
+                        selectedHistoryImage.id.startsWith("temp-")
+                      }
+                      className="rounded-md border border-accent/35 bg-accent-muted px-3 py-1.5 text-xs font-semibold text-text-primary transition hover:bg-accent-hover/90 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {shareUpdatingIds[selectedHistoryImage.id] ? "Saving…" : "Make public"}
+                    </button>
+                    <p className="mt-1 text-xs text-text-secondary">
+                      Share this image with the NovelViz community
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs font-medium text-success">
+                    Public
+                  </div>
+                )}
+
+                <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImgPrompt(selectedHistoryImage.userPrompt);
+                      setActiveAiTab("imagine");
+                      setSelectedHistoryImage(null);
+                      // TODO: reuse additional generation settings when more options are added
+                    }}
+                    className="rounded-md border border-border bg-bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-bg-raised"
+                  >
+                    Reuse settings
+                  </button>
+                </div>
+
                 <details className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
                   <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted sm:text-[11px]">

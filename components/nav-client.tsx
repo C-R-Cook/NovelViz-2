@@ -207,8 +207,8 @@ export function NavChrome({
     "shrink-0 rounded-md px-3 py-1.5 text-sm font-medium text-accent-text/95 transition hover:text-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
 
   return (
-    <header className="relative z-[100] border-b border-border bg-bg-base/95 shadow-lg shadow-bg-overlay backdrop-blur-md">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <header className="fixed inset-x-0 top-0 z-[100] border-b border-border bg-bg-base/95 shadow-lg shadow-bg-overlay backdrop-blur-md">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link
             href="/"
@@ -268,7 +268,7 @@ export function NavChrome({
       {menuOpen ? (
         <div
           id="mobile-nav-menu"
-          className="border-t border-border bg-bg-base/98 px-4 py-4 md:hidden"
+          className="absolute left-0 right-0 top-full max-h-[min(70vh,calc(100dvh-3.75rem))] overflow-y-auto border-t border-border bg-bg-base/98 px-4 py-4 shadow-lg backdrop-blur-md md:hidden"
         >
           <nav className="flex flex-col gap-1" aria-label="Main mobile">
             {links}

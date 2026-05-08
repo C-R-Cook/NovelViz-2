@@ -166,6 +166,7 @@ model User {
   readingProgress ReadingProgress[]
   queries         Query[]
   generatedImages GeneratedImage[]
+  likes           Like[]
   bookRequests    BookRequest[]
 
   createdAt DateTime @default(now())
@@ -248,13 +249,28 @@ model GeneratedImage {
   embeddingTokens     Int?
   subjectTokens         Int?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book Book @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book  Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  likes Like[]
 
   createdAt DateTime @default(now())
 
   @@index([userId, bookId])
   @@index([isPublic])
+}
+
+model Like {
+  id      String @id @default(cuid())
+  userId  String
+  imageId String
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image GeneratedImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([imageId])
+  @@unique([userId, imageId])
 }
 
 model BookRequest {

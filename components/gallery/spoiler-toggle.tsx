@@ -35,26 +35,18 @@ export function SpoilerToggle({ bookId, currentSetting, globalSetting, onUpdate 
   const effectiveHidden = currentSetting === "PROTECTED" || (currentSetting === "INHERIT" && globalSetting);
 
   let pillClass =
-    "inline-flex cursor-pointer flex-col items-start gap-0.5 rounded-full border px-3 py-1.5 text-left text-xs font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
-  let title: string;
-  let sub: string | null = null;
+    "inline-flex cursor-pointer items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50";
+  const title = effectiveHidden ? "Show everything" : "Hide spoilers";
 
-  if (currentSetting === "UNLOCKED") {
-    pillClass += " border-success/35 bg-success/10 text-success";
-    title = "Showing everything";
-  } else if (currentSetting === "PROTECTED") {
+  if (effectiveHidden) {
     pillClass += " border-error/35 bg-error/10 text-error";
-    title = "Spoilers hidden";
   } else {
-    pillClass += " border-border bg-bg-base/80 text-text-secondary";
-    title = "Following global setting";
-    sub = effectiveHidden ? "Effective: spoilers hidden" : "Effective: showing everything";
+    pillClass += " border-success/35 bg-success/10 text-success";
   }
 
   return (
     <button type="button" className={pillClass} disabled={pending} onClick={() => void cycle()} aria-busy={pending}>
-      <span>{title}</span>
-      {sub ? <span className="max-w-[14rem] text-[10px] font-normal leading-tight text-text-muted">{sub}</span> : null}
+      {title}
     </button>
   );
 }

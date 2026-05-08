@@ -16,6 +16,7 @@ type GeneratedImageForGallery = {
   createdAt: Date;
   likeCount: number;
   bookId: string;
+  userId: string;
   book: { title: string; author: string };
   user: { username: string | null; name: string | null };
 };
@@ -28,6 +29,7 @@ const baseSelect = {
   createdAt: true,
   likeCount: true,
   bookId: true,
+  userId: true,
   book: {
     select: {
       title: true,
@@ -42,7 +44,10 @@ const baseSelect = {
   },
 };
 
-function baseFields(image: GeneratedImageForGallery): Omit<GalleryImageCard, "isLocked" | "lockKind"> {
+function baseFields(
+  image: GeneratedImageForGallery,
+  likedByViewer: boolean,
+): Omit<GalleryImageCard, "isLocked" | "lockKind"> {
   return {
     id: image.id,
     imageUrl: image.imageUrl,
@@ -50,16 +55,18 @@ function baseFields(image: GeneratedImageForGallery): Omit<GalleryImageCard, "is
     chapterNumberAtTime: image.chapterNumberAtTime,
     createdAt: image.createdAt.toISOString(),
     likeCount: image.likeCount,
+    likedByViewer,
     bookId: image.bookId,
     bookTitle: image.book.title,
     bookAuthor: image.book.author,
     userName: image.user.username ?? image.user.name ?? null,
+    userId: image.userId,
   };
 }
 
 function toGuestFeaturedCard(image: GeneratedImageForGallery): GalleryImageCard {
   return {
-    ...baseFields(image),
+    ...baseFields(image, false),
     isLocked: false,
     lockKind: "none",
   };
@@ -67,7 +74,7 @@ function toGuestFeaturedCard(image: GeneratedImageForGallery): GalleryImageCard 
 
 function toGuestBlurCard(image: GeneratedImageForGallery): GalleryImageCard {
   return {
-    ...baseFields(image),
+    ...baseFields(image, false),
     isLocked: true,
     lockKind: "guest_blur",
   };
@@ -100,6 +107,16 @@ function memberLock(
   }
 
   return { isLocked: true, lockKind };
+}
+
+async function viewerLikedIdSet(userId: string, imageIds: string[]) {
+  const unique = [...new Set(imageIds)];
+  if (unique.length === 0) return new Set<string>();
+  const rows = await prisma.like.findMany({
+    where: { userId, imageId: { in: unique } },
+    select: { imageId: true },
+  });
+  return new Set(rows.map((r) => r.imageId));
 }
 
 export default async function GalleryPage() {
@@ -137,6 +154,7 @@ export default async function GalleryPage() {
         layout="guest"
         latestFeatured={latest.map(toGuestFeaturedCard)}
         libraryBlur={blur.map(toGuestBlurCard)}
+        viewerUserId={null}
       />
     );
   }
@@ -180,8 +198,12 @@ export default async function GalleryPage() {
 
   if (userLibraryBookIds.length === 0) {
     const featured = await featuredPromise;
+    const likedIds = await viewerLikedIdSet(
+      session.id,
+      featured.map((i) => i.id),
+    );
     const featuredCards = featured.map((img) => ({
-      ...baseFields(img),
+      ...baseFields(img, likedIds.has(img.id)),
       currentChapterNumber: progressByBookId.get(img.bookId),
       spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
       ...memberLock(img, lockCtx),
@@ -191,7 +213,9 @@ export default async function GalleryPage() {
       <GalleryClient
         layout="member"
         isAdmin={!!isAdmin}
+        viewerUserId={session.id}
         globalSpoilerProtection={globalSpoilerProtection}
+        libraryBookIds={userLibraryBookIds}
         library={{ kind: "no_books" }}
         featured={featuredCards}
         spoilerSettingsByBookId={spoilerSettingsByBookId}
@@ -209,15 +233,20 @@ export default async function GalleryPage() {
     featuredPromise,
   ]);
 
+  const likedIds = await viewerLikedIdSet(session.id, [
+    ...libraryRows.map((i) => i.id),
+    ...featured.map((i) => i.id),
+  ]);
+
   const libraryCards = libraryRows.map((img) => ({
-    ...baseFields(img),
+    ...baseFields(img, likedIds.has(img.id)),
     currentChapterNumber: progressByBookId.get(img.bookId),
     spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
     ...memberLock(img, lockCtx),
   }));
 
   const featuredCards = featured.map((img) => ({
-    ...baseFields(img),
+    ...baseFields(img, likedIds.has(img.id)),
     currentChapterNumber: progressByBookId.get(img.bookId),
     spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
     ...memberLock(img, lockCtx),
@@ -227,7 +256,9 @@ export default async function GalleryPage() {
     <GalleryClient
       layout="member"
       isAdmin={!!isAdmin}
+      viewerUserId={session.id}
       globalSpoilerProtection={globalSpoilerProtection}
+      libraryBookIds={userLibraryBookIds}
       library={libraryRows.length === 0 ? { kind: "no_images" } : { kind: "images", images: libraryCards }}
       featured={featuredCards}
       spoilerSettingsByBookId={spoilerSettingsByBookId}

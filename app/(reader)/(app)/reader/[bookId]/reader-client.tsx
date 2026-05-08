@@ -1,9 +1,13 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight } from "lucide-react";
+import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
+import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 
 export type ReaderBook = {
   id: string;
@@ -133,6 +137,8 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [imageHistoryError, setImageHistoryError] = useState<string | null>(null);
   const [imageHistoryInitialized, setImageHistoryInitialized] = useState(false);
   const [selectedHistoryImage, setSelectedHistoryImage] = useState<ImageHistoryItem | null>(null);
+  const [historySwipeDir, setHistorySwipeDir] = useState<-1 | 0 | 1>(0);
+  const [historySwipeBusy, setHistorySwipeBusy] = useState(false);
   const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
   const [promptCopied, setPromptCopied] = useState<PromptCopyKind | null>(null);
   const promptCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -281,6 +287,12 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     setImageHistoryInitialized(false);
   }, [book.id]);
 
+  const openHistoryImageModal = useCallback((item: ImageHistoryItem) => {
+    setHistorySwipeDir(0);
+    setHistorySwipeBusy(false);
+    setSelectedHistoryImage(item);
+  }, []);
+
   const submitImage = useCallback(async () => {
     const trimmed = imgPrompt.trim();
     if (!trimmed) return;
@@ -304,13 +316,13 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       }
       if (data.image && typeof data.image.id === "string") {
         const item = data.image as ImageHistoryItem;
-        setSelectedHistoryImage(item);
+        openHistoryImageModal(item);
         setImgPrompt("");
         setImageHistory((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
         void loadImageHistory();
       } else if (typeof data.imageUrl === "string") {
         const fullPrompt = typeof data.fullPrompt === "string" ? data.fullPrompt : "";
-        setSelectedHistoryImage({
+        openHistoryImageModal({
           id: `temp-${Date.now()}`,
           userPrompt: trimmed,
           fullPrompt,
@@ -329,7 +341,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     } finally {
       setImgLoading(false);
     }
-  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber]);
+  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber, openHistoryImageModal]);
 
   const setImagePublicState = useCallback(
     async (imageId: string, isPublic: boolean) => {
@@ -390,18 +402,57 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     [imageHistory, selectedHistoryImage, shareUpdatingIds],
   );
 
+  const readerHistoryModalIndex = useMemo(() => {
+    if (!selectedHistoryImage || imageHistory.length === 0) return -1;
+    return imageHistory.findIndex((img) => img.id === selectedHistoryImage.id);
+  }, [selectedHistoryImage, imageHistory]);
+
+  const dismissHistoryImageModal = useCallback(() => {
+    setSelectedHistoryImage(null);
+    setHistorySwipeDir(0);
+    setHistorySwipeBusy(false);
+  }, []);
+
+  const bumpHistoryImageModal = useCallback(
+    (delta: number) => {
+      if (!selectedHistoryImage || historySwipeBusy || imageHistory.length <= 1) return;
+      const i = imageHistory.findIndex((img) => img.id === selectedHistoryImage.id);
+      if (i < 0) return;
+      const next = i + delta;
+      if (next < 0 || next >= imageHistory.length) return;
+      const item = imageHistory[next];
+      if (!item) return;
+      setHistorySwipeDir(delta > 0 ? 1 : -1);
+      setSelectedHistoryImage(item);
+    },
+    [selectedHistoryImage, imageHistory, historySwipeBusy],
+  );
+
   useEffect(() => {
     if (!selectedHistoryImage) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setSelectedHistoryImage(null);
+        dismissHistoryImageModal();
+        return;
       }
+      if (imageHistory.length <= 1) return;
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      if (historySwipeBusy) return;
+      const delta = event.key === "ArrowRight" ? 1 : -1;
+      bumpHistoryImageModal(delta);
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedHistoryImage]);
+  }, [
+    selectedHistoryImage,
+    imageHistory,
+    historySwipeBusy,
+    dismissHistoryImageModal,
+    bumpHistoryImageModal,
+  ]);
 
   useEffect(() => {
     setPromptCopied(null);
@@ -444,6 +495,12 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
           </span>
           <p className="min-w-0 text-sm text-text-secondary">{book.author}</p>
         </div>
+        <Link
+          href={`/gallery/${book.id}?from=reader`}
+          className="inline-flex text-xs font-medium text-accent-text/90 underline-offset-2 transition hover:text-accent-text hover:underline sm:text-sm"
+        >
+          See all {book.title} images →
+        </Link>
 
       </header>
 
@@ -641,7 +698,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     >
                       <button
                         type="button"
-                        onClick={() => setSelectedHistoryImage(item)}
+                        onClick={() => openHistoryImageModal(item)}
                         className="w-full text-left"
                         aria-label={`Open generated image for prompt: ${item.userPrompt}`}
                       >
@@ -666,17 +723,17 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                             type="button"
                             onClick={() => void setImagePublicState(item.id, !item.isPublic)}
                             disabled={!!shareUpdatingIds[item.id] || item.id.startsWith("temp-")}
-                            className={`rounded-md border px-2 py-1 text-[10px] font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                            className={`inline-flex items-center justify-center rounded-md border px-2.5 py-1 text-[10px] font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                               item.isPublic
-                                ? "border-success/30 bg-success/10 text-success"
-                                : "border-border bg-bg-surface text-text-secondary"
+                                ? "border-error/35 bg-error/10 text-error"
+                                : "border-success/35 bg-success/10 text-success"
                             }`}
                           >
                             {shareUpdatingIds[item.id]
                               ? "Saving…"
                               : item.isPublic
-                                ? "Public"
-                                : "Private"}
+                                ? "Make private"
+                                : "Make public"}
                           </button>
                         </div>
                       </div>
@@ -722,7 +779,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
           role="dialog"
           aria-modal="true"
           aria-label="Generated image details"
-          onClick={() => setSelectedHistoryImage(null)}
+          onClick={() => dismissHistoryImageModal()}
         >
           <div
             className="flex h-[min(92vh,48rem)] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface p-3 shadow-2xl sm:p-4"
@@ -743,48 +800,68 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedHistoryImage(null)}
+                onClick={() => dismissHistoryImageModal()}
                 className="rounded-md px-2 py-1 text-[11px] font-medium text-text-muted hover:bg-bg-surface sm:text-xs"
               >
                 Close
               </button>
             </div>
 
-            <div className="min-h-0 flex-1">
-              <Image
-                src={selectedHistoryImage.imageUrl}
-                alt={selectedHistoryImage.userPrompt}
-                width={1200}
-                height={900}
-                unoptimized
-                className="h-full w-full rounded-lg border border-border object-contain"
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <ModalImageSwipeView
+                slide={{
+                  id: selectedHistoryImage.id,
+                  imageUrl: selectedHistoryImage.imageUrl,
+                  userPrompt: selectedHistoryImage.userPrompt,
+                  locked: false,
+                }}
+                direction={historySwipeDir}
+                onDirectionConsumed={() => setHistorySwipeDir(0)}
+                onAnimatingChange={setHistorySwipeBusy}
+                sizes="(max-width: 768px) 100vw, min(896px, 100vw)"
+              />
+              <ModalImageNavArrows
+                show={imageHistory.length > 1}
+                canPrev={readerHistoryModalIndex > 0 && !historySwipeBusy}
+                canNext={
+                  readerHistoryModalIndex >= 0 &&
+                  readerHistoryModalIndex < imageHistory.length - 1 &&
+                  !historySwipeBusy
+                }
+                onPrev={() => bumpHistoryImageModal(-1)}
+                onNext={() => bumpHistoryImageModal(1)}
               />
             </div>
 
             <div className="mt-3 shrink-0">
               <div className="space-y-4">
-                {!selectedHistoryImage.isPublic ? (
-                  <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => void setImagePublicState(selectedHistoryImage.id, true)}
-                      disabled={
-                        !!shareUpdatingIds[selectedHistoryImage.id] ||
-                        selectedHistoryImage.id.startsWith("temp-")
-                      }
-                      className="rounded-md border border-accent/35 bg-accent-muted px-3 py-1.5 text-xs font-semibold text-text-primary transition hover:bg-accent-hover/90 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {shareUpdatingIds[selectedHistoryImage.id] ? "Saving…" : "Make public"}
-                    </button>
-                    <p className="mt-1 text-xs text-text-secondary">
-                      Share this image with the NovelViz community
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-xs font-medium text-success">
-                    Public
-                  </div>
-                )}
+                <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
+                  <button
+                    type="button"
+                    onClick={() => void setImagePublicState(selectedHistoryImage.id, !selectedHistoryImage.isPublic)}
+                    disabled={
+                      !!shareUpdatingIds[selectedHistoryImage.id] ||
+                      selectedHistoryImage.id.startsWith("temp-")
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      selectedHistoryImage.isPublic
+                        ? "border-error/35 bg-error/10 text-error"
+                        : "border-success/35 bg-success/10 text-success"
+                    }`}
+                  >
+                    {shareUpdatingIds[selectedHistoryImage.id]
+                      ? "Saving…"
+                      : selectedHistoryImage.isPublic
+                        ? "Make private"
+                        : "Make public"}
+                    <ArrowRight className="h-3 w-3" aria-hidden />
+                  </button>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    {selectedHistoryImage.isPublic
+                      ? "This image is currently visible in the community gallery."
+                      : "Share this image with the NovelViz community."}
+                  </p>
+                </div>
 
                 <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
                   <button
@@ -792,7 +869,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
                     onClick={() => {
                       setImgPrompt(selectedHistoryImage.userPrompt);
                       setActiveAiTab("imagine");
-                      setSelectedHistoryImage(null);
+                      dismissHistoryImageModal();
                       // TODO: reuse additional generation settings when more options are added
                     }}
                     className="rounded-md border border-border bg-bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-bg-raised"

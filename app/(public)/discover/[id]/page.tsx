@@ -53,6 +53,9 @@ export default async function DiscoverBookDetailPage({ params }: PageProps) {
   }
 
   const chapterCount = book._count.chapters;
+  const publicImageCount = await prisma.generatedImage.count({
+    where: { bookId: book.id, isPublic: true },
+  });
 
   const session = await getCurrentUser();
   let initialInLibrary = false;
@@ -163,6 +166,14 @@ export default async function DiscoverBookDetailPage({ params }: PageProps) {
                 className="inline-flex w-fit rounded-md border border-accent/35 bg-accent-muted px-3 py-2 text-xs font-medium text-text-primary transition hover:border-accent/70 hover:bg-accent-hover/90 sm:px-4 sm:text-sm"
               >
                 {readerCta === "continue" ? "Continue Reading" : "Start Reading"}
+              </Link>
+            ) : null}
+            {publicImageCount > 0 ? (
+              <Link
+                href={`/gallery/${book.id}`}
+                className="inline-flex w-fit rounded-md border border-accent/35 bg-accent-muted px-3 py-2 text-xs font-medium text-text-primary transition hover:border-accent/70 hover:bg-accent-hover/90 sm:px-4 sm:text-sm"
+              >
+                View community images ({publicImageCount} {publicImageCount === 1 ? "image" : "images"}) →
               </Link>
             ) : null}
           </div>

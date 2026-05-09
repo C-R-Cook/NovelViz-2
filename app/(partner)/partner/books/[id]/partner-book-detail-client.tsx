@@ -1,6 +1,7 @@
 "use client";
 
 import { ChapterManagerClient } from "@/app/admin/books/[id]/chapter-manager-client";
+import { EpubMetadataToggle } from "@/components/epub-metadata-toggle";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type { BookGenre, BookStatus, ListingPreferenceAfterReview } from "@db";
@@ -23,6 +24,16 @@ export type PartnerBookDetailModel = {
 };
 
 type TabKey = "details" | "chapters";
+
+function partnerBookHasFilledMetadata(book: PartnerBookDetailModel): boolean {
+  const t = book.title.trim() !== "";
+  const a = book.author.trim() !== "";
+  if (!t || !a) return false;
+  const hasGenre = book.genre != null;
+  const hasYear = book.publishedYear != null;
+  const desc = book.description?.trim() ?? "";
+  return hasGenre || hasYear || desc !== "";
+}
 
 function statusActionChipClass(status: BookStatus): string {
   const base =
@@ -86,6 +97,9 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [ingestBusy, setIngestBusy] = useState(false);
   const [ingestErr, setIngestErr] = useState<string | null>(null);
+  const [applyEpubMetadata, setApplyEpubMetadata] = useState(
+    () => !partnerBookHasFilledMetadata(initial),
+  );
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusErr, setStatusErr] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -199,6 +213,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     try {
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("applyEpubMetadata", applyEpubMetadata ? "true" : "false");
       const res = await fetch(`/api/admin/books/${book.id}/ingest`, {
         method: "POST",
         body: fd,
@@ -444,6 +459,15 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             </svg>
           </button>
           </div>
+        </div>
+        <div className="px-3">
+          <EpubMetadataToggle
+            unlocked={applyEpubMetadata}
+            onChange={setApplyEpubMetadata}
+            disabled={ingestBusy}
+            id="partner-book-ingest-metadata-toggle"
+          />
+          <p className="mt-2 text-[11px] text-text-muted">Applies when the uploaded file is an EPUB archive.</p>
         </div>
         {book.status === "draft" ? (
           <fieldset className="space-y-2 rounded-lg border border-border bg-bg-surface/70 px-3 py-2.5">

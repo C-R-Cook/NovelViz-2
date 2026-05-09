@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 import { AdminBookDetailClient } from "./admin-book-detail-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -47,7 +48,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-8">
       <Link
-        href="/admin/books"
+        href="/dashboard?tab=all-books"
         className="inline-flex text-sm font-medium text-text-secondary transition hover:text-accent-text/90"
       >
         ← Back to books

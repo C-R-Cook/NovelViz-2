@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 "use client";
 
 import type { BookStatus } from "@db";

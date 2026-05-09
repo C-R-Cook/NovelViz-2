@@ -8,6 +8,7 @@ import {
   openEpubPackage,
   processBook,
 } from "@/lib/ingestion";
+import { fetchOpenLibraryMetadata } from "@/lib/open-library";
 import { prisma } from "@/lib/prisma";
 import type { BookStatus } from "@db";
 import { Prisma } from "@db";
@@ -284,6 +285,58 @@ export async function POST(request: NextRequest, context: RouteContext) {
       },
       CHUNK_TX,
     );
+
+    // Open Library enrichment — non-blocking, failure safe.
+    // Runs after ingestion transaction commits so ingestion success is unaffected.
+    const latestBookForEnrichment = await prisma.book.findFirst({
+      where: { id: bookId, deletedAt: null },
+      select: {
+        id: true,
+        title: true,
+        author: true,
+        description: true,
+        publishedYear: true,
+      },
+    });
+    if (latestBookForEnrichment) {
+      try {
+        const olMetadata = await fetchOpenLibraryMetadata(
+          latestBookForEnrichment.title,
+          latestBookForEnrichment.author,
+        );
+
+        const updateData: Prisma.BookUpdateInput = {
+          openLibraryKey: olMetadata.openLibraryKey,
+        };
+
+        if (
+          olMetadata.description &&
+          (!latestBookForEnrichment.description ||
+            latestBookForEnrichment.description.trim() === "")
+        ) {
+          updateData.description = olMetadata.description;
+        }
+
+        if (olMetadata.firstPublishYear && !latestBookForEnrichment.publishedYear) {
+          updateData.publishedYear = olMetadata.firstPublishYear;
+        }
+
+        await prisma.book.update({
+          where: { id: latestBookForEnrichment.id },
+          data: updateData,
+        });
+        console.log(
+          `[ingest] Open Library enrichment applied for "${latestBookForEnrichment.title}":`,
+          {
+            description: Boolean(olMetadata.description),
+            year: olMetadata.firstPublishYear,
+            key: olMetadata.openLibraryKey,
+          },
+        );
+      } catch (e) {
+        console.error("[ingest] Open Library enrichment failed (non-fatal)", e);
+      }
+    }
 
     const updated = await prisma.book.findFirst({ where: { id: bookId, deletedAt: null } });
     return NextResponse.json({

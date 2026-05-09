@@ -4,7 +4,7 @@ import {
   DASHBOARD_ADMIN_BOOKS_LIMIT,
   queryAdminBooksPage,
 } from "@/lib/admin-books-list";
-import { fetchAdminPlatformStats } from "@/lib/admin-platform-stats";
+import { getAdminStatsPayload, normalizeVendorWindowDays } from "@/lib/admin-stats";
 import { parseDashboardTab, type DashboardUserRole } from "@/lib/dashboard-tab";
 import { fetchPartnerAnalytics } from "@/lib/partner-analytics";
 import {
@@ -30,7 +30,7 @@ function DashboardLoadingFallback() {
 }
 
 type DashboardPageProps = {
-  searchParams?: Promise<{ tab?: string | string[] }>;
+  searchParams?: Promise<{ tab?: string | string[]; vendorDays?: string | string[] }>;
 };
 
 function toDashboardUserRole(r: UserRole): DashboardUserRole {
@@ -47,6 +47,13 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
 
   const sp = searchParams ? await searchParams : {};
   const rawTabSingle = typeof sp?.tab === "string" ? sp.tab : Array.isArray(sp?.tab) ? sp.tab[0] : undefined;
+  const rawVendorDaysSingle =
+    typeof sp?.vendorDays === "string"
+      ? sp.vendorDays
+      : Array.isArray(sp?.vendorDays)
+        ? sp.vendorDays[0]
+        : undefined;
+  const vendorWindowDays = normalizeVendorWindowDays(rawVendorDaysSingle);
 
   const dbUser = await prisma.user.findUnique({
     where: { id: session.id },
@@ -146,7 +153,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
     pageSize: number;
   } | null = null;
 
-  let adminPlatformStats: Awaited<ReturnType<typeof fetchAdminPlatformStats>> | null = null;
+  let adminStats: Awaited<ReturnType<typeof getAdminStatsPayload>> | null = null;
 
   if (role === UserRole.admin) {
     const [
@@ -156,7 +163,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       pendingReviewCount,
       bookRequestTitleRows,
       allBooksFirstPage,
-      platformStats,
+      statsPayload,
     ] = await Promise.all([
       prisma.book.findMany({
         where: { status: "pending_review", deletedAt: null },
@@ -181,7 +188,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         sort: "createdAt",
         dir: "desc",
       }),
-      fetchAdminPlatformStats(),
+      getAdminStatsPayload(vendorWindowDays),
     ]);
 
     const titleCount = new Map<string, number>();
@@ -205,7 +212,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       initialHasMore: allBooksFirstPage.hasMore,
       pageSize: DASHBOARD_ADMIN_BOOKS_LIMIT,
     };
-    adminPlatformStats = platformStats;
+    adminStats = statsPayload;
   }
 
   return (
@@ -244,7 +251,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       partner={partnerPayload}
       admin={adminPayload}
       adminBooksAll={adminBooksAll}
-      adminPlatformStats={adminPlatformStats}
+      adminStats={adminStats}
     />
   );
 }

@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 import Link from "next/link";
 
 export const metadata = {
@@ -13,10 +14,10 @@ export default function AdminStatsPlaceholderPage() {
         list for operational insight.
       </p>
       <Link
-        href="/dashboard"
+        href="/dashboard?tab=admin-stats"
         className="mt-8 inline-flex text-sm font-medium text-accent-text underline-offset-2 hover:underline"
       >
-        ← Back to dashboard
+        ← Open dashboard (Admin Stats)
       </Link>
     </div>
   );

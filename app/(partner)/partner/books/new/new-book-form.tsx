@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { EpubMetadataToggle } from "@/components/epub-metadata-toggle";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import type { BookGenre } from "@db";
 
@@ -14,7 +15,7 @@ export function NewPartnerBookForm() {
   const [publishedYear, setPublishedYear] = useState("");
   const [description, setDescription] = useState("");
   const [ingestFile, setIngestFile] = useState<File | null>(null);
-  const [applyEpubMetadata, setApplyEpubMetadata] = useState(false);
+  const [applyEpubMetadata, setApplyEpubMetadata] = useState(true);
   const [extractingMetadata, setExtractingMetadata] = useState(false);
   const [metadataErr, setMetadataErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -234,18 +235,13 @@ export function NewPartnerBookForm() {
             {ingestFile ? ingestFile.name : "No file selected"}
           </span>
         </div>
-        <label className="flex items-start gap-2 text-xs text-text-secondary">
-          <input
-            type="checkbox"
-            checked={applyEpubMetadata}
-            onChange={(e) => setApplyEpubMetadata(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 rounded border-border text-accent-text focus:ring-accent/30"
-          />
-          <span>
-            Fill title/author/description/genre/published year from EPUB metadata
-            (ignored for .txt)
-          </span>
-        </label>
+        <EpubMetadataToggle
+          unlocked={applyEpubMetadata}
+          onChange={setApplyEpubMetadata}
+          disabled={extractingMetadata}
+          id="new-book-epub-metadata-toggle"
+        />
+        <p className="text-[11px] text-text-muted">Metadata from EPUB is ignored for plain .txt uploads.</p>
         {extractingMetadata ? (
           <p className="text-xs text-text-secondary">
             Reading EPUB metadata...

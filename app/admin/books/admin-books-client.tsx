@@ -1,6 +1,12 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 "use client";
 
-import type { AdminBooksFilterKey, AdminBookRow } from "@/lib/admin-books-list";
+import type {
+  AdminBookRow,
+  AdminBooksFilterKey,
+  AdminBooksSortDirection,
+  AdminBooksSortField,
+} from "@/lib/admin-books-list";
 import type { BookStatus } from "@db";
 import Image from "next/image";
 import Link from "next/link";
@@ -122,14 +128,22 @@ export function AdminBooksClient({
   initialFilter,
   initialHasMore,
   pageSize,
+  initialSort = "createdAt",
+  initialSortDir = "desc",
+  variant = "page",
 }: {
   initialBooks: AdminBookRow[];
   initialFilter: FilterKey;
   initialHasMore: boolean;
   pageSize: number;
+  initialSort?: AdminBooksSortField;
+  initialSortDir?: AdminBooksSortDirection;
+  variant?: "page" | "embedded";
 }) {
   const listSeq = useRef(0);
   const [filter, setFilter] = useState<FilterKey>(initialFilter);
+  const [sortField, setSortField] = useState<AdminBooksSortField>(initialSort);
+  const [sortDir, setSortDir] = useState<AdminBooksSortDirection>(initialSortDir);
   const [books, setBooks] = useState<AdminBookRow[]>(initialBooks);
   const [hasMore, setHasMore] = useState(initialHasMore);
   /** Full-table skeleton only when switching filters (not after row actions). */
@@ -142,13 +156,23 @@ export function AdminBooksClient({
   const [catalogueWithdrawId, setCatalogueWithdrawId] = useState<string | null>(null);
 
   async function fetchBooks(
-    spec: { filter: FilterKey; skip: number; mode: "replace" | "append" },
+    spec: {
+      filter: FilterKey;
+      skip: number;
+      mode: "replace" | "append";
+      sort: AdminBooksSortField;
+      dir: AdminBooksSortDirection;
+      take: number;
+    },
     /** Snapshot from `listSeq` — updates are skipped if stale */
     nonce: number,
   ): Promise<boolean> {
     const params = new URLSearchParams({
       filter: spec.filter,
       skip: String(spec.skip),
+      sort: spec.sort,
+      dir: spec.dir,
+      take: String(spec.take),
     });
 
     let res: Response;
@@ -190,7 +214,44 @@ export function AdminBooksClient({
   /** Bumps nonce so any in-flight “load more” is ignored before refetch */
   async function reloadCurrentFilter(): Promise<void> {
     const nonce = ++listSeq.current;
-    await fetchBooks({ filter, skip: 0, mode: "replace" }, nonce);
+    await fetchBooks(
+      { filter, skip: 0, mode: "replace", sort: sortField, dir: sortDir, take: pageSize },
+      nonce,
+    );
+  }
+
+  async function onSortHeaderClick(column: AdminBooksSortField) {
+    if (filterLoading) return;
+
+    let nextSort = column;
+    let nextDir = sortDir;
+    if (column === sortField) {
+      nextDir = sortDir === "asc" ? "desc" : "asc";
+      setSortDir(nextDir);
+    } else {
+      nextSort = column;
+      nextDir =
+        column === "createdAt" || column === "chapters" || column === "status"
+          ? "desc"
+          : column === "title" || column === "author" || column === "owner"
+            ? "asc"
+            : "desc";
+      setSortField(column);
+      setSortDir(nextDir);
+    }
+
+    const nonce = ++listSeq.current;
+    setFilterLoading(true);
+    setBooks([]);
+    setHasMore(false);
+    try {
+      await fetchBooks(
+        { filter, skip: 0, mode: "replace", sort: nextSort, dir: nextDir, take: pageSize },
+        nonce,
+      );
+    } finally {
+      if (nonce === listSeq.current) setFilterLoading(false);
+    }
   }
 
   async function selectFilter(next: FilterKey) {
@@ -201,7 +262,10 @@ export function AdminBooksClient({
     setBooks([]);
     setHasMore(false);
     try {
-      await fetchBooks({ filter: next, skip: 0, mode: "replace" }, nonce);
+      await fetchBooks(
+        { filter: next, skip: 0, mode: "replace", sort: sortField, dir: sortDir, take: pageSize },
+        nonce,
+      );
     } finally {
       if (nonce === listSeq.current) setFilterLoading(false);
     }
@@ -213,7 +277,14 @@ export function AdminBooksClient({
     setLoadingMore(true);
     try {
       return await fetchBooks(
-        { filter, skip: books.length, mode: "append" },
+        {
+          filter,
+          skip: books.length,
+          mode: "append",
+          sort: sortField,
+          dir: sortDir,
+          take: pageSize,
+        },
         nonceStart,
       );
     } finally {
@@ -291,20 +362,63 @@ export function AdminBooksClient({
     }
   }
 
+  function SortHead({
+    field,
+    label,
+    alignCenter = false,
+  }: {
+    field: AdminBooksSortField;
+    label: string;
+    alignCenter?: boolean;
+  }) {
+    const active = sortField === field;
+    const chevron = active ? (sortDir === "asc" ? " ↑" : " ↓") : "";
+    return (
+      <th
+        className={`px-4 py-3 font-medium ${alignCenter ? "text-center" : "text-start"}`}
+        scope="col"
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+      >
+        <button
+          type="button"
+          disabled={filterLoading}
+          title={`Sort by ${label}`}
+          onClick={() => void onSortHeaderClick(field)}
+          className={`inline-flex w-full items-center gap-0.5 text-xs uppercase tracking-wide transition hover:text-text-primary disabled:opacity-60 ${
+            alignCenter ? "justify-center text-center" : "justify-start text-start"
+          } ${active ? "text-accent-text" : "text-text-muted"}`}
+        >
+          {label}
+          <span className="tabular-nums text-accent-text">{chevron}</span>
+        </button>
+      </th>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <h1 className="font-serif text-2xl font-semibold text-accent-text">
-            Books
-          </h1>
-          <Link
-            href="/partner/books/new"
-            className="inline-flex w-fit rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/35 transition hover:bg-accent-hover/80"
-          >
-            New book
-          </Link>
-        </div>
+        {variant === "page" ? (
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <h1 className="font-serif text-2xl font-semibold text-accent-text">Books</h1>
+            <Link
+              href="/partner/books/new"
+              className="inline-flex w-fit rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/35 transition hover:bg-accent-hover/80"
+            >
+              New book
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-text-secondary">Browse and manage every book by status.</p>
+            <Link
+              href="/partner/books/new"
+              className="inline-flex w-fit shrink-0 rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/35 transition hover:bg-accent-hover/80"
+            >
+              New book
+            </Link>
+          </div>
+        )}
         {actionErr ? (
           <p className="text-sm text-error">{actionErr}</p>
         ) : null}
@@ -327,15 +441,15 @@ export function AdminBooksClient({
       <div className="overflow-x-auto rounded-xl border border-border bg-bg-surface/90">
         <table className="w-full min-w-[800px] border-collapse text-left text-sm">
           <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
-              <th className="px-4 py-3 font-medium">Cover</th>
-              <th className="px-4 py-3 font-medium">Title</th>
-              <th className="px-4 py-3 font-medium">Author</th>
-              <th className="px-4 py-3 font-medium">Owner</th>
-              <th className="px-4 py-3 text-center font-medium">Status</th>
-              <th className="px-4 py-3 text-center font-medium">Chapters</th>
-              <th className="px-4 py-3 font-medium">Created</th>
-              <th className="px-4 py-3 font-medium"> </th>
+            <tr className="border-b border-border text-xs">
+              <th className="px-4 py-3 font-medium text-text-muted">Cover</th>
+              <SortHead field="title" label="Title" />
+              <SortHead field="author" label="Author" />
+              <SortHead field="owner" label="Owner" />
+              <SortHead field="status" label="Status" alignCenter />
+              <SortHead field="chapters" label="Chapters" alignCenter />
+              <SortHead field="createdAt" label="Created" />
+              <th className="px-4 py-3 font-medium text-text-muted"> </th>
             </tr>
           </thead>
           <tbody>

@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import { prisma } from "@/lib/prisma";
@@ -55,10 +56,10 @@ export default async function AdminBookRequestsPage() {
     <div className="space-y-6">
       <div>
         <Link
-          href="/dashboard"
+          href="/dashboard?tab=admin-stats"
           className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
         >
-          ← Dashboard
+          ← Dashboard (Admin Stats)
         </Link>
         <h1 className="mt-4 font-serif text-2xl font-semibold text-text-primary">Book requests</h1>
         <p className="mt-2 text-sm text-text-secondary">

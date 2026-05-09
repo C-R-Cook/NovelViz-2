@@ -1,6 +1,8 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 "use client";
 
 import { ChapterManagerClient } from "./chapter-manager-client";
+import { EpubMetadataToggle } from "@/components/epub-metadata-toggle";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type { BookGenre } from "@db";
@@ -403,7 +405,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
       if (!res.ok) {
         throw new Error(j.error || res.statusText);
       }
-      router.push("/admin/books");
+      router.push("/dashboard?tab=all-books");
       router.refresh();
     } catch (err) {
       setDeleteErr(err instanceof Error ? err.message : "Delete failed");
@@ -682,17 +684,12 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
                   >
                     {ingestBusy ? "Uploading…" : "Re-upload EPUB"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setApplyEpubMetadata((v) => !v)}
-                    className={
-                      applyEpubMetadata
-                        ? "w-full rounded-lg bg-success px-2 py-2 text-center text-[11px] font-semibold leading-snug text-text-primary shadow-sm ring-1 ring-success/40 transition hover:bg-success"
-                        : "w-full rounded-lg bg-error px-2 py-2 text-center text-[11px] font-semibold leading-snug text-text-primary shadow-sm ring-1 ring-error/35 transition hover:bg-error"
-                    }
-                  >
-                    {applyEpubMetadata ? "Update data from EPUB" : "Do not update data from EPUB"}
-                  </button>
+                  <EpubMetadataToggle
+                    unlocked={applyEpubMetadata}
+                    onChange={setApplyEpubMetadata}
+                    disabled={ingestBusy}
+                    id="admin-book-ingest-metadata-toggle"
+                  />
                   {ingestErr ? <p className="text-xs text-error">{ingestErr}</p> : null}
                   {coverUploadMsg ? (
                     <p className="text-xs text-success">{coverUploadMsg}</p>

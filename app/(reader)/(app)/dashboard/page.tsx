@@ -1,5 +1,11 @@
 import { DashboardClient } from "./dashboard-client";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  DASHBOARD_ADMIN_BOOKS_LIMIT,
+  queryAdminBooksPage,
+} from "@/lib/admin-books-list";
+import { fetchAdminPlatformStats } from "@/lib/admin-platform-stats";
+import { parseDashboardTab, type DashboardUserRole } from "@/lib/dashboard-tab";
 import { fetchPartnerAnalytics } from "@/lib/partner-analytics";
 import {
   PARTNER_BOOKS_PAGE_SIZE,
@@ -9,16 +15,38 @@ import {
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "Dashboard | NovelViz",
 };
 
-export default async function DashboardPage() {
+function DashboardLoadingFallback() {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-12 text-center text-sm text-text-muted sm:px-6">
+      Loading dashboard…
+    </div>
+  );
+}
+
+type DashboardPageProps = {
+  searchParams?: Promise<{ tab?: string | string[] }>;
+};
+
+function toDashboardUserRole(r: UserRole): DashboardUserRole {
+  if (r === UserRole.reader) return "reader";
+  if (r === UserRole.partner) return "partner";
+  return "admin";
+}
+
+async function DashboardContent({ searchParams }: DashboardPageProps) {
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
   }
+
+  const sp = searchParams ? await searchParams : {};
+  const rawTabSingle = typeof sp?.tab === "string" ? sp.tab : Array.isArray(sp?.tab) ? sp.tab[0] : undefined;
 
   const dbUser = await prisma.user.findUnique({
     where: { id: session.id },
@@ -36,6 +64,8 @@ export default async function DashboardPage() {
 
   const userId = dbUser.id;
   const role = dbUser.role;
+  const dashboardRole = toDashboardUserRole(role);
+  const initialTab = parseDashboardTab(dashboardRole, rawTabSingle);
 
   const [
     libraryBookCount,
@@ -104,8 +134,24 @@ export default async function DashboardPage() {
     bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };
   } | null = null;
 
+  let adminBooksAll: {
+    initialBooks: Awaited<ReturnType<typeof queryAdminBooksPage>>["rows"];
+    initialHasMore: boolean;
+    pageSize: number;
+  } | null = null;
+
+  let adminPlatformStats: Awaited<ReturnType<typeof fetchAdminPlatformStats>> | null = null;
+
   if (role === UserRole.admin) {
-    const [pendingBooks, totalUsers, totalBooks, pendingReviewCount, bookRequestTitleRows] = await Promise.all([
+    const [
+      pendingBooks,
+      totalUsers,
+      totalBooks,
+      pendingReviewCount,
+      bookRequestTitleRows,
+      allBooksFirstPage,
+      platformStats,
+    ] = await Promise.all([
       prisma.book.findMany({
         where: { status: "pending_review", deletedAt: null },
         orderBy: { updatedAt: "desc" },
@@ -116,7 +162,16 @@ export default async function DashboardPage() {
       prisma.book.count({ where: { deletedAt: null } }),
       prisma.book.count({ where: { status: "pending_review", deletedAt: null } }),
       prisma.bookRequest.findMany({ select: { bookTitle: true } }),
+      queryAdminBooksPage({
+        filter: "all",
+        skip: 0,
+        take: DASHBOARD_ADMIN_BOOKS_LIMIT,
+        sort: "createdAt",
+        dir: "desc",
+      }),
+      fetchAdminPlatformStats(),
     ]);
+
     const titleCount = new Map<string, number>();
     for (const row of bookRequestTitleRows) {
       titleCount.set(row.bookTitle, (titleCount.get(row.bookTitle) ?? 0) + 1);
@@ -125,6 +180,7 @@ export default async function DashboardPage() {
       .map(([bookTitle, count]) => ({ bookTitle, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
+
     adminPayload = {
       pendingBooks,
       totalUsers,
@@ -132,11 +188,18 @@ export default async function DashboardPage() {
       pendingReviewCount,
       bookRequests: { totalCount: bookRequestTitleRows.length, topBooks },
     };
+    adminBooksAll = {
+      initialBooks: allBooksFirstPage.rows,
+      initialHasMore: allBooksFirstPage.hasMore,
+      pageSize: DASHBOARD_ADMIN_BOOKS_LIMIT,
+    };
+    adminPlatformStats = platformStats;
   }
 
   return (
     <DashboardClient
-      role={role}
+      role={dashboardRole}
+      initialTab={initialTab}
       reader={{
         displayName:
           dbUser.username?.trim() ||
@@ -168,6 +231,16 @@ export default async function DashboardPage() {
       }}
       partner={partnerPayload}
       admin={adminPayload}
+      adminBooksAll={adminBooksAll}
+      adminPlatformStats={adminPlatformStats}
     />
+  );
+}
+
+export default function DashboardPage(props: DashboardPageProps) {
+  return (
+    <Suspense fallback={<DashboardLoadingFallback />}>
+      <DashboardContent {...props} />
+    </Suspense>
   );
 }

@@ -73,6 +73,11 @@ const CAROUSEL_CARD_TEXT_WRAP = "absolute inset-x-0 bottom-0 p-3";
 const CAROUSEL_CARD_TITLE = "line-clamp-1 text-sm font-semibold text-text-primary";
 const CAROUSEL_CARD_AUTHOR = "mt-1 line-clamp-1 text-xs text-text-secondary";
 
+/** Featured strip card width (px) — keep in sync with layout classes. */
+const FEATURED_CARD_W = 180;
+/** Browse carousel card width (px) — keep in sync with `BookCard` `w-[160px]`. */
+const BROWSE_CAROUSEL_CARD_W = 160;
+
 function zIndexFromDistance(distance: number): number {
   if (distance === 0) return 50;
   if (distance === 1) return 40;
@@ -146,35 +151,47 @@ function FeaturedCarouselCard({
 
   return (
     <span
-      className={`relative snap-center shrink-0 inline-block ${!isLast ? "mr-[-26px]" : ""} ${!reducedMotion ? "discover-animate-in" : ""}`}
+      className={`relative inline-block w-[180px] min-h-[270px] shrink-0 snap-center ${!isLast ? "mr-[-26px]" : ""} ${!reducedMotion ? "discover-animate-in" : ""} ${finePointer && !reducedMotion ? "hover:!z-[85] focus-within:!z-[85]" : ""}`}
       style={{
         zIndex: zIndexFromDistance(distanceFeatured),
         position: "relative",
         ...(!reducedMotion ? { animationDelay: `${index * 50}ms` } : {}),
       }}
     >
+      {/* Stable geometry for scroll-center math — must not scale on hover or active index flickers. */}
+      <div
+        data-carousel-card
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 z-0"
+        style={{ width: FEATURED_CARD_W, height: (FEATURED_CARD_W * 3) / 2 }}
+      />
       <Link
         href={`/discover/${book.id}`}
-        data-carousel-card
-        className="group block cursor-pointer outline-none"
+        className="group relative z-10 block h-full min-h-[270px] w-[180px] cursor-pointer outline-none"
       >
         <div
-          className={`relative w-[180px] overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm transition-all duration-200 ease-out ${
-            finePointer
-              ? "hover:scale-[1.03] hover:shadow-lg hover:shadow-bg-overlay/45 focus-visible:scale-[1.03] focus-visible:shadow-lg"
-              : "active:scale-[0.99]"
-          }`}
+          className="relative w-[180px] overflow-visible"
           style={depthStyle}
         >
-          <div className="relative aspect-[2/3] w-full">
-            <Image src={book.coverImageUrl} alt={book.title} fill className="object-cover" sizes="180px" priority={index < 2} />
-            <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
-              {book.genre ? formatGenre(book.genre) : "Unknown"}
-            </div>
-            <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
-            <div className={CAROUSEL_CARD_TEXT_WRAP}>
-              <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
-              <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
+          <div
+            className={`relative w-full origin-center scale-100 overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm will-change-transform ${
+              finePointer && !reducedMotion
+                ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.06] group-hover:shadow-lg group-hover:shadow-bg-overlay/45 group-focus-within:scale-[1.06] group-focus-within:shadow-lg group-focus-within:shadow-bg-overlay/45"
+                : finePointer && reducedMotion
+                  ? "transition-shadow duration-300 ease-out"
+                  : "transition-transform duration-200 ease-out active:scale-[0.99]"
+            }`}
+          >
+            <div className="relative aspect-[2/3] w-full">
+              <Image src={book.coverImageUrl} alt={book.title} fill className="object-cover" sizes="180px" priority={index < 2} />
+              <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
+                {book.genre ? formatGenre(book.genre) : "Unknown"}
+              </div>
+              <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
+              <div className={CAROUSEL_CARD_TEXT_WRAP}>
+                <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
+                <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -454,51 +471,68 @@ export function DiscoverCatalogueClient({
     return (
       <Link
         href={`/books/${book.id}`}
-        data-carousel-card={size === "carousel" ? "true" : undefined}
-        className={`group block outline-none ${size === "grid" ? "w-full" : ""} ${size === "carousel" ? "relative" : ""} ${size === "carousel" && !isLast ? "mr-[-20px]" : ""}`}
+        className={`group block outline-none ${size === "grid" ? "w-full" : ""} ${size === "carousel" ? "relative block min-h-[240px] w-[160px]" : ""} ${size === "carousel" && !isLast ? "mr-[-20px]" : ""} ${size === "carousel" && finePointer && !reducedMotion ? "hover:!z-[85] focus-within:!z-[85]" : ""}`}
         style={
           size === "carousel"
             ? { position: "relative", zIndex: zIndexFromDistance(distanceBrowse) }
             : undefined
         }
       >
+        {size === "carousel" ? (
+          <div
+            data-carousel-card
+            aria-hidden
+            className="pointer-events-none absolute left-0 top-0 z-0"
+            style={{ width: BROWSE_CAROUSEL_CARD_W, height: (BROWSE_CAROUSEL_CARD_W * 3) / 2 }}
+          />
+        ) : null}
         <article
           data-book-card
-          className={`${cardClass} relative aspect-[2/3] overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm transition-all duration-200 ease-out ${finePointer ? "hover:scale-[1.03] hover:shadow-lg hover:shadow-bg-overlay/45 focus-visible:scale-[1.03] focus-visible:shadow-lg" : "active:scale-[0.99]"}`}
+          className={`${cardClass} relative aspect-[2/3] overflow-visible ${size === "carousel" ? "z-10" : ""}`}
           style={carouselDepthStyle}
         >
-          {book.coverImageUrl ? (
-            <Image
-              src={book.coverImageUrl}
-              alt={book.title}
-              fill
-              className="object-cover"
-              sizes={
-                size === "carousel"
-                  ? "160px"
-                  : "(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
-              }
-            />
-          ) : (
-            <div className="absolute inset-0 bg-bg-raised" />
-          )}
-
-          <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
-            {book.genre ? formatGenre(book.genre) : "Unknown"}
-          </div>
-
-          <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
-          <div className={CAROUSEL_CARD_TEXT_WRAP}>
-            <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
-            <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
-          </div>
-
           <div
-            className={`absolute inset-0 flex items-center justify-center bg-bg-overlay/45 transition-opacity duration-200 ease-out ${finePointer ? "opacity-0 group-hover:opacity-100" : "opacity-0"}`}
+            className={`absolute inset-0 origin-center scale-100 overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm will-change-transform ${
+              finePointer && !reducedMotion
+                ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.06] group-hover:shadow-lg group-hover:shadow-bg-overlay/45 group-focus-within:scale-[1.06] group-focus-within:shadow-lg group-focus-within:shadow-bg-overlay/45"
+                : finePointer && reducedMotion
+                  ? "transition-shadow duration-300 ease-out"
+                  : "transition-transform duration-200 ease-out active:scale-[0.99]"
+            }`}
           >
-            <span className="rounded-md bg-bg-surface/85 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-primary">
-              View Book
-            </span>
+            {book.coverImageUrl ? (
+              <Image
+                src={book.coverImageUrl}
+                alt={book.title}
+                fill
+                className="object-cover"
+                sizes={
+                  size === "carousel"
+                    ? "160px"
+                    : "(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
+                }
+              />
+            ) : (
+              <div className="absolute inset-0 bg-bg-raised" />
+            )}
+
+            <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
+              {book.genre ? formatGenre(book.genre) : "Unknown"}
+            </div>
+
+            <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
+            <div className={CAROUSEL_CARD_TEXT_WRAP}>
+              <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
+              <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
+            </div>
+
+            <div
+              className={`absolute inset-0 flex items-center justify-center bg-bg-overlay/45 transition-opacity duration-300 ease-out ${finePointer ? "opacity-0 group-hover:opacity-100" : "opacity-0"}`}
+            >
+              <span className="rounded-md bg-bg-surface/85 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-primary">
+                View Book
+              </span>
+            </div>
           </div>
         </article>
       </Link>
@@ -553,7 +587,7 @@ export function DiscoverCatalogueClient({
             <div>
               <div
                 ref={featuredScrollerRef}
-                className={`-mx-4 relative flex gap-0 overflow-x-auto px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory scroll-pb-4 sm:mx-0 sm:px-0 ${
+                className={`-mx-4 relative flex gap-0 overflow-x-auto overflow-y-visible px-4 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory scroll-pb-4 sm:mx-0 sm:px-0 ${
                   centerFeaturedRow ? "sm:justify-center" : ""
                 }`}
                 style={{ perspective: "1000px", transformStyle: "preserve-3d", position: "relative" }}
@@ -646,7 +680,7 @@ export function DiscoverCatalogueClient({
               <div className="relative">
                 <div
                   ref={browseScrollerRef}
-                  className="relative flex gap-0 overflow-x-auto pb-2 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="relative flex gap-0 overflow-x-auto overflow-y-visible py-5 pb-2 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   style={{
                     perspective: "1000px",
                     transformStyle: "preserve-3d",

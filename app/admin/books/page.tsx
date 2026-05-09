@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 import {
   ADMIN_BOOKS_PAGE_SIZE,
   queryAdminBooksPage,

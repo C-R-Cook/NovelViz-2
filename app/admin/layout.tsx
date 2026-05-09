@@ -1,3 +1,4 @@
+// TODO: deprecated — functionality moved to /dashboard tabs
 import { Nav } from "@/components/nav";
 import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
 import { UserRole } from "@db";

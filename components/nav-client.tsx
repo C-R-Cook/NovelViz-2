@@ -34,14 +34,12 @@ function NavUserMenu({
   initials,
   menuPrimaryLabel,
   menuSecondaryLabel,
-  userRole,
   isProduction,
   onNavigate,
 }: {
   initials: string;
   menuPrimaryLabel: string;
   menuSecondaryLabel: string | null;
-  userRole: "reader" | "partner" | "admin";
   isProduction: boolean;
   onNavigate: () => void;
 }) {
@@ -59,9 +57,6 @@ function NavUserMenu({
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open]);
-
-  const showDashboard = userRole === "partner" || userRole === "admin";
-  const showAdmin = userRole === "admin";
 
   return (
     <div className="relative" ref={rootRef}>
@@ -97,35 +92,17 @@ function NavUserMenu({
           >
             My Account
           </Link>
-          {(showDashboard || showAdmin) && (
-            <div className="my-1 border-t border-border-subtle" role="separator" />
-          )}
-          {showDashboard ? (
-            <Link
-              href="/dashboard"
-              className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onNavigate();
-              }}
-            >
-              Dashboard
-            </Link>
-          ) : null}
-          {showAdmin ? (
-            <Link
-              href="/admin/books"
-              className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onNavigate();
-              }}
-            >
-              Admin
-            </Link>
-          ) : null}
+          <Link
+            href="/dashboard"
+            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onNavigate();
+            }}
+          >
+            Dashboard
+          </Link>
           <div className="my-1 border-t border-border-subtle" role="separator" />
           {isProduction ? (
             <button
@@ -200,6 +177,15 @@ export function NavChrome({
       >
         Gallery
       </Link>
+      {isLoggedIn ? (
+        <Link
+          href="/dashboard"
+          className={navLinkClass(isActive(pathname, "/dashboard"))}
+          onClick={() => setMenuOpen(false)}
+        >
+          Dashboard
+        </Link>
+      ) : null}
     </>
   );
 
@@ -235,7 +221,6 @@ export function NavChrome({
               initials={userInitials}
               menuPrimaryLabel={menuPrimaryLabel}
               menuSecondaryLabel={menuSecondaryLabel}
-              userRole={userRole}
               isProduction={isProduction}
               onNavigate={() => setMenuOpen(false)}
             />

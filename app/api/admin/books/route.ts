@@ -1,6 +1,9 @@
 import {
   ADMIN_BOOKS_PAGE_SIZE,
   parseAdminBooksFilterParam,
+  parseAdminBooksSortDirection,
+  parseAdminBooksSortField,
+  parseAdminBooksTakeParam,
   queryAdminBooksPage,
 } from "@/lib/admin-books-list";
 import { getCurrentUser } from "@/lib/auth";
@@ -22,12 +25,23 @@ export async function GET(request: Request) {
   const skipRaw = url.searchParams.get("skip");
   const parsed = skipRaw === null || skipRaw === "" ? 0 : Number.parseInt(skipRaw, 10);
   const skip = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+  const take = parseAdminBooksTakeParam(url.searchParams.get("take"), ADMIN_BOOKS_PAGE_SIZE);
+  const sort = parseAdminBooksSortField(url.searchParams.get("sort"));
+  const dir = parseAdminBooksSortDirection(url.searchParams.get("dir"));
 
-  const { rows, hasMore } = await queryAdminBooksPage({ filter, skip });
+  const { rows, hasMore } = await queryAdminBooksPage({
+    filter,
+    skip,
+    take,
+    sort,
+    dir,
+  });
   return NextResponse.json({
     books: rows,
     hasMore,
-    pageSize: ADMIN_BOOKS_PAGE_SIZE,
+    pageSize: take,
+    sort,
+    dir,
   });
 }
 

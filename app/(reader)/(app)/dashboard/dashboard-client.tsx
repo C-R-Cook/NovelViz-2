@@ -3,9 +3,9 @@
 import { ForReviewQueue } from "@/app/(reader)/(app)/dashboard/for-review-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
-import { AdminPlatformStatsClient } from "@/components/admin/admin-platform-stats-client";
+import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
-import type { AdminPlatformStatsPayload } from "@/lib/admin-platform-stats";
+import type { AdminStatsPayload } from "@/lib/admin-stats";
 import type { AdminBookRow } from "@/lib/admin-books-list";
 import {
   dashboardTabLabel,
@@ -78,7 +78,7 @@ export type DashboardClientProps = {
     initialHasMore: boolean;
     pageSize: number;
   } | null;
-  adminPlatformStats: AdminPlatformStatsPayload | null;
+  adminStats: AdminStatsPayload | null;
 };
 
 function StatMini({ label, value }: { label: string; value: number }) {
@@ -112,7 +112,7 @@ export function DashboardClient({
   partner,
   admin,
   adminBooksAll,
-  adminPlatformStats,
+  adminStats,
 }: DashboardClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -370,7 +370,7 @@ export function DashboardClient({
           />
         ) : null;
       case "admin-stats":
-        if (!adminPlatformStats || !admin) return null;
+        if (!adminStats || !admin) return null;
         return (
           <div className="space-y-10">
             <section aria-labelledby="dashboard-admin-quick-stats">
@@ -407,7 +407,7 @@ export function DashboardClient({
               )}
             </section>
 
-            <AdminPlatformStatsClient data={adminPlatformStats} />
+            <AdminStatsClient initialData={adminStats} />
           </div>
         );
       default:

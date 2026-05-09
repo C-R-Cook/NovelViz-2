@@ -85,6 +85,7 @@ model Book {
   description                  String?
   genre                        BookGenre?
   publishedYear                Int?
+  openLibraryKey               String?
   isPublicDomain               Boolean    @default(false)
   status                       BookStatus @default(draft)
   rejectionReason              String?

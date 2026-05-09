@@ -32,6 +32,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     author: row.author,
     genre: row.genre,
     publishedYear: row.publishedYear,
+    openLibraryKey: row.openLibraryKey,
     description: row.description,
     coverImageUrl: row.coverImageUrl,
     status: row.status,

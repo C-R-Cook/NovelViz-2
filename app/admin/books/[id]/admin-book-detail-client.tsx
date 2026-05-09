@@ -9,6 +9,7 @@ import type { BookGenre } from "@db";
 import type { BookStatus } from "@db";
 import type { ListingPreferenceAfterReview } from "@db";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,6 +19,7 @@ export type AdminBookDetailModel = {
   author: string;
   genre: BookGenre | null;
   publishedYear: number | null;
+  openLibraryKey: string | null;
   description: string | null;
   coverImageUrl: string | null;
   status: BookStatus;
@@ -163,6 +165,40 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
       }));
       setSaveMsg("Saved");
       setTimeout(() => setSaveMsg(null), 3000);
+      router.refresh();
+    } catch (err) {
+      setSaveErr(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function savePublishedYearOnly() {
+    setSaveErr(null);
+    setSaveMsg(null);
+    setSaving(true);
+    try {
+      const trimmed = publishedYear.trim();
+      const parsed = trimmed === "" ? null : Number.parseInt(trimmed, 10);
+      if (parsed !== null) {
+        if (Number.isNaN(parsed)) throw new Error("Published year must be a number");
+        if (trimmed.length !== 4) throw new Error("Published year must be 4 digits");
+      }
+      const res = await fetch(`/api/admin/books/${book.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ publishedYear: parsed }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        book?: AdminBookDetailModel;
+      };
+      if (!res.ok || !data.book) {
+        throw new Error(data.error || res.statusText);
+      }
+      setBook((prev) => ({ ...prev, ...data.book, chapterCount: prev.chapterCount }));
+      setSaveMsg("Published year updated");
+      setTimeout(() => setSaveMsg(null), 2500);
       router.refresh();
     } catch (err) {
       setSaveErr(err instanceof Error ? err.message : "Save failed");
@@ -533,10 +569,46 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
               <InfoRow label="Title" value={book.title} />
               <InfoRow label="Author" value={book.author} />
               <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
-              <InfoRow label="Year" value={book.publishedYear != null ? String(book.publishedYear) : "Unknown"} />
+              <div className="sm:col-span-2">
+                <label className="flex items-center gap-2">
+                  <span className="w-28 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
+                    Published Year
+                  </span>
+                  <input
+                    type="number"
+                    value={publishedYear}
+                    onChange={(e) => setPublishedYear(e.target.value)}
+                    placeholder="e.g. 1847"
+                    className="max-w-[10rem] rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                  />
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void savePublishedYearOnly()}
+                    className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
+                  >
+                    {saving ? "Saving…" : "Save Year"}
+                  </button>
+                </label>
+              </div>
               <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
               <InfoRow label="Uploaded" value={book.createdAtLabel} />
               <InfoRow label="Chapters" value={String(book.chapterCount)} />
+              {book.openLibraryKey ? (
+                <div className="sm:col-span-2">
+                  <span className="mr-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+                    Open Library:
+                  </span>
+                  <Link
+                    href={`https://openlibrary.org${book.openLibraryKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
+                  >
+                    Open Library ↗
+                  </Link>
+                </div>
+              ) : null}
               {book.status === "pending_review" ? (
                 <div className="sm:col-span-2">
                   <InfoRow

@@ -153,7 +153,6 @@ export function AdminBooksClient({
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [catalogueWithdrawId, setCatalogueWithdrawId] = useState<string | null>(null);
 
   async function fetchBooks(
     spec: {
@@ -314,32 +313,6 @@ export function AdminBooksClient({
     }
   }
 
-  /** Same as partner “Remove from catalogue”: `published` → `unlisted`, no delete. */
-  async function removeFromCatalogue(book: AdminBookRow) {
-    const confirmed = window.confirm(
-      `Remove "${book.title}" from the public catalogue? It will stay in the database as unlisted.`,
-    );
-    if (!confirmed) return;
-
-    setActionErr(null);
-    setCatalogueWithdrawId(book.id);
-    try {
-      const res = await fetch(`/api/admin/books/${book.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "unlisted" }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || res.statusText);
-      }
-      await reloadCurrentFilter();
-    } catch (err) {
-      setActionErr(err instanceof Error ? err.message : "Could not unlist");
-    } finally {
-      setCatalogueWithdrawId(null);
-    }
-  }
 
   async function restoreBook(book: AdminBookRow) {
     setActionErr(null);
@@ -520,19 +493,6 @@ export function AdminBooksClient({
                           >
                             Manage
                           </Link>
-                          {book.status === "published" ? (
-                            <button
-                              type="button"
-                              aria-label={`Remove ${book.title} from catalogue`}
-                              disabled={
-                                catalogueWithdrawId === book.id || deletingId === book.id
-                              }
-                              onClick={() => void removeFromCatalogue(book)}
-                              className="inline-flex rounded-lg bg-status-unlisted px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-status-unlisted disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {catalogueWithdrawId === book.id ? "Removing…" : "Remove from catalogue"}
-                            </button>
-                          ) : null}
                           <button
                             type="button"
                             aria-label={`Delete ${book.title}`}

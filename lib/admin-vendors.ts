@@ -23,6 +23,11 @@ export type FalVendorSnapshot = {
   byModel: FalModelBreakdownRow[];
 };
 
+export type VendorFetchResult<T> = {
+  snapshot: T | null;
+  errorMessage: string | null;
+};
+
 type OpenAiCostBucket = {
   start_time: number;
   end_time?: number;
@@ -160,9 +165,14 @@ async function fetchOpenAiEmbeddingsBuckets(adminKey: string, startSec: number):
 export async function fetchOpenAiVendorSnapshot(
   rangeStartUtc: Date,
   rangeEndInclusiveUtc: Date,
-): Promise<OpenAiVendorSnapshot | null> {
+): Promise<VendorFetchResult<OpenAiVendorSnapshot>> {
   const adminKey = process.env.OPENAI_ADMIN_API_KEY?.trim();
-  if (!adminKey) return null;
+  if (!adminKey) {
+    return {
+      snapshot: null,
+      errorMessage: "Configure OPENAI_ADMIN_API_KEY to see live OpenAI billing data.",
+    };
+  }
 
   try {
     const startSec = Math.floor(rangeStartUtc.getTime() / 1000);
@@ -171,7 +181,13 @@ export async function fetchOpenAiVendorSnapshot(
       costBuckets = await fetchOpenAiCostsAllBuckets(adminKey, startSec);
     } catch (e) {
       console.warn("[admin-vendors] OpenAI costs failed:", e);
-      return null;
+      const msg = e instanceof Error ? e.message : "OpenAI costs request failed";
+      return {
+        snapshot: null,
+        errorMessage: msg.includes(" 429")
+          ? "OpenAI usage API rate limit exceeded. Try again in a few minutes."
+          : "OpenAI billing data request failed.",
+      };
     }
 
     let embedBuckets: OpenAiEmbeddingsBucket[] = [];
@@ -217,13 +233,22 @@ export async function fetchOpenAiVendorSnapshot(
     }));
 
     return {
-      totalSpendUsd,
-      dailySpendUsd,
-      totalEmbeddingTokens,
+      snapshot: {
+        totalSpendUsd,
+        dailySpendUsd,
+        totalEmbeddingTokens,
+      },
+      errorMessage: null,
     };
   } catch (e) {
     console.warn("[admin-vendors] openai snapshot:", e);
-    return null;
+    const msg = e instanceof Error ? e.message : "OpenAI request failed";
+    return {
+      snapshot: null,
+      errorMessage: msg.includes(" 429")
+        ? "OpenAI usage API rate limit exceeded. Try again in a few minutes."
+        : "OpenAI billing data request failed.",
+    };
   }
 }
 
@@ -257,9 +282,14 @@ function parseFalBucketDay(bucketIso: string): string {
 export async function fetchFalVendorSnapshot(
   rangeStartInclusiveUtc: Date,
   rangeEndInclusiveUtc: Date,
-): Promise<FalVendorSnapshot | null> {
-  const key = process.env.FAL_API_KEY?.trim();
-  if (!key) return null;
+): Promise<VendorFetchResult<FalVendorSnapshot>> {
+  const key = process.env.FAL_ADMIN_API_KEY?.trim();
+  if (!key) {
+    return {
+      snapshot: null,
+      errorMessage: "No fal.ai usage data available. Check FAL_API_KEY is set.",
+    };
+  }
 
   try {
     const start = formatDayKeyUtc(utcStartOfCalendarDay(rangeStartInclusiveUtc));
@@ -331,13 +361,32 @@ export async function fetchFalVendorSnapshot(
     byModel.sort((a, b) => b.costUsd - a.costUsd);
 
     return {
-      totalSpendUsd,
-      imagesGenerated,
-      dailySpendUsd,
-      byModel,
+      snapshot: {
+        totalSpendUsd,
+        imagesGenerated,
+        dailySpendUsd,
+        byModel,
+      },
+      errorMessage: null,
     };
   } catch (e) {
     console.warn("[admin-vendors] fal snapshot:", e);
-    return null;
+    const msg = e instanceof Error ? e.message : "fal usage request failed";
+    if (msg.includes(" 429")) {
+      return {
+        snapshot: null,
+        errorMessage: "fal.ai usage API rate limit exceeded. Try again in a few minutes.",
+      };
+    }
+    if (msg.includes(" 403")) {
+      return {
+        snapshot: null,
+        errorMessage: "FAL_API_KEY is not permitted for the fal.ai usage endpoint.",
+      };
+    }
+    return {
+      snapshot: null,
+      errorMessage: "No fal.ai usage data available. Check FAL_API_KEY is set.",
+    };
   }
 }

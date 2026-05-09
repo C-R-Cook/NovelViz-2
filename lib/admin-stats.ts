@@ -29,6 +29,7 @@ export type AdminStatsKpis = {
 export type AdminStatsPayload = {
   generatedAt: string;
   window: { chartStartUtc: string; chartEndInclusiveUtc: string };
+  vendorWindowDays: number;
   kpis: AdminStatsKpis;
   charts: {
     queriesByDay: DailyCountPoint[];
@@ -52,6 +53,10 @@ export type AdminStatsPayload = {
     openai: OpenAiVendorSnapshot | null;
     fal: FalVendorSnapshot | null;
   };
+  vendorMessages: {
+    openai: string | null;
+    fal: string | null;
+  };
 };
 
 function chartWindow(): {
@@ -67,6 +72,23 @@ function chartWindow(): {
   return { startInclusive, endInclusive, endExclusive };
 }
 
+function vendorWindow(days: number): {
+  startInclusive: Date;
+  endInclusive: Date;
+} {
+  const endInclusive = utcStartOfCalendarDay(new Date());
+  const startInclusive = new Date(endInclusive.getTime());
+  startInclusive.setUTCDate(startInclusive.getUTCDate() - (days - 1));
+  return { startInclusive, endInclusive };
+}
+
+export function normalizeVendorWindowDays(raw: string | number | null | undefined): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 30;
+  if (n === 7 || n === 14 || n === 30 || n === 90) return n;
+  return 30;
+}
+
 function rowsToDayMap(rows: Array<{ day: Date; count: bigint }>): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -76,8 +98,11 @@ function rowsToDayMap(rows: Array<{ day: Date; count: bigint }>): Map<string, nu
   return map;
 }
 
-export async function getAdminStatsPayload(): Promise<AdminStatsPayload> {
+export async function getAdminStatsPayload(vendorDays = 30): Promise<AdminStatsPayload> {
   const { startInclusive, endInclusive, endExclusive } = chartWindow();
+  const normalizedVendorDays = normalizeVendorWindowDays(vendorDays);
+  const { startInclusive: vendorStartInclusive, endInclusive: vendorEndInclusive } =
+    vendorWindow(normalizedVendorDays);
 
   const [
     totalUsers,
@@ -196,9 +221,9 @@ export async function getAdminStatsPayload(): Promise<AdminStatsPayload> {
   const imageMap = rowsToDayMap(imageDayRows);
   const userMap = rowsToDayMap(userDayRows);
 
-  const [openaiVendor, falVendor] = await Promise.all([
-    fetchOpenAiVendorSnapshot(startInclusive, endInclusive),
-    fetchFalVendorSnapshot(startInclusive, endInclusive),
+  const [openaiVendorResult, falVendorResult] = await Promise.all([
+    fetchOpenAiVendorSnapshot(vendorStartInclusive, vendorEndInclusive),
+    fetchFalVendorSnapshot(vendorStartInclusive, vendorEndInclusive),
   ]);
 
   return {
@@ -207,6 +232,7 @@ export async function getAdminStatsPayload(): Promise<AdminStatsPayload> {
       chartStartUtc: startInclusive.toISOString(),
       chartEndInclusiveUtc: endInclusive.toISOString(),
     },
+    vendorWindowDays: normalizedVendorDays,
     kpis: {
       totalUsers,
       newUsersLast30Days,
@@ -233,8 +259,12 @@ export async function getAdminStatsPayload(): Promise<AdminStatsPayload> {
       footnote: ESTIMATED_COSTS_FOOTNOTE,
     },
     vendors: {
-      openai: openaiVendor,
-      fal: falVendor,
+      openai: openaiVendorResult.snapshot,
+      fal: falVendorResult.snapshot,
+    },
+    vendorMessages: {
+      openai: openaiVendorResult.errorMessage,
+      fal: falVendorResult.errorMessage,
     },
   };
 }

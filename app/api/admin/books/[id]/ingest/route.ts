@@ -105,6 +105,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   let buffer: Buffer;
   let filename: string;
   let applyEpubMetadata = false;
+  let lockTitle = false;
+  let lockAuthor = false;
+  let lockGenre = false;
+  let lockPublishedYear = false;
   try {
     const formData = await request.formData();
     const file = formData.get("file");
@@ -119,6 +123,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
     applyEpubMetadata = formData.get("applyEpubMetadata") === "true";
+    lockTitle = formData.get("lockTitle") === "true";
+    lockAuthor = formData.get("lockAuthor") === "true";
+    lockGenre = formData.get("lockGenre") === "true";
+    lockPublishedYear = formData.get("lockPublishedYear") === "true";
     buffer = Buffer.from(await file.arrayBuffer());
     filename = file.name;
   } catch (error) {
@@ -137,13 +145,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const { opfXml } = await openEpubPackage(buffer);
         const m = extractEpubMetadataFromOpf(opfXml, { isPublicDomain: book.isPublicDomain });
         const data: Prisma.BookUpdateInput = {};
-        if (m.title) data.title = m.title.slice(0, 500);
-        if (m.author) data.author = m.author.slice(0, 500);
+        if (!lockTitle && m.title) data.title = m.title.slice(0, 500);
+        if (!lockAuthor && m.author) data.author = m.author.slice(0, 500);
         if (m.description != null && m.description.length > 0) {
           data.description = m.description;
         }
-        if (m.genre) data.genre = m.genre;
-        if (m.publishedYear != null) {
+        if (!lockGenre && m.genre) data.genre = m.genre;
+        if (!lockPublishedYear && m.publishedYear != null) {
           const current = book.publishedYear;
           const shouldOverwrite =
             current === null ||

@@ -127,7 +127,13 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
   }
 
   let adminPayload: {
-    pendingBooks: { id: string; title: string; author: string; coverImageUrl: string | null }[];
+    pendingBooks: {
+      id: string;
+      title: string;
+      author: string;
+      coverImageUrl: string | null;
+      listingPreferenceAfterReview: "published" | "unlisted" | null;
+    }[];
     totalUsers: number;
     totalBooks: number;
     pendingReviewCount: number;
@@ -156,7 +162,13 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         where: { status: "pending_review", deletedAt: null },
         orderBy: { updatedAt: "desc" },
         take: 50,
-        select: { id: true, title: true, author: true, coverImageUrl: true },
+        select: {
+          id: true,
+          title: true,
+          author: true,
+          coverImageUrl: true,
+          listingPreferenceAfterReview: true,
+        },
       }),
       prisma.user.count(),
       prisma.book.count({ where: { deletedAt: null } }),

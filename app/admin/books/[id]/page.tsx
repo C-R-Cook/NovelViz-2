@@ -48,7 +48,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-8">
       <Link
-        href="/dashboard?tab=all-books"
+        href="/dashboard?tab=for-review"
         className="inline-flex text-sm font-medium text-text-secondary transition hover:text-accent-text/90"
       >
         ← Back to books

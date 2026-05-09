@@ -28,8 +28,6 @@ export type AdminBookDetailModel = {
   createdAtLabel: string;
 };
 
-type TabKey = "overview" | "edit";
-
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
   switch (status) {
@@ -54,7 +52,6 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   const router = useRouter();
   const ingestFileRef = useRef<HTMLInputElement>(null);
   const coverUploadRef = useRef<HTMLInputElement>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [book, setBook] = useState(initial);
 
   useEffect(() => {
@@ -234,16 +231,20 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
 
   async function promoteToPublished() {
     const snapshot = { ...book };
+    const nextStatus: BookStatus =
+      book.status === "pending_review"
+        ? (book.listingPreferenceAfterReview ?? "published")
+        : "published";
     setPublishErr(null);
     setStatusErr(null);
     setActionFeedback(null);
     setPromotingBusy(true);
-    setBook((prev) => ({ ...prev, status: "published", rejectionReason: null }));
+    setBook((prev) => ({ ...prev, status: nextStatus, rejectionReason: null }));
     try {
       const res = await fetch(`/api/admin/books/${book.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "published" }),
+        body: JSON.stringify({ status: nextStatus }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -261,7 +262,7 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
           createdAtLabel: prev.createdAtLabel,
         }));
       }
-      showFeedback("success", "Book published.");
+      showFeedback("success", nextStatus === "published" ? "Book published." : "Book unlisted.");
       router.refresh();
     } catch (err) {
       setBook(snapshot);
@@ -426,39 +427,6 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   return (
     <div className="space-y-6">
       <div
-        className="flex gap-1 border-b border-border"
-        role="tablist"
-        aria-label="Admin book tabs"
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "overview"}
-          onClick={() => setActiveTab("overview")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            activeTab === "overview"
-              ? "border-b-2 border-accent text-text-primary"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === "edit"}
-          onClick={() => setActiveTab("edit")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            activeTab === "edit"
-              ? "border-b-2 border-accent text-text-primary"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Edit
-        </button>
-      </div>
-
-      <div
         className="sticky top-0 z-20 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
         aria-label="Book actions"
       >
@@ -545,229 +513,51 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
         ) : null}
       </div>
 
-      {activeTab === "overview" ? (
-        <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-xl border border-border p-6">
-            <div
-              className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
-              aria-hidden
-            />
-            <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
-              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
-                {book.coverImageUrl ? (
-                  <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
-                    No cover image
-                  </div>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <InfoRow label="Title" value={book.title} />
-                <InfoRow label="Author" value={book.author} />
-                <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
-                <InfoRow label="Year" value={book.publishedYear != null ? String(book.publishedYear) : "Unknown"} />
-                <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
-                <InfoRow label="Uploaded" value={book.createdAtLabel} />
-                <InfoRow label="Chapters" value={String(book.chapterCount)} />
-                {book.status === "pending_review" ? (
-                  <div className="sm:col-span-2">
-                    <InfoRow
-                      label="Partner visibility request"
-                      value={labelListingPreferenceAfterReview(
-                        book.listingPreferenceAfterReview ?? "published",
-                      )}
-                    />
-                  </div>
-                ) : null}
+      <section className="space-y-4">
+        <div className="relative overflow-hidden rounded-xl border border-border p-6">
+          <div
+            className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
+            aria-hidden
+          />
+          <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
+            <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
+              {book.coverImageUrl ? (
+                <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
+              ) : (
+                <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
+                  No cover image
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InfoRow label="Title" value={book.title} />
+              <InfoRow label="Author" value={book.author} />
+              <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
+              <InfoRow label="Year" value={book.publishedYear != null ? String(book.publishedYear) : "Unknown"} />
+              <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
+              <InfoRow label="Uploaded" value={book.createdAtLabel} />
+              <InfoRow label="Chapters" value={String(book.chapterCount)} />
+              {book.status === "pending_review" ? (
                 <div className="sm:col-span-2">
-                  <InfoRow label="Description" value={book.description ?? "No description"} multiline />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
-      {activeTab === "edit" ? (
-        <section className="space-y-4">
-          {showReviewToggle ? (
-            <div className="rounded-lg border border-border bg-bg-base/80 p-3">
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  disabled={reviewToggleDisabled}
-                  onClick={() =>
-                    void transitionStatus(book.status === "pending_review" ? "draft" : "pending_review", {
-                      successMessage:
-                        book.status === "pending_review"
-                          ? "Withdrawn from review."
-                          : "Submitted for review.",
-                    })
-                  }
-                  className={
-                    book.status === "pending_review"
-                      ? "rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
-                      : "rounded-lg bg-info px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-info disabled:opacity-50"
-                  }
-                >
-                  {statusBusy ? "Updating..." : book.status === "pending_review" ? "Withdraw Review" : "Submit Review"}
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="relative overflow-hidden rounded-xl border border-border p-6">
-            <div
-              className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
-              aria-hidden
-            />
-            <form
-              onSubmit={saveMetadata}
-              className="relative z-10 space-y-4 rounded-lg bg-bg-surface/80 p-1"
-            >
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
-                <div className="w-36 space-y-2">
-                  <input
-                    ref={ingestFileRef}
-                    type="file"
-                    accept=".epub,application/epub+zip"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void uploadIngest(f);
-                      e.target.value = "";
-                    }}
-                  />
-                  <input
-                    ref={coverUploadRef}
-                    type="file"
-                    accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                    className="hidden"
-                    disabled={coverUploadBusy}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) void uploadCover(f);
-                    }}
-                  />
-                  <button
-                    type="button"
-                    disabled={coverUploadBusy}
-                    onClick={() => !coverUploadBusy && coverUploadRef.current?.click()}
-                    className="group relative block h-52 w-full overflow-hidden rounded-lg border border-border bg-bg-surface p-0 text-left outline-none ring-accent/0 transition hover:ring-2 hover:ring-accent/40 focus-visible:ring-2 focus-visible:ring-accent/50 disabled:cursor-not-allowed disabled:opacity-50"
-                    aria-label={coverUploadBusy ? "Uploading cover" : "Change cover image"}
-                  >
-                    {book.coverImageUrl ? (
-                      <Image
-                        src={book.coverImageUrl}
-                        alt=""
-                        fill
-                        className="object-cover"
-                        sizes="144px"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
-                        No cover image
-                      </div>
+                  <InfoRow
+                    label="Partner visibility request"
+                    value={labelListingPreferenceAfterReview(
+                      book.listingPreferenceAfterReview ?? "published",
                     )}
-                    <span className="pointer-events-none absolute inset-0 flex flex-col items-center justify-end bg-gradient-to-t from-bg-overlay/65 via-bg-overlay/20 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
-                      <span className="mb-3 rounded-md bg-bg-base/55 px-2.5 py-1 text-[11px] font-medium text-text-primary ring-1 ring-white/20 backdrop-blur-[2px]">
-                        {coverUploadBusy ? "Uploading…" : "Change cover"}
-                      </span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={ingestBusy}
-                    onClick={() => ingestFileRef.current?.click()}
-                    className="w-full rounded-lg bg-bg-raised px-2 py-2 text-center text-xs font-medium leading-snug text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
-                  >
-                    {ingestBusy ? "Uploading…" : "Re-upload EPUB"}
-                  </button>
-                  <EpubMetadataToggle
-                    unlocked={applyEpubMetadata}
-                    onChange={setApplyEpubMetadata}
-                    disabled={ingestBusy}
-                    id="admin-book-ingest-metadata-toggle"
                   />
-                  {ingestErr ? <p className="text-xs text-error">{ingestErr}</p> : null}
-                  {coverUploadMsg ? (
-                    <p className="text-xs text-success">{coverUploadMsg}</p>
-                  ) : null}
-                  {coverUploadErr ? (
-                    <p className="text-xs text-error">{coverUploadErr}</p>
-                  ) : null}
                 </div>
-
-                <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
-                  <div className="space-y-3">
-                    <Field label="Title" value={title} onChange={setTitle} required />
-                    <Field label="Author" value={author} onChange={setAuthor} required />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                        Genre
-                      </span>
-                      <select
-                        value={genre}
-                        onChange={(e) => setGenre(e.target.value as BookGenre | "")}
-                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                      >
-                        <option value="">Select genre</option>
-                        {GENRE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                        Year
-                      </span>
-                      <input
-                        type="number"
-                        value={publishedYear}
-                        onChange={(e) => setPublishedYear(e.target.value)}
-                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                      />
-                    </label>
-                  </div>
-                </div>
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
-                    Description
-                  </span>
-                  <textarea
-                    rows={6}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                  />
-                </label>
-                <div className="w-36 space-y-2">
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
-                  >
-                    {saving ? "Saving..." : "Save"}
-                  </button>
-                  {saveMsg ? <p className="text-sm text-success">{saveMsg}</p> : null}
-                  {saveErr ? <p className="text-sm text-error">{saveErr}</p> : null}
-                </div>
+              ) : null}
+              <div className="sm:col-span-2">
+                <InfoRow label="Description" value={book.description ?? "No description"} multiline />
               </div>
-              </div>
-            </form>
+            </div>
           </div>
+        </div>
+      </section>
 
-          <div className="mt-10 border-t border-border pt-8">
-            <ChapterManagerClient bookId={book.id} status={book.status} />
-          </div>
-        </section>
-      ) : null}
+      <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+        <ChapterManagerClient bookId={book.id} status={book.status} />
+      </section>
 
       {rejectOpen ? (
         <div

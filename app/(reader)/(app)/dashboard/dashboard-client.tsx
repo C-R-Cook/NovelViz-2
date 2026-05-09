@@ -61,7 +61,13 @@ export type DashboardClientProps = {
     pageSize: number;
   } | null;
   admin: {
-    pendingBooks: { id: string; title: string; author: string; coverImageUrl: string | null }[];
+    pendingBooks: {
+      id: string;
+      title: string;
+      author: string;
+      coverImageUrl: string | null;
+      listingPreferenceAfterReview: "published" | "unlisted" | null;
+    }[];
     totalUsers: number;
     totalBooks: number;
     pendingReviewCount: number;
@@ -141,13 +147,19 @@ export function DashboardClient({
   }
 
   const runModeration = useCallback(
-    async (bookId: string, status: "published" | "rejected") => {
+    async (
+      bookId: string,
+      payload: { status: "published" | "unlisted" | "rejected"; rejectionReason?: string },
+    ) => {
       setActionId(bookId);
       try {
         const body =
-          status === "rejected"
-            ? { status: "rejected" as const, rejectionReason: REJECT_REASON }
-            : { status: "published" as const };
+          payload.status === "rejected"
+            ? {
+                status: "rejected" as const,
+                rejectionReason: payload.rejectionReason?.trim() || REJECT_REASON,
+              }
+            : { status: payload.status };
         const res = await fetch(`/api/admin/books/${bookId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

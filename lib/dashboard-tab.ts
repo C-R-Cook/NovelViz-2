@@ -46,7 +46,7 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
     case "reader":
       return "Reader";
     case "my-books":
-      return "My Books";
+      return "My Publishes";
     case "stats":
       return "Stats";
     case "for-review":

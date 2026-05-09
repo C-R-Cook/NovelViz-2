@@ -58,6 +58,8 @@ function statusActionChipClass(status: BookStatus): string {
 
 function statusActionChipLabel(status: BookStatus): string {
   if (status === "pending_review") return "Pending Review";
+  if (status === "published") return "Live";
+  if (status === "unlisted") return "Un-listed";
   return status.replace(/_/g, " ");
 }
 
@@ -102,11 +104,13 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
   );
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusErr, setStatusErr] = useState<string | null>(null);
+  const [statusPickerOpen, setStatusPickerOpen] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [listingPref, setListingPref] = useState<ListingPreferenceAfterReview>(
     initial.listingPreferenceAfterReview ?? "published",
   );
+  const statusPickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setBook(initial);
@@ -127,6 +131,29 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
   useEffect(() => {
     if (book.status !== "draft") setActiveTab("details");
   }, [book.status]);
+
+  useEffect(() => {
+    if (!statusPickerOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      const el = statusPickerRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setStatusPickerOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [statusPickerOpen]);
+
+  useEffect(() => {
+    if (!statusPickerOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setStatusPickerOpen(false);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [statusPickerOpen]);
 
   async function saveMetadata(e: React.FormEvent) {
     e.preventDefault();
@@ -317,6 +344,8 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
   const reviewToggleDisabled =
     statusBusy || (book.status === "draft" && book.chapterCount <= 0);
   const catalogueActionBusy = statusBusy || ingestBusy || deleteBusy;
+  const canToggleCatalogueStatus = book.status === "published" || book.status === "unlisted";
+  const statusLabel = book.status === "published" ? "Live" : "Un-listed";
 
   /** Single scroll: book form then chapters while still in draft (before submit for review). */
   const mergeBookAndChapterPanels = book.status === "draft";
@@ -365,9 +394,77 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
         <div
           className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 ${actionRowGradientClass(book.status)}`}
         >
-          <span className={statusActionChipClass(book.status)}>
-            {statusActionChipLabel(book.status)}
-          </span>
+          {canToggleCatalogueStatus ? (
+            <div ref={statusPickerRef} className={`${statusActionChipClass(book.status)} relative`}>
+              <button
+                type="button"
+                aria-haspopup="listbox"
+                aria-expanded={statusPickerOpen}
+                disabled={catalogueActionBusy}
+                onClick={() => setStatusPickerOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-bg-surface px-3 py-2 text-left text-sm text-text-primary outline-none ring-accent/0 transition focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span className="min-w-0 flex-1 text-center">{statusLabel}</span>
+                <svg
+                  className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${statusPickerOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {statusPickerOpen ? (
+                <ul
+                  role="listbox"
+                  className="absolute left-0 right-0 top-full z-[100] max-h-56 overflow-y-auto rounded-b-lg border-x border-b border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
+                >
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={book.status === "published"}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-bg-raised ${
+                        book.status === "published" ? "bg-accent-muted text-text-primary" : "text-text-primary"
+                      }`}
+                      onClick={() => {
+                        setStatusPickerOpen(false);
+                        if (book.status !== "published") {
+                          void transitionStatus("published");
+                        }
+                      }}
+                    >
+                      <span>Live</span>
+                      {book.status === "published" ? <span className="text-accent">✓</span> : null}
+                    </button>
+                  </li>
+                  <li role="none">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={book.status === "unlisted"}
+                      className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition hover:bg-bg-raised ${
+                        book.status === "unlisted" ? "bg-accent-muted text-text-primary" : "text-text-primary"
+                      }`}
+                      onClick={() => {
+                        setStatusPickerOpen(false);
+                        if (book.status !== "unlisted") {
+                          void transitionStatus("unlisted");
+                        }
+                      }}
+                    >
+                      <span>Un-listed</span>
+                      {book.status === "unlisted" ? <span className="text-accent">✓</span> : null}
+                    </button>
+                  </li>
+                </ul>
+              ) : null}
+            </div>
+          ) : (
+            <span className={statusActionChipClass(book.status)}>{statusActionChipLabel(book.status)}</span>
+          )}
           <div className="flex flex-wrap items-center justify-end gap-2">
           <input
             ref={ingestFileRef}
@@ -411,28 +508,6 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                 : book.status === "pending_review"
                   ? "Withdraw from Review"
                   : "Submit for Review"}
-            </button>
-          ) : null}
-          {book.status === "published" ? (
-            <button
-              type="button"
-              disabled={catalogueActionBusy}
-              onClick={() =>
-                void transitionStatus("unlisted")
-              }
-              className="rounded-lg bg-status-unlisted px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-status-unlisted disabled:opacity-50"
-            >
-              Remove from catalogue
-            </button>
-          ) : null}
-          {book.status === "unlisted" ? (
-            <button
-              type="button"
-              disabled={catalogueActionBusy}
-              onClick={() => void transitionStatus("published")}
-              className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
-            >
-              Add to catalogue
             </button>
           ) : null}
           <button

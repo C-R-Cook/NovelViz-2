@@ -1,8 +1,10 @@
 import anthropic from "@/lib/anthropic";
+import cloudinary from "@/lib/cloudinary";
 import fal from "@/lib/fal";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -404,14 +406,33 @@ Reader's request: ${userPrompt}`;
     );
   }
 
+  const generatedImageId = randomUUID();
+  let finalImageUrl: string;
+  try {
+    const cloudinaryResult = await cloudinary.uploader.upload(imageUrl, {
+      folder: "novelviz/gallery",
+      public_id: generatedImageId,
+      resource_type: "image",
+      overwrite: false,
+    });
+    finalImageUrl = cloudinaryResult.secure_url;
+  } catch (e) {
+    console.error("[api/imagine POST] cloudinary upload", e);
+    return NextResponse.json(
+      { error: "Failed to store generated image. Please try again." },
+      { status: 502 },
+    );
+  }
+
   const created = await prisma.generatedImage.create({
     data: {
+      id: generatedImageId,
       userId: dbUser.id,
       bookId,
       chapterNumberAtTime: currentChapterNumber,
       userPrompt,
       fullPrompt: enrichedPrompt,
-      imageUrl,
+      imageUrl: finalImageUrl,
       isPublic: false,
       model: FAL_ENDPOINT,
       promptTokens,
@@ -431,7 +452,7 @@ Reader's request: ${userPrompt}`;
   });
 
   return NextResponse.json({
-    imageUrl,
+    imageUrl: finalImageUrl,
     fullPrompt: enrichedPrompt,
     image: {
       id: created.id,

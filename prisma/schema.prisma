@@ -91,6 +91,9 @@ model Book {
   /// Set when submitting for admin review; cleared when review is withdrawn or resolved.
   listingPreferenceAfterReview ListingPreferenceAfterReview?
   scheduledPublishAt           DateTime?
+  /// GPT genre-detection usage during EPUB ingest (OpenAI completion usage).
+  ingestionPromptTokens     Int?
+  ingestionCompletionTokens Int?
 
   chapters        Chapter[]
   chunks          Chunk[]

@@ -415,8 +415,16 @@ const BOOK_GENRES: BookGenre[] = [
   "short_stories",
 ];
 
-async function detectBookGenreFromSubjects(subjects: string[]): Promise<BookGenre | null> {
-  if (subjects.length === 0) return null;
+type GenreFromSubjectsResult = {
+  genre: BookGenre | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+};
+
+async function detectBookGenreFromSubjects(subjects: string[]): Promise<GenreFromSubjectsResult> {
+  if (subjects.length === 0) {
+    return { genre: null, promptTokens: null, completionTokens: null };
+  }
   const openai = getOpenAI();
   const prompt = `Given these book subject tags: '${subjects.join("; ")}'\nPick the single best matching genre from this list:\nfantasy, horror, romance, adventure, mystery, science_fiction,\nhistorical_fiction, literary_fiction, thriller, childrens_fiction,\nclassic_literature, gothic, crime, biography, short_stories.\nReturn ONLY the genre value, nothing else.`;
   try {
@@ -425,13 +433,16 @@ async function detectBookGenreFromSubjects(subjects: string[]): Promise<BookGenr
       max_tokens: 20,
       messages: [{ role: "user", content: prompt }],
     });
+    const usage = res.usage;
+    const promptTokens = usage?.prompt_tokens ?? null;
+    const completionTokens = usage?.completion_tokens ?? null;
     const raw = res.choices[0]?.message?.content?.trim().toLowerCase() ?? "";
     if ((BOOK_GENRES as string[]).includes(raw)) {
-      return raw as BookGenre;
+      return { genre: raw as BookGenre, promptTokens, completionTokens };
     }
-    return null;
+    return { genre: null, promptTokens, completionTokens };
   } catch {
-    return null;
+    return { genre: null, promptTokens: null, completionTokens: null };
   }
 }
 
@@ -851,10 +862,16 @@ export async function extractEpubCover(
  */
 export async function parseEpub(
   buffer: Buffer,
-): Promise<{ chapters: { title: string; content: string }[]; genre: BookGenre | null }> {
+): Promise<{
+  chapters: { title: string; content: string }[];
+  genre: BookGenre | null;
+  ingestionPromptTokens: number | null;
+  ingestionCompletionTokens: number | null;
+}> {
   const { zip, opfXml, opfDir } = await openEpubPackage(buffer);
   const subjects = getOpfDcElements(opfXml, "subject");
-  const detectedGenre = await detectBookGenreFromSubjects(subjects);
+  const genreDetection = await detectBookGenreFromSubjects(subjects);
+  const detectedGenre = genreDetection.genre;
   const { manifestById, spineIdrefs, spineTocIdref } = parseOpfManifestAndSpine(opfXml);
   const opfBookTitle = getOpfTitle(opfXml);
 
@@ -981,7 +998,12 @@ export async function parseEpub(
     chapters.push({ title, content: text });
   }
 
-  return { chapters, genre: detectedGenre };
+  return {
+    chapters,
+    genre: detectedGenre,
+    ingestionPromptTokens: genreDetection.promptTokens,
+    ingestionCompletionTokens: genreDetection.completionTokens,
+  };
 }
 
 export function detectFileType(_buffer: Buffer, filename: string): "epub" | "txt" {
@@ -992,12 +1014,22 @@ export function detectFileType(_buffer: Buffer, filename: string): "epub" | "txt
 export async function processBook(
   buffer: Buffer,
   filename: string,
-): Promise<{ chapters: { title: string; content: string }[]; genre: BookGenre | null }> {
+): Promise<{
+  chapters: { title: string; content: string }[];
+  genre: BookGenre | null;
+  ingestionPromptTokens: number | null;
+  ingestionCompletionTokens: number | null;
+}> {
   const type = detectFileType(buffer, filename);
   if (type === "epub") {
     return parseEpub(buffer);
   }
-  return { chapters: detectChapters(buffer.toString("utf-8")), genre: null };
+  return {
+    chapters: detectChapters(buffer.toString("utf-8")),
+    genre: null,
+    ingestionPromptTokens: null,
+    ingestionCompletionTokens: null,
+  };
 }
 
 const CHAPTER_HEADER =

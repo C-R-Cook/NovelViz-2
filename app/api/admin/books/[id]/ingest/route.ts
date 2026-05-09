@@ -266,7 +266,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
         await tx.book.update({
           where: { id: bookId },
-          data: { status: "pending_review", genre: processed.genre },
+          data: {
+            status: "pending_review",
+            genre: processed.genre,
+            ingestionPromptTokens: processed.ingestionPromptTokens,
+            ingestionCompletionTokens: processed.ingestionCompletionTokens,
+          },
         });
       },
       CHUNK_TX,

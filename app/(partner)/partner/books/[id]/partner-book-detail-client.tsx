@@ -1,13 +1,12 @@
 "use client";
 
 import { ChapterManagerClient } from "@/app/admin/books/[id]/chapter-manager-client";
-import { EpubMetadataToggle } from "@/components/epub-metadata-toggle";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type { BookGenre, BookStatus, ListingPreferenceAfterReview } from "@db";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 export type PartnerBookDetailModel = {
   id: string;
@@ -24,16 +23,6 @@ export type PartnerBookDetailModel = {
 };
 
 type TabKey = "details" | "chapters";
-
-function partnerBookHasFilledMetadata(book: PartnerBookDetailModel): boolean {
-  const t = book.title.trim() !== "";
-  const a = book.author.trim() !== "";
-  if (!t || !a) return false;
-  const hasGenre = book.genre != null;
-  const hasYear = book.publishedYear != null;
-  const desc = book.description?.trim() ?? "";
-  return hasGenre || hasYear || desc !== "";
-}
 
 function statusActionChipClass(status: BookStatus): string {
   const base =
@@ -53,6 +42,19 @@ function statusActionChipClass(status: BookStatus): string {
       return `${base} bg-status-unlisted text-text-primary`;
     default:
       return `${base} bg-bg-raised text-text-primary`;
+  }
+}
+
+function statusDropdownShellClass(status: BookStatus): string {
+  const base =
+    "inline-flex h-[34px] w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-1 text-sm font-medium tracking-tight bg-bg-surface";
+  switch (status) {
+    case "published":
+      return `${base} border-success/55 text-text-primary`;
+    case "unlisted":
+      return `${base} border-status-unlisted/60 text-text-primary`;
+    default:
+      return `${base} border-border text-text-primary`;
   }
 }
 
@@ -94,14 +96,15 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     initial.publishedYear != null ? String(initial.publishedYear) : "",
   );
   const [description, setDescription] = useState(initial.description ?? "");
+  const [lockTitle, setLockTitle] = useState(false);
+  const [lockAuthor, setLockAuthor] = useState(false);
+  const [lockGenre, setLockGenre] = useState(false);
+  const [lockYear, setLockYear] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [ingestBusy, setIngestBusy] = useState(false);
   const [ingestErr, setIngestErr] = useState<string | null>(null);
-  const [applyEpubMetadata, setApplyEpubMetadata] = useState(
-    () => !partnerBookHasFilledMetadata(initial),
-  );
   const [statusBusy, setStatusBusy] = useState(false);
   const [statusErr, setStatusErr] = useState<string | null>(null);
   const [statusPickerOpen, setStatusPickerOpen] = useState(false);
@@ -120,6 +123,10 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     setPublishedYear(initial.publishedYear != null ? String(initial.publishedYear) : "");
     setDescription(initial.description ?? "");
     setListingPref(initial.listingPreferenceAfterReview ?? "published");
+    setLockTitle(false);
+    setLockAuthor(false);
+    setLockGenre(false);
+    setLockYear(false);
   }, [initial]);
 
   useEffect(() => {
@@ -240,7 +247,11 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     try {
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("applyEpubMetadata", applyEpubMetadata ? "true" : "false");
+      fd.append("applyEpubMetadata", "true");
+      fd.append("lockTitle", lockTitle ? "true" : "false");
+      fd.append("lockAuthor", lockAuthor ? "true" : "false");
+      fd.append("lockGenre", lockGenre ? "true" : "false");
+      fd.append("lockPublishedYear", lockYear ? "true" : "false");
       const res = await fetch(`/api/admin/books/${book.id}/ingest`, {
         method: "POST",
         body: fd,
@@ -395,14 +406,14 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
           className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 ${actionRowGradientClass(book.status)}`}
         >
           {canToggleCatalogueStatus ? (
-            <div ref={statusPickerRef} className={`${statusActionChipClass(book.status)} relative`}>
+            <div ref={statusPickerRef} className={`${statusDropdownShellClass(book.status)} relative`}>
               <button
                 type="button"
                 aria-haspopup="listbox"
                 aria-expanded={statusPickerOpen}
                 disabled={catalogueActionBusy}
                 onClick={() => setStatusPickerOpen((o) => !o)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-border bg-bg-surface px-3 py-2 text-left text-sm text-text-primary outline-none ring-accent/0 transition focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-full w-full items-center justify-between gap-2 rounded-lg bg-transparent px-3 py-0.5 text-left text-sm text-text-primary outline-none transition focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span className="min-w-0 flex-1 text-center">{statusLabel}</span>
                 <svg
@@ -419,7 +430,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
               {statusPickerOpen ? (
                 <ul
                   role="listbox"
-                  className="absolute left-0 right-0 top-full z-[100] max-h-56 overflow-y-auto rounded-b-lg border-x border-b border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
+                  className="absolute left-0 right-0 top-full z-[100] max-h-56 overflow-y-auto rounded-b-lg border border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
                 >
                   <li role="none">
                     <button
@@ -535,15 +546,6 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
           </button>
           </div>
         </div>
-        <div className="px-3">
-          <EpubMetadataToggle
-            unlocked={applyEpubMetadata}
-            onChange={setApplyEpubMetadata}
-            disabled={ingestBusy}
-            id="partner-book-ingest-metadata-toggle"
-          />
-          <p className="mt-2 text-[11px] text-text-muted">Applies when the uploaded file is an EPUB archive.</p>
-        </div>
         {book.status === "draft" ? (
           <fieldset className="space-y-2 rounded-lg border border-border bg-bg-surface/70 px-3 py-2.5">
             <legend className="px-1 text-xs font-medium text-text-secondary">
@@ -655,10 +657,38 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
               </div>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]">
+                <div className="grid grid-cols-1 gap-16 lg:grid-cols-[minmax(0,0.64fr)_14rem]">
                   <div className="space-y-3">
-                    <Field label="Title" value={title} onChange={setTitle} required />
-                    <Field label="Author" value={author} onChange={setAuthor} required />
+                    <Field
+                      label="Title"
+                      value={title}
+                      onChange={setTitle}
+                      required
+                      disabled={lockTitle}
+                      inputClassName="max-w-[23rem]"
+                      suffix={
+                        <MetaFieldLockButton
+                          locked={lockTitle}
+                          onToggle={() => setLockTitle((v) => !v)}
+                          label="Lock title metadata"
+                        />
+                      }
+                    />
+                    <Field
+                      label="Author"
+                      value={author}
+                      onChange={setAuthor}
+                      required
+                      disabled={lockAuthor}
+                      inputClassName="max-w-[23rem]"
+                      suffix={
+                        <MetaFieldLockButton
+                          locked={lockAuthor}
+                          onToggle={() => setLockAuthor((v) => !v)}
+                          label="Lock author metadata"
+                        />
+                      }
+                    />
                   </div>
                   <div className="space-y-3">
                     <label className="flex items-center gap-2">
@@ -668,6 +698,7 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                       <select
                         value={genre}
                         onChange={(e) => setGenre(e.target.value as BookGenre | "")}
+                        disabled={lockGenre}
                         className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                       >
                         <option value="">Select genre</option>
@@ -677,6 +708,11 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                           </option>
                         ))}
                       </select>
+                      <MetaFieldLockButton
+                        locked={lockGenre}
+                        onToggle={() => setLockGenre((v) => !v)}
+                        label="Lock genre metadata"
+                      />
                     </label>
                     <label className="flex items-center gap-2">
                       <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
@@ -686,7 +722,13 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
                         type="number"
                         value={publishedYear}
                         onChange={(e) => setPublishedYear(e.target.value)}
+                        disabled={lockYear}
                         className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                      />
+                      <MetaFieldLockButton
+                        locked={lockYear}
+                        onToggle={() => setLockYear((v) => !v)}
+                        label="Lock year metadata"
                       />
                     </label>
                   </div>
@@ -724,11 +766,17 @@ function Field({
   value,
   onChange,
   required = false,
+  disabled = false,
+  inputClassName,
+  suffix,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  disabled?: boolean;
+  inputClassName?: string;
+  suffix?: ReactNode;
 }) {
   return (
     <label className="flex items-center gap-2">
@@ -738,9 +786,51 @@ function Field({
       <input
         required={required}
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+        className={`w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-60 ${inputClassName ?? ""}`}
       />
+      {suffix}
     </label>
+  );
+}
+
+function MetaFieldLockButton({
+  locked,
+  onToggle,
+  label,
+}: {
+  locked: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  const baseClass =
+    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-transparent transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35";
+  const stateClass = locked
+    ? "text-red-300 drop-shadow-[0_0_6px_rgba(239,68,68,0.8)] hover:text-red-200"
+    : "text-green-300 drop-shadow-[0_0_6px_rgba(34,197,94,0.8)] hover:text-green-200";
+
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      aria-pressed={locked}
+      className={`${baseClass} ${stateClass}`}
+      title={locked ? "Locked" : "Unlocked"}
+    >
+      {locked ? (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
+          <rect x="5" y="11" width="14" height="10" rx="2" />
+          <path d="M8 11V8a4 4 0 0 1 7.6-1.8" />
+          <path d="M16 4l3 3" />
+        </svg>
+      )}
+    </button>
   );
 }

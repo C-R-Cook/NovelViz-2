@@ -75,12 +75,12 @@ export function PartnerDashboardBooksClient({
             <tr className="border-b border-border text-xs uppercase tracking-wide text-text-muted">
               <th className="px-4 py-3 font-medium">Cover</th>
               <th className="px-4 py-3 font-medium">Book</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Chapters</th>
-              <th className="px-4 py-3 font-medium">Readers</th>
-              <th className="px-4 py-3 font-medium">Queries</th>
-              <th className="px-4 py-3 font-medium">Images</th>
-              <th className="px-4 py-3 font-medium">Stats</th>
+              <th className="px-4 py-3 text-center font-medium">Status</th>
+              <th className="px-4 py-3 text-center font-medium">Chapters</th>
+              <th className="px-4 py-3 text-center font-medium">Readers</th>
+              <th className="px-4 py-3 text-center font-medium">Queries</th>
+              <th className="px-4 py-3 text-center font-medium">Images</th>
+              <th className="px-4 py-3 font-medium" />
               <th className="px-4 py-3 font-medium" />
             </tr>
           </thead>
@@ -111,24 +111,24 @@ export function PartnerDashboardBooksClient({
                   <div className="font-medium text-text-primary">{book.title}</div>
                   <div className="text-text-secondary">{book.author}</div>
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-center">
                   <StatusBadge status={book.status} />
                 </td>
-                <td className="px-4 py-3 tabular-nums text-text-secondary">
+                <td className="px-4 py-3 text-center tabular-nums text-text-secondary">
                   {book.chapterCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-text-secondary">
+                <td className="px-4 py-3 text-center tabular-nums text-text-secondary">
                   {book.readerCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-text-secondary">
+                <td className="px-4 py-3 text-center tabular-nums text-text-secondary">
                   {book.queryCount}
                 </td>
-                <td className="px-4 py-3 tabular-nums text-text-secondary">
+                <td className="px-4 py-3 text-center tabular-nums text-text-secondary">
                   {book.imageCount}
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/partner/books/${book.id}/stats`}
+                    href={`/partner/books/${book.id}/stats?from=${encodeURIComponent("/dashboard?tab=my-books")}`}
                     className="inline-flex rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-accent/40 hover:bg-bg-raised"
                   >
                     Stats

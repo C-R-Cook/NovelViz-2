@@ -10,7 +10,20 @@ export const metadata = {
 
 type PageProps = { params: Promise<{ id: string }> };
 
-export default async function PartnerBookStatsPage({ params }: PageProps) {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function normalizeFromParam(raw: string | string[] | undefined): string | null {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return null;
+  // Allow only app-internal absolute paths.
+  if (!value.startsWith("/")) return null;
+  return value;
+}
+
+export default async function PartnerBookStatsPage({
+  params,
+  searchParams,
+}: PageProps & { searchParams?: SearchParams }) {
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
@@ -27,5 +40,9 @@ export default async function PartnerBookStatsPage({ params }: PageProps) {
     notFound();
   }
 
-  return <BookStatsClient data={data} />;
+  const sp = searchParams ? await searchParams : {};
+  const from = normalizeFromParam(sp.from);
+  const backHref = from ?? `/partner/books/${id}`;
+
+  return <BookStatsClient data={data} backHref={backHref} />;
 }

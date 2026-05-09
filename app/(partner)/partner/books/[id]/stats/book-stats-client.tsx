@@ -42,7 +42,13 @@ function StatCard({ label, value, decimals }: { label: string; value: number; de
   );
 }
 
-export function BookStatsClient({ data }: { data: PartnerBookAnalyticsPayload }) {
+export function BookStatsClient({
+  data,
+  backHref,
+}: {
+  data: PartnerBookAnalyticsPayload;
+  backHref: string;
+}) {
   const { book } = data;
   const areaData = data.readersOverTime.map((p) => ({
     label: p.label,
@@ -53,10 +59,10 @@ export function BookStatsClient({ data }: { data: PartnerBookAnalyticsPayload })
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <Link
-          href={`/partner/books/${book.id}`}
+          href={backHref}
           className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
         >
-          ← Back to book
+          ← Back
         </Link>
       </div>
 

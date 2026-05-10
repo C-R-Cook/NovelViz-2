@@ -1,0 +1,811 @@
+/* Discover catalogue — cinematic presentation (scoped under .discover-root) */
+
+.discover-root {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+
+.discover-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse 60% 35% at 50% 0%,
+    var(--glow-color, rgba(80, 130, 190, 0.14)),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.discover-root-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+.discover-header {
+  padding: 2.5rem 0 1.75rem;
+}
+
+@media (min-width: 640px) {
+  .discover-header {
+    padding: 3.5rem 0 2rem;
+  }
+}
+
+.discover-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 0.625rem;
+  animation: discover-fade-up 0.7s ease both;
+  animation-delay: 0.05s;
+}
+
+.discover-title {
+  animation: discover-fade-up 0.7s ease both;
+  animation-delay: 0.12s;
+}
+
+.discover-subtitle {
+  animation: discover-fade-up 0.7s ease both;
+  animation-delay: 0.22s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-eyebrow,
+  .discover-title,
+  .discover-subtitle {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Search */
+.discover-search-input:focus,
+.discover-search-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+/* Marquee */
+.discover-marquee-wrap {
+  overflow: hidden;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 0;
+  margin: 1.75rem 0 2.25rem;
+  white-space: nowrap;
+}
+
+@keyframes discover-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.discover-marquee-track {
+  display: inline-block;
+  animation: discover-marquee-scroll 28s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-marquee-track {
+    animation: none;
+    transform: none;
+  }
+}
+
+.discover-marquee-item {
+  display: inline-block;
+  margin-right: 2.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.discover-marquee-sep {
+  margin-left: 2.5rem;
+  color: var(--border-default);
+}
+
+/* Section label row */
+.discover-section-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.discover-section-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.discover-section-label-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--border-default), transparent);
+  margin-left: 1rem;
+  min-width: 2rem;
+}
+
+.discover-carousel-hint {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+/* Divider */
+.discover-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 2.25rem 0;
+}
+
+.discover-divider-line {
+  flex: 1;
+  height: 1px;
+  min-height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-default, var(--border)) 15%,
+    var(--border-default, var(--border)) 85%,
+    transparent
+  );
+  opacity: 0.85;
+}
+
+.discover-divider-gem {
+  font-size: 13px;
+  color: var(--accent);
+  opacity: 0.55;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Featured shelf row */
+.discover-featured-row {
+  align-items: flex-end;
+  padding-bottom: 2rem;
+}
+
+.discover-featured-scroller {
+  cursor: grab;
+}
+
+.discover-featured-scroller.discover-featured-scroller--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* Featured card face — shelf lift (inner div; parent holds 3D depth) */
+.discover-featured-wrap .discover-featured-card-face {
+  transition:
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.35s ease,
+    border-color 0.3s ease;
+  border-color: var(--border);
+}
+
+@media (pointer: fine) {
+  .discover-featured-wrap:hover .discover-featured-card-face,
+  .discover-featured-wrap:focus-within .discover-featured-card-face {
+    transform: translateY(-10px) scale(1.04);
+    box-shadow: 0 24px 48px var(--shelf-shadow);
+    border-color: var(--card-border-hover);
+  }
+
+  .discover-featured-wrap[data-featured-active="true"] .discover-featured-card-face {
+    transform: translateY(-12px) scale(1.05);
+    box-shadow: 0 28px 56px var(--shelf-shadow);
+    border-color: var(--card-border-hover);
+  }
+
+  .discover-featured-wrap[data-featured-active="true"]:hover .discover-featured-card-face,
+  .discover-featured-wrap[data-featured-active="true"]:focus-within .discover-featured-card-face {
+    transform: translateY(-14px) scale(1.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-featured-wrap .discover-featured-card-face {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .discover-featured-wrap:hover .discover-featured-card-face,
+  .discover-featured-wrap:focus-within .discover-featured-card-face,
+  .discover-featured-wrap[data-featured-active="true"] .discover-featured-card-face {
+    transform: none;
+  }
+}
+
+/* Genre pills */
+.discover-genre-pill {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.discover-genre-pill:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+}
+
+.discover-root .discover-genre-pill.discover-genre-pill-active {
+  background: var(--accent-dim) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  /* Steady glow: pill pulse animation overwrites box-shadow, so use drop-shadow */
+  filter: drop-shadow(0 0 10px var(--accent-glow, rgba(123, 167, 201, 0.35)));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 0 18px var(--accent-glow, rgba(123, 167, 201, 0.25));
+}
+
+/* Grid card mount stagger */
+@keyframes discover-card-mount-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Wrapper around grid BookCards — high specificity + explicit fill */
+.discover-root .discover-grid-cell {
+  animation: discover-card-mount-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-root .discover-grid-cell {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ── Image strip ──────────────────────────────────── */
+
+.discover-image-strip {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.4s ease;
+  margin-bottom: 0;
+}
+
+.discover-image-strip--visible {
+  max-height: 320px;
+  opacity: 1;
+  margin-bottom: 24px;
+}
+
+.discover-image-strip-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.discover-image-strip-count {
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.discover-image-strip-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scrollbar-width: none;
+}
+
+.discover-image-strip-row::-webkit-scrollbar {
+  display: none;
+}
+
+.discover-image-strip-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+}
+
+.discover-image-strip-loading-text {
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+.discover-image-strip-empty {
+  font-family: monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  opacity: 0.4;
+  padding: 60px 0;
+  text-align: center;
+}
+
+/* ── Individual image card ────────────────────────── */
+
+@keyframes discover-image-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.discover-image-card {
+  flex: 0 0 auto;
+  width: 130px;
+  height: 170px;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  transition:
+    border-color 0.25s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: discover-image-card-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.discover-image-card:hover {
+  border-color: var(--card-border-hover);
+  transform: translateY(-6px) scale(1.03);
+}
+
+.discover-image-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.discover-image-card:hover .discover-image-card-img {
+  transform: scale(1.06);
+}
+
+.discover-image-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0) 55%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px 8px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.discover-image-card:hover .discover-image-card-overlay {
+  opacity: 1;
+}
+
+.discover-image-card-chapter {
+  font-family: monospace;
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--accent);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.discover-image-card-prompt {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.3;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.discover-image-card-user {
+  font-family: monospace;
+  font-size: 8px;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-image-card {
+    animation: none;
+  }
+
+  .discover-image-card:hover {
+    transform: none;
+  }
+
+  .discover-image-card:hover .discover-image-card-img {
+    transform: none;
+  }
+}
+
+/* ── Concept page (tmp/discover-page.jsx alignment) ───────────────── */
+
+.discover-root--concept {
+  background: #0a0806;
+  color: #f5f0e8;
+}
+
+.discover-root--concept::before {
+  background: radial-gradient(
+    ellipse 60% 42% at 50% 16%,
+    color-mix(in srgb, var(--discover-glow, #1a1814) 38%, transparent) 0%,
+    transparent 72%
+  );
+}
+
+.discover-concept-hero {
+  padding: 3rem 0 1.5rem;
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .discover-concept-hero {
+    padding: 4rem 0 2rem;
+  }
+}
+
+.discover-concept-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(180, 140, 100, 0.62);
+  margin-bottom: 1rem;
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+
+.discover-concept-title {
+  margin: 0 0 1rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  line-height: 1.1;
+  font-size: clamp(2rem, 5.5vw, 4.25rem);
+  background: linear-gradient(135deg, #fff 0%, rgba(180, 140, 100, 0.92) 45%, #fff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: discover-concept-shimmer 6s linear infinite;
+  transition:
+    opacity 1s ease,
+    transform 1s ease;
+}
+
+.discover-concept-lede {
+  margin: 0 auto 2.5rem;
+  max-width: 30rem;
+  font-size: 1rem;
+  line-height: 1.7;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.42);
+  transition:
+    opacity 1s ease,
+    transform 1s ease;
+}
+
+.discover-concept-hero-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.discover-concept-hero-in--delay {
+  transition-delay: 0.15s;
+}
+
+.discover-concept-hero-in--delay2 {
+  transition-delay: 0.35s;
+}
+
+@keyframes discover-concept-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-concept-title {
+    animation: none;
+    color: rgba(230, 210, 180, 0.95);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .discover-concept-eyebrow,
+  .discover-concept-lede {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.discover-concept-marquee {
+  overflow: hidden;
+  margin: 1.5rem 0 2rem;
+  padding: 12px 0;
+  border-top: 1px solid rgba(180, 140, 100, 0.15);
+  border-bottom: 1px solid rgba(180, 140, 100, 0.15);
+  white-space: nowrap;
+}
+
+.discover-concept-marquee-track {
+  display: inline-block;
+  animation: discover-marquee-scroll 32s linear infinite;
+}
+
+.discover-concept-marquee-item {
+  display: inline-block;
+  margin-right: 3rem;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: rgba(180, 140, 100, 0.48);
+}
+
+.discover-concept-marquee-sep {
+  margin-left: 3rem;
+  color: rgba(180, 140, 100, 0.2);
+}
+
+.discover-concept-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.discover-concept-section-title {
+  flex-shrink: 0;
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.discover-concept-section-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, rgba(180, 140, 100, 0.32), transparent);
+}
+
+.discover-concept-drag-hint {
+  flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: rgba(180, 140, 100, 0.42);
+}
+
+.discover-concept-shelf-row {
+  cursor: grab;
+  user-select: none;
+}
+
+.discover-concept-shelf-row.discover-featured-scroller--dragging {
+  cursor: grabbing;
+}
+
+.discover-shelf-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: 140px;
+  min-height: 210px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  transition:
+    width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.35s ease,
+    z-index 0s linear;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.55));
+}
+
+.discover-shelf-card--active {
+  width: 200px;
+  min-height: 280px;
+  filter: drop-shadow(0 22px 44px rgba(0, 0, 0, 0.82));
+}
+
+.discover-shelf-card--hover:not(.discover-shelf-card--active) {
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.65));
+}
+
+.discover-shelf-card-inner {
+  position: relative;
+  height: 100%;
+  min-height: 210px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  background: #111;
+}
+
+.discover-shelf-card--active .discover-shelf-card-inner {
+  min-height: 280px;
+  border: 2px solid rgba(180, 140, 100, 0.55);
+}
+
+.discover-shelf-gem {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 5;
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  animation: discover-shelf-gem-pulse 2s ease-in-out infinite;
+}
+
+@keyframes discover-shelf-gem-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.75;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discover-shelf-gem {
+    animation: none;
+  }
+}
+
+.discover-concept-detail-genre {
+  color: var(--discover-accent, rgba(196, 30, 58, 0.95));
+}
+
+.discover-concept-masonry {
+  column-width: 220px;
+  column-gap: 1rem;
+}
+
+.discover-concept-masonry-item {
+  margin-bottom: 1rem;
+  break-inside: avoid;
+}
+
+.discover-concept-vision-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  animation: discover-image-card-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.35s ease;
+}
+
+.discover-concept-vision-card:hover {
+  border-color: rgba(180, 140, 100, 0.38);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+.discover-concept-vision-img {
+  display: block;
+  aspect-ratio: 4 / 5;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  transition: transform 0.55s ease;
+}
+
+.discover-concept-vision-card:hover .discover-concept-vision-img {
+  transform: scale(1.06);
+}
+
+.discover-concept-vision-grad {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0) 58%);
+  transition: opacity 0.35s ease;
+}
+
+.discover-concept-vision-card:hover .discover-concept-vision-grad {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.22) 52%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+
+.discover-concept-vision-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(8px);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.discover-concept-vision-bottom {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 14px 12px;
+}

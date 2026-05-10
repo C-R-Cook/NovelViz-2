@@ -4,41 +4,47 @@ import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "dev_palette";
 
-const PALETTE_CLASSES = [
-  "",
-  "palette-gothic",
-  "palette-candlelight",
-  "palette-moonlight",
-  "palette-crimson",
+export const THEME_IDS = [
+  "moonlight-silver",
+  "candle-light",
+  "deep-ocean",
+  "aged-parchment",
+  "forest-dusk",
+  "antiquarian",
 ] as const;
 
-const PALETTE_IDS = ["midnight", "gothic", "candlelight", "moonlight", "crimson"] as const;
+export type ThemeId = (typeof THEME_IDS)[number];
 
-type PaletteId = (typeof PALETTE_IDS)[number];
+const THEME_LABELS: Record<ThemeId, string> = {
+  "moonlight-silver": "Moonlight Silver",
+  "candle-light": "Candle Light",
+  "deep-ocean": "Deep Ocean",
+  "aged-parchment": "Aged Parchment",
+  "forest-dusk": "Forest at Dusk",
+  antiquarian: "Antiquarian",
+};
 
-function idToBodyClass(id: PaletteId): string {
-  const i = PALETTE_IDS.indexOf(id);
-  return PALETTE_CLASSES[i] ?? "";
-}
-
-function readStoredId(): PaletteId {
-  if (typeof window === "undefined") return "midnight";
+function readStoredThemeId(): ThemeId {
+  if (typeof window === "undefined") return "moonlight-silver";
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw && PALETTE_IDS.includes(raw as PaletteId)) return raw as PaletteId;
+    if (raw && (THEME_IDS as readonly string[]).includes(raw)) return raw as ThemeId;
+    const migrate: Record<string, ThemeId> = {
+      midnight: "moonlight-silver",
+      gothic: "forest-dusk",
+      candlelight: "candle-light",
+      moonlight: "moonlight-silver",
+      crimson: "antiquarian",
+    };
+    if (raw && migrate[raw]) return migrate[raw];
   } catch {
     /* ignore */
   }
-  return "midnight";
+  return "moonlight-silver";
 }
 
-function applyPaletteToBody(id: PaletteId) {
-  const body = document.body;
-  for (const c of PALETTE_CLASSES) {
-    if (c) body.classList.remove(c);
-  }
-  const cls = idToBodyClass(id);
-  if (cls) body.classList.add(cls);
+function applyTheme(id: ThemeId) {
+  document.documentElement.setAttribute("data-theme", id);
 }
 
 export function PaletteSwitcher() {
@@ -49,43 +55,48 @@ export function PaletteSwitcher() {
 }
 
 function PaletteSwitcherInner() {
-  const [paletteId, setPaletteId] = useState<PaletteId>("midnight");
+  const [themeId, setThemeId] = useState<ThemeId>("moonlight-silver");
 
   useEffect(() => {
-    const id = readStoredId();
-    setPaletteId(id);
-    applyPaletteToBody(id);
-  }, []);
-
-  const onChange = useCallback((id: PaletteId) => {
-    setPaletteId(id);
+    const id = readStoredThemeId();
+    setThemeId(id);
+    applyTheme(id);
     try {
       localStorage.setItem(STORAGE_KEY, id);
     } catch {
       /* ignore */
     }
-    applyPaletteToBody(id);
+  }, []);
+
+  const onChange = useCallback((id: ThemeId) => {
+    setThemeId(id);
+    try {
+      localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      /* ignore */
+    }
+    applyTheme(id);
   }, []);
 
   return (
     <label className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
       <span className="hidden text-[10px] font-medium uppercase tracking-wide text-text-muted sm:inline">
-        Palette
+        Theme
       </span>
       <select
-        aria-label="Development colour palette"
-        value={paletteId}
+        aria-label="Development colour theme"
+        value={themeId}
         onChange={(e) => {
-          const v = e.target.value as PaletteId;
-          if (PALETTE_IDS.includes(v)) onChange(v);
+          const v = e.target.value as ThemeId;
+          if ((THEME_IDS as readonly string[]).includes(v)) onChange(v);
         }}
-        className="min-w-[10.5rem] cursor-pointer rounded-lg border border-border bg-bg-raised px-2 py-1.5 text-xs font-medium text-text-primary shadow-inner outline-none ring-accent/30 transition focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="min-w-[12rem] cursor-pointer rounded-lg border border-border bg-bg-raised px-2 py-1.5 text-xs font-medium text-text-primary shadow-inner outline-none ring-accent/30 transition focus-visible:ring-2 focus-visible:ring-accent/40"
       >
-        <option value="midnight">Midnight Library</option>
-        <option value="gothic">Gothic Noir</option>
-        <option value="candlelight">Candlelight</option>
-        <option value="moonlight">Moonlight Silver</option>
-        <option value="crimson">Crimson</option>
+        {THEME_IDS.map((id) => (
+          <option key={id} value={id}>
+            {THEME_LABELS[id]}
+          </option>
+        ))}
       </select>
     </label>
   );

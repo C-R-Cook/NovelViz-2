@@ -23,6 +23,34 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
+  const featured = url.searchParams.get("featured") === "true";
+  const limitRaw = parseInt(url.searchParams.get("limit") ?? "8", 10);
+  const limit = Math.min(Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 8, 20);
+
+  if (featured) {
+    const featuredImages = await prisma.generatedImage.findMany({
+      where: { bookId, isFeatured: true, isPublic: true },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      include: {
+        user: { select: { username: true, name: true } },
+      },
+    });
+
+    return NextResponse.json({
+      images: featuredImages.map((img) => ({
+        id: img.id,
+        imageUrl: img.imageUrl,
+        userPrompt: img.userPrompt,
+        chapterNumberAtTime: img.chapterNumberAtTime,
+        username: img.user.username ?? img.user.name ?? "",
+        likeCount: 0,
+        isLocked: false,
+        bookId: img.bookId,
+      })),
+    });
+  }
+
   const images = await prisma.generatedImage.findMany({
     where: { bookId, isPublic: true },
     orderBy: { createdAt: "desc" },

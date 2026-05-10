@@ -238,6 +238,7 @@ model GeneratedImage {
   fullPrompt          String  @db.Text
   imageUrl            String
   isPublic            Boolean @default(false)
+  isFeatured          Boolean @default(false)
   likeCount           Int     @default(0)
   model               String?
   cfgScale            Float?

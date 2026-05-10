@@ -1,0 +1,39 @@
+/* ────────────────────────────────────────────────────────────
+   ANTIQUARIAN
+   Deep warm black, rich gold, crimson-tinged book glow
+   ──────────────────────────────────────────────────────────── */
+[data-theme="antiquarian"] {
+
+  --bg-base:           #0A0806;
+  --bg-surface:        #131009;
+  --bg-elevated:       #1C170E;
+  --bg-hover:          #252016;
+
+  --border-subtle:     rgba(180, 140, 100, 0.08);
+  --border-default:    rgba(180, 140, 100, 0.16);
+  --border-strong:     rgba(180, 140, 100, 0.40);
+
+  --accent:            #B8860B;
+  --accent-dim:        rgba(184, 134, 11, 0.18);
+  --accent-glow:       rgba(184, 134, 11, 0.32);
+
+  --highlight:         #D4A843;
+  --highlight-dim:     rgba(212, 168, 67, 0.12);
+
+  --text-primary:      #EDE0C8;
+  --text-secondary:    rgba(220, 195, 155, 0.65);
+  --text-muted:        rgba(195, 168, 125, 0.38);
+  --text-on-accent:    #0A0806;
+
+  --badge-bg:          rgba(184, 134, 11, 0.15);
+  --badge-text:        #D4A843;
+
+  --shelf-shadow:      rgba(20, 8, 0, 0.80);
+  --card-border-hover: rgba(184, 134, 11, 0.55);
+
+  --glow-color:        rgba(160, 100, 20, 0.14);
+
+  --logo-color:        #D4A843;
+
+  --palette-name:      "Antiquarian";
+}

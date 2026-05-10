@@ -26,6 +26,29 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const publicImagesRows = await prisma.generatedImage.findMany({
+    where: { bookId: id, isPublic: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: {
+      id: true,
+      imageUrl: true,
+      chapterNumberAtTime: true,
+      userPrompt: true,
+      isFeatured: true,
+      user: { select: { username: true, name: true } },
+    },
+  });
+
+  const publicImages = publicImagesRows.map((img) => ({
+    id: img.id,
+    imageUrl: img.imageUrl,
+    chapterNumberAtTime: img.chapterNumberAtTime,
+    userPrompt: img.userPrompt,
+    isFeatured: img.isFeatured,
+    username: img.user.username ?? img.user.name ?? "",
+  }));
+
   const book = {
     id: row.id,
     title: row.title,
@@ -54,7 +77,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
       >
         ← Back to books
       </Link>
-      <AdminBookDetailClient book={book} />
+      <AdminBookDetailClient book={book} publicImages={publicImages} />
     </div>
   );
 }

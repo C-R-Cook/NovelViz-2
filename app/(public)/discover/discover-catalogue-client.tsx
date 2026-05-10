@@ -1,12 +1,18 @@
 "use client";
 
+import "./discover-redesign.css";
+
 import { BookRequestModal } from "@/components/book-request-modal";
+import { DiscoverParticleField } from "@/components/discover-particle-field";
 import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
+import { discoverGenrePalette } from "@/lib/discover-genre-palette";
 import { GENRE_OPTIONS, formatGenre } from "@/lib/genre";
+import type { BookGenre } from "@db";
 import Image from "next/image";
 import Link from "next/link";
+import { BookLibraryActions } from "./book-library-actions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 
 type ApiResponse = {
   books: DiscoverCatalogueBook[];
@@ -16,9 +22,60 @@ type ApiResponse = {
 type Props = {
   featured: DiscoverCatalogueBook[];
   allBooks: DiscoverCatalogueBook[];
+  featuredLibrary?: { bookId: string; inLibrary: boolean }[];
+  isLoggedIn?: boolean;
+};
+
+type FeaturedImage = {
+  id: string;
+  imageUrl: string;
+  userPrompt: string;
+  chapterNumberAtTime: number;
+  username: string;
+};
+
+type VisionImage = FeaturedImage & {
+  bookId: string;
+  bookTitle: string;
+  bookGenre: BookGenre | null;
 };
 
 const GENRE_PILLS = [{ value: "all", label: "All" }, ...GENRE_OPTIONS];
+
+const DISCOVER_MARQUEE_ITEMS = [
+  "Spoiler-free Q&A",
+  "Chapter-gated image generation",
+  "Published library",
+  "Community gallery",
+  "Reading progress tracking",
+  "No spoilers — ever",
+] as const;
+
+function DiscoverMarquee() {
+  const doubled = [...DISCOVER_MARQUEE_ITEMS, ...DISCOVER_MARQUEE_ITEMS];
+  return (
+    <div className="discover-concept-marquee" aria-hidden>
+      <div className="discover-concept-marquee-track">
+        {doubled.map((item, i) => (
+          <span key={`${item}-${i}`} className="discover-concept-marquee-item">
+            {item.toUpperCase()}
+            <span className="discover-concept-marquee-sep">✦</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SectionDivider() {
+  return (
+    <div className="discover-section-divider">
+      <div className="discover-divider-line" />
+      <span className="discover-divider-gem">✦</span>
+      <div className="discover-divider-line" />
+    </div>
+  );
+}
 
 function buildQuery(input: {
   genre: string;
@@ -58,23 +115,12 @@ function useDiscoverMotionPrefs() {
   return { finePointer, reducedMotion };
 }
 
-type FeaturedCarouselCardProps = {
-  book: DiscoverCatalogueBook;
-  index: number;
-  activeIndex: number;
-  isLast: boolean;
-  finePointer: boolean;
-  reducedMotion: boolean;
-};
-
 const CAROUSEL_CARD_OVERLAY_GRADIENT =
   "absolute inset-0 bg-gradient-to-t from-bg-overlay/90 via-bg-overlay/35 to-transparent";
 const CAROUSEL_CARD_TEXT_WRAP = "absolute inset-x-0 bottom-0 p-3";
 const CAROUSEL_CARD_TITLE = "line-clamp-1 text-sm font-semibold text-text-primary";
 const CAROUSEL_CARD_AUTHOR = "mt-1 line-clamp-1 text-xs text-text-secondary";
 
-/** Featured strip card width (px) — keep in sync with layout classes. */
-const FEATURED_CARD_W = 180;
 /** Browse carousel card width (px) — keep in sync with `BookCard` `w-[160px]`. */
 const BROWSE_CAROUSEL_CARD_W = 160;
 
@@ -138,71 +184,106 @@ function computeDepthStyle(
   };
 }
 
-function FeaturedCarouselCard({
+function ShelfFeaturedCard({
   book,
   index,
-  activeIndex,
-  isLast,
-  finePointer,
+  isSelected,
   reducedMotion,
-}: FeaturedCarouselCardProps) {
-  const depthStyle = computeDepthStyle(index, activeIndex, "featured");
-  const distanceFeatured = Math.abs(index - activeIndex);
+  onSelect,
+}: {
+  book: DiscoverCatalogueBook;
+  index: number;
+  isSelected: boolean;
+  reducedMotion: boolean;
+  onSelect: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const pal = discoverGenrePalette(book.genre);
+  const tiltDeg = index % 2 === 0 ? -1.5 : 1.5;
 
   return (
-    <span
-      className={`relative inline-block w-[180px] min-h-[270px] shrink-0 snap-center ${!isLast ? "mr-[-26px]" : ""} ${!reducedMotion ? "discover-animate-in" : ""} ${finePointer && !reducedMotion ? "hover:!z-[85] focus-within:!z-[85]" : ""}`}
+    <button
+      type="button"
+      onClick={onSelect}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={`discover-shelf-card shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)] ${
+        isSelected ? "discover-shelf-card--active" : ""
+      } ${hovered && !isSelected ? "discover-shelf-card--hover" : ""} ${!reducedMotion ? "discover-animate-in" : ""}`}
       style={{
-        zIndex: zIndexFromDistance(distanceFeatured),
-        position: "relative",
         ...(!reducedMotion ? { animationDelay: `${index * 50}ms` } : {}),
+        ...({ "--disc-shelf-accent": pal.accent } as CSSProperties),
+        transform: isSelected
+          ? "translateY(-16px) scale(1.05)"
+          : hovered
+            ? "translateY(-8px) rotate(-1deg)"
+            : `rotate(${tiltDeg}deg)`,
+        zIndex: isSelected ? 10 : hovered ? 5 : 1,
       }}
     >
-      {/* Stable geometry for scroll-center math — must not scale on hover or active index flickers. */}
-      <div
-        data-carousel-card
-        aria-hidden
-        className="pointer-events-none absolute left-0 top-0 z-0"
-        style={{ width: FEATURED_CARD_W, height: (FEATURED_CARD_W * 3) / 2 }}
-      />
-      <Link
-        href={`/discover/${book.id}`}
-        className="group relative z-10 block h-full min-h-[270px] w-[180px] cursor-pointer outline-none"
-      >
+      <div className="discover-shelf-card-inner relative aspect-[2/3] w-full overflow-hidden rounded">
+        {book.coverImageUrl ? (
+          <Image
+            src={book.coverImageUrl}
+            alt=""
+            fill
+            className={`object-cover transition-transform duration-500 ease-out ${
+              hovered || isSelected ? "scale-[1.08]" : "scale-100"
+            }`}
+            sizes="200px"
+            priority={index < 2}
+          />
+        ) : (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center"
+            style={{ background: pal.glow }}
+          >
+            <div className="mb-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
+              {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
+            </div>
+            <div className="font-serif text-base leading-snug text-white">{book.title}</div>
+          </div>
+        )}
         <div
-          className="relative w-[180px] overflow-visible"
-          style={depthStyle}
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent transition-opacity duration-300 ${
+            hovered || isSelected ? "opacity-100" : "opacity-70"
+          }`}
+        />
+        <div
+          className={`pointer-events-none absolute inset-x-0 bottom-0 p-3 transition-all duration-300 ${
+            hovered || isSelected ? "translate-y-0 opacity-100" : "translate-y-1 opacity-60"
+          }`}
         >
           <div
-            className={`relative w-full origin-center scale-100 overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm will-change-transform ${
-              finePointer && !reducedMotion
-                ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.06] group-hover:shadow-lg group-hover:shadow-bg-overlay/45 group-focus-within:scale-[1.06] group-focus-within:shadow-lg group-focus-within:shadow-bg-overlay/45"
-                : finePointer && reducedMotion
-                  ? "transition-shadow duration-300 ease-out"
-                  : "transition-transform duration-200 ease-out active:scale-[0.99]"
-            }`}
+            className="mb-1 font-mono text-[10px] uppercase tracking-[0.15em]"
+            style={{ color: pal.accent }}
           >
-            <div className="relative aspect-[2/3] w-full">
-              <Image src={book.coverImageUrl} alt={book.title} fill className="object-cover" sizes="180px" priority={index < 2} />
-              <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
-                {book.genre ? formatGenre(book.genre) : "Unknown"}
-              </div>
-              <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
-              <div className={CAROUSEL_CARD_TEXT_WRAP}>
-                <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
-                <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
-              </div>
-            </div>
+            {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
           </div>
+          <div className="line-clamp-2 font-serif text-[13px] font-bold leading-tight text-white">{book.title}</div>
         </div>
-      </Link>
-    </span>
+      </div>
+      {isSelected ? (
+        <span
+          className="discover-shelf-gem"
+          style={{
+            background: pal.accent,
+            boxShadow: `0 0 12px ${pal.accent}`,
+          }}
+          aria-hidden
+        >
+          ✦
+        </span>
+      ) : null}
+    </button>
   );
 }
 
 export function DiscoverCatalogueClient({
   featured,
   allBooks,
+  featuredLibrary = [],
+  isLoggedIn = false,
 }: Props) {
   const { finePointer, reducedMotion } = useDiscoverMotionPrefs();
   const [genre, setGenre] = useState("all");
@@ -219,7 +300,7 @@ export function DiscoverCatalogueClient({
   const fetchSeq = useRef(0);
   const featuredScrollerRef = useRef<HTMLDivElement>(null);
   const browseScrollerRef = useRef<HTMLDivElement>(null);
-  const [activeFeatured, setActiveFeatured] = useState(0);
+  const [selectedFeaturedIndex, setSelectedFeaturedIndex] = useState(0);
   const [activeBrowse, setActiveBrowse] = useState(0);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -243,10 +324,6 @@ export function DiscoverCatalogueClient({
     return bestIndex;
   }, []);
 
-  const updateActiveFeatured = useCallback(() => {
-    setActiveFeatured(findActiveCardIndex(featuredScrollerRef.current));
-  }, [findActiveCardIndex]);
-
   const updateActiveBrowse = useCallback(() => {
     setActiveBrowse(findActiveCardIndex(browseScrollerRef.current));
   }, [findActiveCardIndex]);
@@ -255,6 +332,63 @@ export function DiscoverCatalogueClient({
   const nextCursorRef = useRef<string | null>(null);
   const loadingMoreRef = useRef(false);
   const browseSectionRef = useRef<HTMLElement>(null);
+  const featuredNavBlockUntilRef = useRef(0);
+  const featuredDragRef = useRef<{
+    pointerId: number | null;
+    startX: number;
+    scrollLeft0: number;
+    moved: boolean;
+  }>({ pointerId: null, startX: 0, scrollLeft0: 0, moved: false });
+  const [featuredScrollerDragging, setFeaturedScrollerDragging] = useState(false);
+
+  const [visionImages, setVisionImages] = useState<VisionImage[]>([]);
+  const [visionsLoading, setVisionsLoading] = useState(false);
+  const [visionsGenre, setVisionsGenre] = useState<"all" | BookGenre>("all");
+
+  useEffect(() => {
+    setSelectedFeaturedIndex((idx) =>
+      featured.length === 0 ? 0 : Math.min(idx, featured.length - 1),
+    );
+  }, [featured]);
+
+  useEffect(() => {
+    if (featured.length === 0) {
+      setVisionImages([]);
+      setVisionsLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setVisionsLoading(true);
+    void (async () => {
+      const merged: VisionImage[] = [];
+      await Promise.all(
+        featured.map(async (b) => {
+          try {
+            const res = await fetch(`/api/gallery/book/${b.id}?featured=true&limit=8`);
+            if (!res.ok) return;
+            const data = (await res.json()) as { images?: FeaturedImage[] };
+            for (const img of data.images ?? []) {
+              merged.push({
+                ...img,
+                bookId: b.id,
+                bookTitle: b.title,
+                bookGenre: b.genre,
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        }),
+      );
+      if (!cancelled) {
+        setVisionImages(merged);
+        setVisionsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [featured]);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(searchInput), 300);
@@ -414,18 +548,59 @@ export function DiscoverCatalogueClient({
     };
   }, [browseBooks.length, genre, updateActiveBrowse]);
 
-  useEffect(() => {
-    updateActiveFeatured();
+  const onFeaturedPointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!finePointer || reducedMotion) return;
+      if (e.button !== 0) return;
+      const el = featuredScrollerRef.current;
+      if (!el) return;
+      featuredDragRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        scrollLeft0: el.scrollLeft,
+        moved: false,
+      };
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [finePointer, reducedMotion],
+  );
+
+  const onFeaturedPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = featuredDragRef.current;
+    if (d.pointerId !== e.pointerId) return;
     const el = featuredScrollerRef.current;
     if (!el) return;
-    const onScroll = () => updateActiveFeatured();
-    el.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      el.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [featured.length, updateActiveFeatured]);
+    const dx = e.clientX - d.startX;
+    if (!d.moved && Math.abs(dx) > 6) {
+      d.moved = true;
+      setFeaturedScrollerDragging(true);
+    }
+    if (d.moved) {
+      el.scrollLeft = d.scrollLeft0 - dx * 1.35;
+    }
+  }, []);
+
+  const endFeaturedDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = featuredDragRef.current;
+    if (d.pointerId !== e.pointerId) return;
+    const el = featuredScrollerRef.current;
+    if (el) {
+      try {
+        el.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (d.moved) {
+      featuredNavBlockUntilRef.current = Date.now() + 450;
+    }
+    featuredDragRef.current = { pointerId: null, startX: 0, scrollLeft0: 0, moved: false };
+    setFeaturedScrollerDragging(false);
+  }, []);
 
   function scrollBrowse(dir: -1 | 1) {
     const el = browseScrollerRef.current;
@@ -436,6 +611,33 @@ export function DiscoverCatalogueClient({
     const step = card.getBoundingClientRect().width + gap;
     el.scrollBy({ left: dir * step * 3, behavior: "smooth" });
   }
+
+  const [headerVisible, setHeaderVisible] = useState(false);
+  useEffect(() => {
+    const t = window.setTimeout(() => setHeaderVisible(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  const selectedBook = featured[selectedFeaturedIndex] ?? null;
+  const heroPalette = discoverGenrePalette(selectedBook?.genre ?? null);
+
+  const filteredVisionImages = useMemo(() => {
+    if (visionsGenre === "all") return visionImages;
+    return visionImages.filter((v) => v.bookGenre === visionsGenre);
+  }, [visionImages, visionsGenre]);
+
+  const visionGenreOptions = useMemo((): ("all" | BookGenre)[] => {
+    const g = new Set<BookGenre>();
+    for (const b of featured) {
+      if (b.genre) g.add(b.genre);
+    }
+    return ["all", ...g];
+  }, [featured]);
+
+  const selectedLibraryEntry = useMemo(() => {
+    if (!selectedBook) return undefined;
+    return featuredLibrary.find((x) => x.bookId === selectedBook.id);
+  }, [featuredLibrary, selectedBook]);
 
   const showFeatured = featured.length > 0;
   const centerFeaturedRow = featured.length <= 5;
@@ -540,16 +742,47 @@ export function DiscoverCatalogueClient({
   }
 
   return (
-    <div className="min-h-screen bg-bg-base pb-20 pt-6 text-text-primary sm:pt-10">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <header className="mb-10 sm:mb-12">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-            Discover
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
-            Browse published titles with covers. Add what you love to your library.
-          </p>
-        </header>
+    <div
+      className={`discover-root min-h-screen pb-20 pt-6 text-text-primary sm:pt-10 ${!searchActive && showFeatured ? "discover-root--concept" : ""}`}
+      style={
+        !searchActive && showFeatured
+          ? ({
+              "--discover-glow": heroPalette.glow,
+              "--discover-accent": heroPalette.accent,
+            } as CSSProperties)
+          : undefined
+      }
+    >
+      <div className="discover-root-inner mx-auto max-w-7xl px-4 sm:px-6">
+        {!searchActive && showFeatured ? (
+          <header className="discover-concept-hero">
+            <p
+              className={`discover-concept-eyebrow ${headerVisible ? "discover-concept-hero-in" : "opacity-0 translate-y-2"}`}
+            >
+              AI companion for readers
+            </p>
+            <h1
+              className={`discover-concept-title ${headerVisible ? "discover-concept-hero-in discover-concept-hero-in--delay" : "opacity-0 translate-y-3"}`}
+            >
+              Every Chapter, Alive.
+            </h1>
+            <p
+              className={`discover-concept-lede ${headerVisible ? "discover-concept-hero-in discover-concept-hero-in--delay2" : "opacity-0 translate-y-3"}`}
+            >
+              AI that knows only what you&apos;ve read — no spoilers, ever.
+            </p>
+          </header>
+        ) : (
+          <header className="discover-header">
+            <p className="discover-eyebrow">Published library</p>
+            <h1 className="discover-title font-serif text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
+              Discover
+            </h1>
+            <p className="discover-subtitle mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
+              Browse published titles with covers. Add what you love to your library.
+            </p>
+          </header>
+        )}
 
         <section className="mb-10">
           <div className="relative">
@@ -564,7 +797,7 @@ export function DiscoverCatalogueClient({
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search by title or author..."
-              className="w-full rounded-xl border border-border bg-bg-surface px-10 py-3 text-sm text-text-primary outline-none transition duration-200 ease-out placeholder:text-text-muted focus:border-accent/50 focus:ring-2 focus:ring-accent/30"
+              className="discover-search-input w-full rounded-xl border border-border bg-bg-surface px-10 py-3 text-sm text-text-primary transition duration-200 ease-out placeholder:text-text-muted"
             />
             {searchInput ? (
               <button
@@ -579,30 +812,184 @@ export function DiscoverCatalogueClient({
           </div>
         </section>
 
+        {!searchActive && showFeatured ? <DiscoverMarquee /> : null}
+
         {!searchActive && showFeatured ? (
-          <section className="mb-14 sm:mb-16">
-            <h2 className="mb-5 px-1 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">
-              Featured
-            </h2>
-            <div>
+          <section className="mb-10 sm:mb-12">
+            <div className="discover-concept-section-head mb-6 px-1 sm:px-0">
+              <h2 className="discover-concept-section-title">Featured titles</h2>
+              <div className="discover-concept-section-line" />
+              {finePointer && !reducedMotion ? (
+                <span className="discover-concept-drag-hint">Drag to explore →</span>
+              ) : null}
+            </div>
+            <div
+              ref={featuredScrollerRef}
+              onPointerDownCapture={onFeaturedPointerDown}
+              onPointerMove={onFeaturedPointerMove}
+              onPointerUp={endFeaturedDrag}
+              onPointerCancel={endFeaturedDrag}
+              onPointerLeave={(e) => {
+                if (featuredDragRef.current.pointerId === e.pointerId) endFeaturedDrag(e);
+              }}
+              className={`discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 py-6 [scrollbar-width:none] sm:mx-0 sm:px-8 [&::-webkit-scrollbar]:hidden ${
+                centerFeaturedRow ? "sm:justify-center" : ""
+              } ${featuredScrollerDragging ? "discover-featured-scroller--dragging" : ""}`}
+            >
+              {featured.map((book, i) => (
+                <ShelfFeaturedCard
+                  key={book.id}
+                  book={book}
+                  index={i}
+                  isSelected={i === selectedFeaturedIndex}
+                  reducedMotion={reducedMotion}
+                  onSelect={() => setSelectedFeaturedIndex(i)}
+                />
+              ))}
+            </div>
+
+            {selectedBook ? (
               <div
-                ref={featuredScrollerRef}
-                className={`-mx-4 relative flex gap-0 overflow-x-auto overflow-y-visible px-4 py-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory scroll-pb-4 sm:mx-0 sm:px-0 ${
-                  centerFeaturedRow ? "sm:justify-center" : ""
-                }`}
-                style={{ perspective: "1000px", transformStyle: "preserve-3d", position: "relative" }}
+                key={selectedBook.id}
+                className="discover-concept-detail mt-2 flex flex-col gap-6 px-2 sm:flex-row sm:items-center sm:px-4"
+                style={
+                  {
+                    "--discover-accent": discoverGenrePalette(selectedBook.genre).accent,
+                  } as CSSProperties
+                }
               >
-                {featured.map((book, i) => (
-                  <FeaturedCarouselCard
-                    key={book.id}
-                    book={book}
-                    index={i}
-                    activeIndex={activeFeatured}
-                    isLast={i === featured.length - 1}
-                    finePointer={finePointer}
-                    reducedMotion={reducedMotion}
+                <div className="min-w-0 flex-1">
+                  <div className="discover-concept-detail-genre font-mono text-[11px] uppercase tracking-[0.2em]">
+                    {selectedBook.genre ? formatGenre(selectedBook.genre).toUpperCase() : "FEATURED"}
+                  </div>
+                  <div className="mt-1 font-serif text-2xl text-white sm:text-3xl">{selectedBook.title}</div>
+                  <div className="mt-1 text-sm italic text-white/50">by {selectedBook.author}</div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 sm:ml-auto">
+                  <BookLibraryActions
+                    bookId={selectedBook.id}
+                    initialInLibrary={selectedLibraryEntry?.inLibrary ?? false}
+                    isLoggedIn={isLoggedIn}
+                    variant="discoverGold"
                   />
+                  <Link
+                    href={`/discover/${selectedBook.id}`}
+                    className="font-mono text-[11px] uppercase tracking-[0.2em] text-[rgba(180,140,100,0.75)] underline-offset-4 transition hover:text-[rgba(230,200,160,0.95)] hover:underline"
+                  >
+                    Open title →
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {!searchActive && showFeatured ? <SectionDivider /> : null}
+
+        {!searchActive && showFeatured ? (
+          <section className="mb-12 px-1 sm:px-0">
+            <div className="discover-concept-visions-head mb-6 flex flex-wrap items-center gap-4">
+              <h2 className="discover-concept-section-title m-0 shrink-0">Community visions</h2>
+              <div className="discover-concept-section-line min-w-[4rem] flex-1" />
+              <div className="flex max-w-full flex-wrap gap-2">
+                {visionGenreOptions.slice(0, 5).map((g) => {
+                  const active = visionsGenre === g;
+                  const label = g === "all" ? "All" : formatGenre(g);
+                  return (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => setVisionsGenre(g)}
+                      className={`discover-concept-vision-pill rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition ${
+                        active
+                          ? "border border-[rgba(180,140,100,0.45)] bg-[rgba(180,140,100,0.15)] text-[rgba(230,200,160,0.95)]"
+                          : "border border-white/[0.08] bg-transparent text-white/35 hover:border-white/15 hover:text-white/50"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {visionsLoading ? (
+              <p className="py-16 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
+                Loading community picks…
+              </p>
+            ) : filteredVisionImages.length === 0 ? (
+              <p className="py-16 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
+                No featured gallery images yet. Admins can mark public images as featured for each title.
+              </p>
+            ) : (
+              <div className="discover-concept-masonry">
+                {filteredVisionImages.map((img, i) => (
+                  <div key={`${img.bookId}-${img.id}`} className="discover-concept-masonry-item">
+                    <div
+                      className="discover-concept-vision-card group"
+                      style={
+                        !reducedMotion
+                          ? ({ animationDelay: `${Math.min(i, 24) * 70}ms` } as CSSProperties)
+                          : undefined
+                      }
+                    >
+                      <Link href="/gallery" className="block outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.imageUrl} alt="" className="discover-concept-vision-img" />
+                        <div className="discover-concept-vision-grad" />
+                        <div className="discover-concept-vision-badge font-mono">CH. {img.chapterNumberAtTime}</div>
+                        <div className="discover-concept-vision-bottom">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(180,140,100,0.9)]">
+                            {img.bookTitle}
+                          </div>
+                          <div className="mt-1 font-serif text-xs leading-snug text-white/85 line-clamp-2">
+                            {img.userPrompt}
+                          </div>
+                          <div className="mt-2 font-mono text-[10px] text-white/40">@{img.username}</div>
+                        </div>
+                      </Link>
+                    </div>
+                  </div>
                 ))}
+              </div>
+            )}
+            <div className="mt-10 text-center">
+              <Link
+                href="/gallery"
+                className="inline-block rounded border border-[rgba(180,140,100,0.28)] px-10 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-[rgba(180,140,100,0.75)] transition hover:border-[rgba(180,140,100,0.45)] hover:text-[rgba(230,200,160,0.95)]"
+              >
+                Explore all images
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
+        {!searchActive && showFeatured ? (
+          <section className="discover-concept-cta relative mb-14 overflow-hidden rounded-lg border border-[rgba(180,140,100,0.18)] px-6 py-10 sm:px-10 sm:py-12">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(180,140,100,0.06)] to-[rgba(139,26,26,0.05)]" />
+            {!reducedMotion ? <DiscoverParticleField /> : null}
+            <div className="relative z-[1] flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-[rgba(180,140,100,0.55)]">
+                  Begin your journey
+                </p>
+                <p className="mt-3 font-serif text-2xl text-white sm:text-3xl">Read without fear.</p>
+                <p className="mt-2 max-w-md text-sm italic text-white/40">
+                  Your AI companion respects every page you haven&apos;t turned yet.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/sign-in"
+                  className="rounded border-0 bg-[rgba(180,140,100,0.9)] px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#0a0806] transition hover:brightness-110"
+                >
+                  Join free →
+                </Link>
+                <Link
+                  href="/books"
+                  className="rounded border border-[rgba(180,140,100,0.35)] bg-transparent px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-[rgba(180,140,100,0.75)] transition hover:border-[rgba(180,140,100,0.55)] hover:text-[rgba(230,200,160,0.95)]"
+                >
+                  Browse books
+                </Link>
               </div>
             </div>
           </section>
@@ -610,35 +997,37 @@ export function DiscoverCatalogueClient({
 
         {!searchActive ? (
           <section className="mb-8">
-          <h2 className="sr-only">Filter by genre</h2>
-          <div
-            className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-              !reducedMotion ? "discover-animate-in" : ""
-            }`}
-            style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
-          >
-            {genrePills.map((pill) => {
-              const active = genre === pill.value;
-              return (
-                <button
-                  key={pill.value}
-                  type="button"
-                  onClick={() => selectGenre(pill.value)}
-                  className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium outline-none transition-all duration-200 ease-out sm:text-sm ${
-                    finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
-                  } ${
-                    active
-                      ? `bg-accent text-text-inverse ${!reducedMotion ? "discover-pill-pulse" : ""}`
-                      : "border border-border bg-bg-raised text-text-secondary hover:bg-bg-raised hover:text-text-primary"
-                  }`}
-                >
-                  {pill.label}
-                </button>
-              );
-            })}
-          </div>
+            <h2 className="sr-only">Filter by genre</h2>
+            <div
+              className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                !reducedMotion ? "discover-animate-in" : ""
+              }`}
+              style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
+            >
+              {genrePills.map((pill) => {
+                const active = genre === pill.value;
+                return (
+                  <button
+                    key={pill.value}
+                    type="button"
+                    onClick={() => selectGenre(pill.value)}
+                    className={`discover-genre-pill shrink-0 rounded-full px-4 py-2 text-xs font-medium outline-none sm:text-sm ${
+                      finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
+                    } ${
+                      active
+                        ? `discover-genre-pill-active ${!reducedMotion ? "discover-pill-pulse" : ""}`
+                        : "bg-bg-raised text-text-secondary"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
           </section>
         ) : null}
+
+        {!searchActive ? <SectionDivider /> : null}
 
         {searchActive ? (
           <section className="mb-12">
@@ -651,26 +1040,35 @@ export function DiscoverCatalogueClient({
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {searchResults.map((book) => (
-                  <BookCard key={book.id} book={book} size="grid" />
-                ))}
+                {searchResults.map((book, i) =>
+                  reducedMotion ? (
+                    <BookCard key={book.id} book={book} size="grid" />
+                  ) : (
+                    <div
+                      key={book.id}
+                      className="discover-grid-cell"
+                      style={{ animationDelay: `${Math.min(i, 20) * 60}ms` }}
+                    >
+                      <BookCard book={book} size="grid" />
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </section>
         ) : (
           <>
             <section ref={browseSectionRef} className="mb-8">
-              <div className="mb-4 flex items-end justify-between gap-3">
-                <div>
-                  <h2 className="text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted">
-                    Browse {selectedGenreName} Books
-                  </h2>
+              <div className="discover-section-label-row mb-4 items-end justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-0">
+                  <h2 className="discover-section-label m-0">Browse {selectedGenreName} Books</h2>
+                  <div className="discover-section-label-line" />
                 </div>
                 {filteredByGenre.length > 20 ? (
                   <button
                     type="button"
                     onClick={toggleExpanded}
-                    className="text-sm font-medium text-accent-text transition duration-200 hover:underline underline-offset-2"
+                    className="shrink-0 text-sm font-medium text-accent-text transition duration-200 hover:underline underline-offset-2"
                   >
                     {expanded ? "Show Less ↑" : "View All →"}
                   </button>
@@ -748,9 +1146,19 @@ export function DiscoverCatalogueClient({
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                      {expandedBooks.map((book) => (
-                        <BookCard key={book.id} book={book} size="grid" />
-                      ))}
+                      {expandedBooks.map((book, i) =>
+                        reducedMotion ? (
+                          <BookCard key={book.id} book={book} size="grid" />
+                        ) : (
+                          <div
+                            key={book.id}
+                            className="discover-grid-cell"
+                            style={{ animationDelay: `${Math.min(i, 20) * 60}ms` }}
+                          >
+                            <BookCard book={book} size="grid" />
+                          </div>
+                        ),
+                      )}
                     </div>
                   )}
 
@@ -784,9 +1192,9 @@ export function DiscoverCatalogueClient({
             Request a Book
           </button>
         </section>
-      </div>
 
-      <BookRequestModal open={bookRequestOpen} onClose={() => setBookRequestOpen(false)} />
+        <BookRequestModal open={bookRequestOpen} onClose={() => setBookRequestOpen(false)} />
+      </div>
     </div>
   );
 }

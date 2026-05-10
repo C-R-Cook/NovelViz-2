@@ -30,6 +30,15 @@ export type AdminBookDetailModel = {
   createdAtLabel: string;
 };
 
+export type AdminBookPublicImageRow = {
+  id: string;
+  imageUrl: string;
+  chapterNumberAtTime: number;
+  userPrompt: string;
+  isFeatured: boolean;
+  username: string;
+};
+
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
   switch (status) {
@@ -50,7 +59,13 @@ function actionRowGradientClass(status: BookStatus): string {
   }
 }
 
-export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetailModel }) {
+export function AdminBookDetailClient({
+  book: initial,
+  publicImages: initialPublicImages,
+}: {
+  book: AdminBookDetailModel;
+  publicImages: AdminBookPublicImageRow[];
+}) {
   const router = useRouter();
   const ingestFileRef = useRef<HTMLInputElement>(null);
   const coverUploadRef = useRef<HTMLInputElement>(null);
@@ -116,6 +131,42 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
   const [coverUploadBusy, setCoverUploadBusy] = useState(false);
   const [coverUploadErr, setCoverUploadErr] = useState<string | null>(null);
   const [coverUploadMsg, setCoverUploadMsg] = useState<string | null>(null);
+
+  const [publicImages, setPublicImages] = useState(initialPublicImages);
+  const [featureToggleBusyId, setFeatureToggleBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPublicImages(initialPublicImages);
+  }, [initialPublicImages]);
+
+  async function toggleImageFeatured(imageId: string, current: boolean) {
+    const next = !current;
+    setFeatureToggleBusyId(imageId);
+    setPublicImages((rows) =>
+      rows.map((row) => (row.id === imageId ? { ...row, isFeatured: next } : row)),
+    );
+    try {
+      const res = await fetch(`/api/admin/images/${imageId}/feature`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: next }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { id: string; isFeatured: boolean };
+      setPublicImages((rows) =>
+        rows.map((row) => (row.id === data.id ? { ...row, isFeatured: data.isFeatured } : row)),
+      );
+    } catch {
+      setPublicImages((rows) =>
+        rows.map((row) => (row.id === imageId ? { ...row, isFeatured: current } : row)),
+      );
+    } finally {
+      setFeatureToggleBusyId(null);
+    }
+  }
 
   useEffect(() => {
     if (book.status !== "processing") return;
@@ -625,6 +676,48 @@ export function AdminBookDetailClient({ book: initial }: { book: AdminBookDetail
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Featured Images</h2>
+        <p className="mt-1 text-xs text-text-secondary">
+          Mark public gallery images to appear on the Discover page strip for this title.
+        </p>
+        {publicImages.length === 0 ? (
+          <p className="mt-4 text-sm text-text-muted">No public images yet.</p>
+        ) : (
+          <ul className="mt-4 space-y-4">
+            {publicImages.map((img) => (
+              <li
+                key={img.id}
+                className="flex flex-wrap items-center gap-4 rounded-lg border border-border/80 bg-bg-base/60 p-3"
+              >
+                <div className="relative h-[100px] w-20 shrink-0 overflow-hidden rounded-md border border-border bg-bg-surface">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+                  <img src={img.imageUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-text-muted">
+                    @{img.username} · Chapter {img.chapterNumberAtTime}
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm text-text-secondary">{img.userPrompt}</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={featureToggleBusyId === img.id}
+                  onClick={() => void toggleImageFeatured(img.id, img.isFeatured)}
+                  className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${
+                    img.isFeatured
+                      ? "bg-accent/20 text-accent-text ring-1 ring-accent/40"
+                      : "bg-bg-raised text-text-secondary ring-1 ring-border hover:bg-bg-base hover:text-text-primary"
+                  }`}
+                >
+                  {featureToggleBusyId === img.id ? "…" : img.isFeatured ? "★ Featured" : "★ Feature"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
 
       <section className="rounded-xl border border-border bg-bg-surface/85 p-6">

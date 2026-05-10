@@ -23,14 +23,16 @@ export default async function RootLayout({
 
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
+      <html lang="en" data-theme="moonlight-silver" suppressHydrationWarning>
+        <head>
+          {isDev && DEV_PALETTE_HYDRATION_SCRIPT ? (
+            <script dangerouslySetInnerHTML={{ __html: DEV_PALETTE_HYDRATION_SCRIPT }} />
+          ) : null}
+        </head>
         <body
           className="flex min-h-screen flex-col bg-bg-base text-text-primary antialiased"
           suppressHydrationWarning
         >
-          {isDev && DEV_PALETTE_HYDRATION_SCRIPT ? (
-            <script dangerouslySetInnerHTML={{ __html: DEV_PALETTE_HYDRATION_SCRIPT }} />
-          ) : null}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
           <PublicFooter />
           {isDev ? (

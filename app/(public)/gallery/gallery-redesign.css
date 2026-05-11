@@ -1,0 +1,451 @@
+/* Gallery — Discover-aligned presentation (scoped under .gallery-root) */
+
+.gallery-root {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  background: var(--bg-base);
+}
+
+.gallery-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    ellipse 55% 30% at 50% 0%,
+    var(--glow-color, rgba(160, 100, 20, 0.1)),
+    transparent 70%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gallery-root-inner {
+  position: relative;
+  z-index: 1;
+}
+
+/* Discover concept hero — same entrance + shimmer as "Every Chapter, Alive." */
+@keyframes gallery-concept-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.gallery-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(180, 140, 100, 0.62);
+  margin-bottom: 1rem;
+  transition:
+    opacity 0.8s ease,
+    transform 0.8s ease;
+}
+
+.gallery-title {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  line-height: 1.1;
+  background: linear-gradient(135deg, #fff 0%, rgba(180, 140, 100, 0.92) 45%, #fff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gallery-concept-shimmer 6s linear infinite;
+  transition:
+    opacity 1s ease,
+    transform 1s ease;
+}
+
+.gallery-subtitle {
+  margin: 0;
+  margin-top: 0.5rem;
+  max-width: 30rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  font-style: italic;
+  color: var(--text-secondary);
+  transition:
+    opacity 1s ease,
+    transform 1s ease;
+}
+
+.gallery-concept-hero-in {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gallery-concept-hero-in--delay {
+  transition-delay: 0.15s;
+}
+
+.gallery-concept-hero-in--delay2 {
+  transition-delay: 0.35s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-title {
+    animation: none;
+    color: rgba(230, 210, 180, 0.95);
+    background: none;
+    -webkit-background-clip: unset;
+    background-clip: unset;
+  }
+
+  .gallery-eyebrow,
+  .gallery-subtitle {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Section label row */
+.gallery-section-label-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.gallery-section-label-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.gallery-section-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.gallery-section-sublabel {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  opacity: 0.5;
+  text-transform: uppercase;
+}
+
+.gallery-section-label-line {
+  flex: 1;
+  height: 1px;
+  min-height: 1px;
+  background: linear-gradient(to right, var(--border-default), transparent);
+}
+
+.gallery-section-label-right {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  opacity: 0.5;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+/* Gem divider */
+.gallery-section-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 44px 0;
+}
+
+.gallery-divider-line {
+  flex: 1;
+  height: 1px;
+  min-height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-default, var(--border)) 15%,
+    var(--border-default, var(--border)) 85%,
+    transparent
+  );
+  opacity: 0.85;
+}
+
+.gallery-divider-gem {
+  font-size: 12px;
+  color: var(--accent);
+  opacity: 0.55;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Horizontal scroller — drag */
+.gallery-featured-scroller {
+  cursor: grab;
+}
+
+.gallery-featured-scroller.gallery-featured-scroller--dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* Card mount stagger */
+@keyframes gallery-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.gallery-root .gallery-card-mount {
+  animation: gallery-card-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-root .gallery-card-mount {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Outer card lift (article) */
+.gallery-image-card-wrap {
+  transition:
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.35s ease;
+}
+
+.gallery-image-card-wrap [data-gallery-card] {
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.35s ease;
+}
+
+@media (pointer: fine) {
+  .gallery-image-card-wrap:hover,
+  .gallery-image-card-wrap:focus-visible {
+    transform: translateY(-7px) scale(1.02);
+    z-index: 5;
+  }
+
+  .gallery-image-card-wrap:hover [data-gallery-card],
+  .gallery-image-card-wrap:focus-visible [data-gallery-card] {
+    box-shadow: 0 20px 50px var(--shelf-shadow);
+    border-color: var(--card-border-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-image-card-wrap {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .gallery-image-card-wrap:hover,
+  .gallery-image-card-wrap:focus-visible {
+    transform: none;
+  }
+
+  .gallery-image-card-wrap:hover [data-gallery-card],
+  .gallery-image-card-wrap:focus-visible [data-gallery-card] {
+    box-shadow: none;
+  }
+}
+
+/* Library masonry */
+.gallery-library-masonry {
+  column-width: 200px;
+  column-gap: 1rem;
+}
+
+.gallery-library-masonry-cell {
+  margin-bottom: 1rem;
+  break-inside: avoid;
+}
+
+/* Empty state */
+.gallery-empty-state {
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  padding: 2rem 1.25rem;
+  text-align: center;
+}
+
+.gallery-empty-state-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  padding: 0.65rem 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-decoration: none;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.gallery-empty-state-cta:hover {
+  background: var(--accent-dim);
+  color: var(--text-on-accent, var(--text-primary));
+}
+
+/* Guest overlay card */
+.gallery-guest-overlay-card {
+  max-width: 28rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface) 95%, transparent);
+  padding: 1.5rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 20px 50px var(--shelf-shadow, rgba(0, 0, 0, 0.35));
+  backdrop-filter: blur(12px);
+}
+
+.gallery-guest-overlay-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  padding: 0.65rem 1.25rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-on-accent, var(--text-primary));
+  background: var(--accent);
+  text-decoration: none;
+  transition: filter 0.2s ease;
+}
+
+.gallery-guest-overlay-cta:hover {
+  filter: brightness(1.08);
+}
+
+/* CTA banner */
+.gallery-cta-banner {
+  margin-top: 72px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent-dim), rgba(139, 26, 26, 0.04));
+  padding: 48px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.gallery-cta-content {
+  min-width: 0;
+}
+
+.gallery-cta-eyebrow {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 9px;
+  letter-spacing: 0.28em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.gallery-cta-heading {
+  font-size: 28px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: normal;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.gallery-cta-sub {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.gallery-cta-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.gallery-cta-primary {
+  background: var(--accent);
+  color: var(--text-on-accent, var(--text-primary));
+  border: none;
+  border-radius: 4px;
+  padding: 11px 28px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: center;
+  transition: filter 0.2s ease;
+}
+
+.gallery-cta-primary:hover {
+  filter: brightness(1.08);
+}
+
+.gallery-cta-secondary {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 11px 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.gallery-cta-secondary:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+@media (max-width: 767px) {
+  .gallery-cta-banner {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 32px 24px;
+  }
+
+  .gallery-cta-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .gallery-cta-primary,
+  .gallery-cta-secondary {
+    width: 100%;
+  }
+}

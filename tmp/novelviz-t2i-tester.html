@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NovelViz — T2I Model Tester</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141418;
+    --panel: #1a1a20;
+    --border: #2a2a35;
+    --border-bright: #3d3d52;
+    --accent: #7c6aff;
+    --accent-dim: rgba(124, 106, 255, 0.15);
+    --accent-glow: rgba(124, 106, 255, 0.35);
+    --gold: #e4a853;
+    --gold-dim: rgba(228, 168, 83, 0.15);
+    --text: #e8e8f0;
+    --text-mid: #9898b0;
+    --text-dim: #55556a;
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+    --running: #38bdf8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(13,13,15,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+    font-size: 1.25rem;
+    color: var(--gold);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .logo span { color: var(--text-mid); font-size: 0.7rem; font-family: 'DM Mono', monospace; margin-left: 8px; vertical-align: middle; }
+
+  .header-tabs {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .header-tabs::-webkit-scrollbar { display: none; }
+
+  .tab-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: none;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .tab-btn:hover { color: var(--text-mid); border-color: var(--border); }
+  .tab-btn.active { color: var(--accent); background: var(--accent-dim); border-color: var(--accent); }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-bright);
+    background: var(--surface);
+    color: var(--text-mid);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #6855ef; border-color: #6855ef; }
+  .btn.danger { border-color: #3d2020; color: #f87171; }
+  .btn.danger:hover { background: rgba(248,113,113,0.1); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .progress-indicator {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    padding: 0 8px;
+  }
+
+  .progress-indicator.running { color: var(--running); animation: pulse 1.5s infinite; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ── Main layout ── */
+  main { padding: 24px 28px; max-width: 1800px; }
+
+  /* ── Config Panel ── */
+  .config-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+  }
+
+  .config-panel summary {
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-mid);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    user-select: none;
+  }
+
+  .config-panel summary::before { content: '▶'; font-size: 0.6rem; transition: transform 0.2s; }
+  .config-panel[open] summary::before { transform: rotate(90deg); }
+
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+
+  .config-section h3 {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+  }
+
+  .field label {
+    font-size: 0.75rem;
+    color: var(--text-mid);
+    font-family: 'DM Mono', monospace;
+  }
+
+  .field input, .field textarea, .field select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    padding: 7px 10px;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .field textarea { resize: vertical; min-height: 60px; }
+
+  .prompt-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .prompt-item {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .prompt-item textarea {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 6px 10px;
+    resize: vertical;
+    min-height: 48px;
+    transition: border-color 0.15s;
+  }
+
+  .prompt-item textarea:focus { outline: none; border-color: var(--accent); }
+
+  .prompt-item .prompt-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    padding-top: 8px;
+    min-width: 22px;
+    text-align: right;
+  }
+
+  .prompt-item .btn-icon {
+    padding: 6px 8px;
+    font-size: 0.75rem;
+    margin-top: 2px;
+  }
+
+  .add-prompt-btn {
+    margin-top: 6px;
+    width: 100%;
+    border-style: dashed;
+  }
+
+  /* ── Model tabs content ── */
+  .model-view { display: none; }
+  .model-view.active { display: block; }
+
+  .model-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .model-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 4px 10px;
+    border-radius: 6px;
+  }
+
+  .model-stats {
+    display: flex;
+    gap: 20px;
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+  }
+
+  .model-stats .stat { display: flex; flex-direction: column; gap: 2px; }
+  .model-stats .stat-val { color: var(--text-mid); font-size: 0.85rem; }
+
+  /* ── Prompt rows ── */
+  .prompt-row {
+    margin-bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .prompt-row-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+
+  .prompt-row-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    min-width: 24px;
+  }
+
+  .prompt-row-text {
+    flex: 1;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.76rem;
+    color: var(--text-mid);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .prompt-row-status {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .status-pending { color: var(--text-dim); }
+  .status-running { color: var(--running); animation: pulse 1.5s infinite; }
+  .status-done { color: var(--green); }
+  .status-partial { color: var(--amber); }
+  .status-error { color: var(--red); }
+
+  .prompt-row-images {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1px;
+    background: var(--border);
+  }
+
+  /* ── Image cell ── */
+  .img-cell {
+    background: var(--bg);
+    position: relative;
+    aspect-ratio: 3/4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .img-cell:hover .img-overlay { opacity: 1; }
+
+  .img-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .img-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+  }
+
+  .img-placeholder .attempt-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+  }
+
+  .img-placeholder .run-single {
+    font-size: 0.7rem;
+    padding: 4px 10px;
+  }
+
+  .img-loading {
+    position: absolute;
+    inset: 0;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+
+  .img-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(13,13,15,0.85);
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .img-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.64rem;
+    color: var(--text-mid);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .img-meta .meta-row { display: flex; justify-content: space-between; }
+  .img-meta .meta-label { color: var(--text-dim); }
+  .img-meta .meta-val { color: var(--text); }
+
+  .img-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .img-actions .btn { padding: 3px 8px; font-size: 0.68rem; flex: 1; }
+
+  .img-error {
+    position: absolute;
+    inset: 0;
+    background: rgba(248,113,113,0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .img-error .err-icon { font-size: 1.5rem; }
+  .img-error .err-msg {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--red);
+    word-break: break-all;
+  }
+
+  /* ── Modal ── */
+  .modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-bg.open { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    border-radius: 12px;
+    max-width: 900px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .modal-img { aspect-ratio: 3/4; object-fit: cover; border-radius: 12px 0 0 12px; width: 100%; }
+
+  .modal-info {
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .modal-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    color: var(--text);
+  }
+
+  .modal-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .modal-meta-item { display: flex; flex-direction: column; gap: 3px; }
+
+  .modal-meta-item label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .modal-meta-item span {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--text);
+  }
+
+  .modal-prompt-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--text-mid);
+    line-height: 1.5;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-mid);
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--panel);
+    border: 1px solid var(--border-bright);
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text);
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 300;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
+
+  /* ── Cost pill ── */
+  .cost-pill {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    background: var(--gold-dim);
+    border: 1px solid rgba(228,168,83,0.3);
+    color: var(--gold);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .attempt-badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(13,13,15,0.75);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     ⚙️  CONFIGURATION — edit this section
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+const CONFIG = {
+  // Your fal.ai API key (inference key)
+  FAL_API_KEY: "YOUR_FAL_API_KEY_HERE",
+
+  // Number of times to run each prompt
+  RUNS_PER_PROMPT: 5,
+
+  // Image dimensions
+  IMAGE_SIZE: "portrait_4_3",  // portrait_4_3 | square_hd | landscape_4_3
+
+  // Models to test — one tab per model
+  MODELS: [
+    {
+      id: "flux-schnell",
+      label: "flux/schnell",
+      endpoint: "fal-ai/flux/schnell",
+      costPerImage: 0.003,
+      description: "Fast, cheap, dev/test baseline"
+    },
+    {
+      id: "flux-dev",
+      label: "flux/dev",
+      endpoint: "fal-ai/flux/dev",
+      costPerImage: 0.025,
+      description: "Better quality, slower"
+    },
+    {
+      id: "flux-pro-11",
+      label: "flux-pro/v1.1",
+      endpoint: "fal-ai/flux-pro/v1.1",
+      costPerImage: 0.04,
+      description: "High quality"
+    },
+    {
+      id: "flux-kontext-pro",
+      label: "flux-kontext/pro",
+      endpoint: "fal-ai/flux-kontext/pro",
+      costPerImage: 0.04,
+      description: "Good consistency"
+    },
+    {
+      id: "flux-pro-ultra",
+      label: "flux-pro/v1.1-ultra",
+      endpoint: "fal-ai/flux-pro/v1.1-ultra",
+      costPerImage: 0.06,
+      description: "Best FLUX quality"
+    }
+  ],
+
+  // Test prompts — edit these to your book's scenes/characters
+  PROMPTS: [
+    "A gaunt man with pale skin and sharp features standing in a dark doorway, candlelight casting deep shadows, Victorian gothic atmosphere, oil painting style",
+    "A vast library with towering bookshelves reaching into darkness, a single scholar at a reading desk illuminated by lamplight, gothic architecture",
+    "A woman in Victorian dress standing on a cliff at night, stormy sea below, full moon behind dark clouds, dramatic lighting",
+    "Ancient stone castle on a rocky promontory, mist rising from the valley, twilight sky in deep purples and blues, romantic gothic style",
+    "A grand dining hall with long table and candelabras, cobwebs in the corners, dust motes in shaft of moonlight, oil painting style",
+    "Close portrait of a young woman with dark circles under her eyes, pearl necklace, expression of fear, soft candlelight, Victorian setting",
+    "A black bat silhouetted against a full moon, Romanian mountain peaks below, deep indigo sky",
+    "Two men in Victorian coats examining old maps spread on a desk, lantern light, mysterious documents and letters scattered about",
+    "A horse-drawn carriage racing along a mountain road at night, forest on both sides, lanterns casting warm glow, stormy sky",
+    "Interior of a Victorian ship cabin, brass instruments, porthole showing moonlit sea, leather-bound journals on the desk"
+  ]
+};
+</script>
+<!-- ═══════════════════════════════════════════════════════════ -->
+
+<header>
+  <div class="logo">NovelViz <span>T2I TESTER</span></div>
+  <div class="header-tabs" id="headerTabs"></div>
+  <div class="header-actions">
+    <span class="progress-indicator" id="progressLabel">idle</span>
+    <button class="btn" onclick="clearModelData()">Clear Tab</button>
+    <button class="btn danger" onclick="clearAllData()">Clear All</button>
+    <button class="btn primary" id="runAllBtn" onclick="runAll()">▶ Run All</button>
+  </div>
+</header>
+
+<main id="mainContent"></main>
+
+<!-- Config panel -->
+<div style="padding: 0 28px 28px;">
+  <details class="config-panel" id="configPanel">
+    <summary>Configuration &amp; Settings</summary>
+    <div class="config-grid">
+      <div class="config-section">
+        <h3>Session Settings</h3>
+        <div class="field">
+          <label>fal.ai API Key</label>
+          <input type="password" id="cfgApiKey" placeholder="Enter your fal.ai key…" oninput="updateLiveConfig()">
+        </div>
+        <div class="field">
+          <label>Runs per prompt</label>
+          <input type="number" id="cfgRuns" min="1" max="10" value="5" oninput="updateLiveConfig()">
+        </div>
+        <div class="field">
+          <label>Image size</label>
+          <select id="cfgSize" onchange="updateLiveConfig()">
+            <option value="portrait_4_3">portrait_4_3</option>
+            <option value="square_hd">square_hd</option>
+            <option value="landscape_4_3">landscape_4_3</option>
+          </select>
+        </div>
+      </div>
+      <div class="config-section">
+        <h3>Prompts <span style="color: var(--text-dim); font-weight: 300;" id="promptCount"></span></h3>
+        <div class="prompt-list" id="promptList"></div>
+        <button class="btn add-prompt-btn" onclick="addPrompt()">+ Add Prompt</button>
+      </div>
+    </div>
+  </details>
+</div>
+
+<!-- Image modal -->
+<div class="modal-bg" id="modalBg" onclick="closeModal(event)">
+  <div class="modal" id="modalContent" style="position:relative;">
+    <button class="modal-close" onclick="document.getElementById('modalBg').classList.remove('open')">✕ close</button>
+    <img id="modalImg" class="modal-img" src="" alt="">
+    <div class="modal-info">
+      <div class="modal-title" id="modalTitle">Generation Details</div>
+      <div class="modal-meta-grid" id="modalMeta"></div>
+      <div>
+        <div style="font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;">Prompt</div>
+        <div class="modal-prompt-box" id="modalPrompt"></div>
+      </div>
+      <div>
+        <div style="font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em;">Actions</div>
+        <div style="display: flex; gap: 8px;">
+          <a id="modalDownload" href="#" download class="btn" style="text-decoration:none; text-align:center;">↓ Download</a>
+          <button class="btn" onclick="rerunFromModal()">↻ Re-run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'novelviz_t2i_tester_v2';
+let activeModelId = null;
+let isRunning = false;
+let abortRequested = false;
+let liveConfig = { ...CONFIG };
+let modalContext = null;
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function saveState(state) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function getModelState(modelId) {
+  const state = loadState();
+  if (!state[modelId]) state[modelId] = {};
+  return state[modelId];
+}
+
+function setResult(modelId, promptIdx, runIdx, result) {
+  const state = loadState();
+  if (!state[modelId]) state[modelId] = {};
+  const key = `${promptIdx}_${runIdx}`;
+  state[modelId][key] = result;
+  saveState(state);
+}
+
+function getResult(modelId, promptIdx, runIdx) {
+  const state = loadState();
+  return state[modelId]?.[`${promptIdx}_${runIdx}`] || null;
+}
+
+// ── Live Config ─────────────────────────────────────────────────────────────
+function updateLiveConfig() {
+  const keyInput = document.getElementById('cfgApiKey').value.trim();
+  const runsInput = parseInt(document.getElementById('cfgRuns').value) || 5;
+  const sizeInput = document.getElementById('cfgSize').value;
+  liveConfig = {
+    ...CONFIG,
+    FAL_API_KEY: keyInput || CONFIG.FAL_API_KEY,
+    RUNS_PER_PROMPT: runsInput,
+    IMAGE_SIZE: sizeInput,
+    PROMPTS: getPromptsFromUI()
+  };
+  renderAllRows();
+}
+
+function getPromptsFromUI() {
+  return Array.from(document.querySelectorAll('#promptList .prompt-item textarea'))
+    .map(t => t.value.trim())
+    .filter(Boolean);
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  liveConfig = { ...CONFIG };
+  buildTabs();
+  buildConfigPanel();
+  activeModelId = liveConfig.MODELS[0].id;
+  renderActiveTab();
+  updateTabActive();
+});
+
+function buildTabs() {
+  const container = document.getElementById('headerTabs');
+  container.innerHTML = liveConfig.MODELS.map(m => `
+    <button class="tab-btn" data-model="${m.id}" onclick="switchTab('${m.id}')">${m.label}</button>
+  `).join('');
+}
+
+function buildConfigPanel() {
+  // API key
+  document.getElementById('cfgApiKey').placeholder = CONFIG.FAL_API_KEY.startsWith('YOUR') ? 'Enter your fal.ai key…' : '••••••••';
+  document.getElementById('cfgRuns').value = CONFIG.RUNS_PER_PROMPT;
+  document.getElementById('cfgSize').value = CONFIG.IMAGE_SIZE;
+
+  renderPromptList();
+}
+
+function renderPromptList() {
+  const container = document.getElementById('promptList');
+  container.innerHTML = liveConfig.PROMPTS.map((p, i) => `
+    <div class="prompt-item">
+      <span class="prompt-num">${i+1}</span>
+      <textarea oninput="updateLiveConfig()">${escHtml(p)}</textarea>
+      <button class="btn btn-icon" onclick="removePrompt(${i})">✕</button>
+    </div>
+  `).join('');
+  document.getElementById('promptCount').textContent = `(${liveConfig.PROMPTS.length})`;
+}
+
+function addPrompt() {
+  liveConfig.PROMPTS.push('');
+  renderPromptList();
+}
+
+function removePrompt(idx) {
+  liveConfig.PROMPTS.splice(idx, 1);
+  renderPromptList();
+  renderAllRows();
+}
+
+function switchTab(modelId) {
+  activeModelId = modelId;
+  updateTabActive();
+  renderActiveTab();
+}
+
+function updateTabActive() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.model === activeModelId);
+  });
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function renderActiveTab() {
+  const main = document.getElementById('mainContent');
+  const model = liveConfig.MODELS.find(m => m.id === activeModelId);
+
+  const stats = computeModelStats(activeModelId);
+
+  main.innerHTML = `
+    <div class="model-view active" id="view_${activeModelId}">
+      <div class="model-header">
+        <div class="model-badge">${model.endpoint}</div>
+        <div class="model-stats">
+          <div class="stat"><div class="meta-label">generated</div><div class="stat-val">${stats.done} / ${liveConfig.PROMPTS.length * liveConfig.RUNS_PER_PROMPT}</div></div>
+          <div class="stat"><div class="meta-label">avg gen time</div><div class="stat-val">${stats.avgTime}</div></div>
+          <div class="stat"><div class="meta-label">total cost</div><div class="stat-val cost-pill">$${stats.totalCost}</div></div>
+          <div class="stat"><div class="meta-label">errors</div><div class="stat-val" style="color: ${stats.errors > 0 ? 'var(--red)' : 'var(--text-dim)'}">${stats.errors}</div></div>
+        </div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--text-dim)">${model.description}</div>
+      </div>
+      <div id="rows_${activeModelId}">
+        ${renderPromptRows(activeModelId)}
+      </div>
+    </div>
+  `;
+}
+
+function renderAllRows() {
+  const container = document.getElementById(`rows_${activeModelId}`);
+  if (container) container.innerHTML = renderPromptRows(activeModelId);
+  updateModelHeader(activeModelId);
+}
+
+function renderPromptRows(modelId) {
+  return liveConfig.PROMPTS.map((prompt, pi) => renderPromptRow(modelId, pi, prompt)).join('');
+}
+
+function renderPromptRow(modelId, pi, prompt) {
+  const runs = liveConfig.RUNS_PER_PROMPT;
+  const results = Array.from({length: runs}, (_, ri) => getResult(modelId, pi, ri));
+  const doneCount = results.filter(r => r && r.status === 'done').length;
+  const hasAny = results.some(r => r);
+  const allDone = doneCount === runs;
+  const hasError = results.some(r => r && r.status === 'error');
+
+  let statusClass = 'status-pending';
+  let statusLabel = 'pending';
+  if (allDone) { statusClass = 'status-done'; statusLabel = 'done'; }
+  else if (doneCount > 0 || hasError) { statusClass = 'status-partial'; statusLabel = `${doneCount}/${runs}`; }
+
+  return `
+    <div class="prompt-row" id="row_${modelId}_${pi}">
+      <div class="prompt-row-header">
+        <span class="prompt-row-num">#${pi+1}</span>
+        <span class="prompt-row-text" title="${escAttr(prompt)}">${escHtml(prompt)}</span>
+        <span class="prompt-row-status ${statusClass}">${statusLabel}</span>
+        <button class="btn" style="padding:4px 10px;font-size:0.72rem;" onclick="runPromptRow('${modelId}', ${pi})">↻ Row</button>
+      </div>
+      <div class="prompt-row-images">
+        ${Array.from({length: runs}, (_, ri) => renderImageCell(modelId, pi, ri, results[ri])).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderImageCell(modelId, pi, ri, result) {
+  if (!result) {
+    return `
+      <div class="img-cell" id="cell_${modelId}_${pi}_${ri}" onclick="runSingle('${modelId}', ${pi}, ${ri})">
+        <div class="img-placeholder">
+          <div class="attempt-num" style="font-size:1.5rem;opacity:0.2">${ri+1}</div>
+          <button class="btn run-single">▶</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (result.status === 'loading') {
+    return `
+      <div class="img-cell" id="cell_${modelId}_${pi}_${ri}">
+        <div class="img-loading">
+          <div class="spinner"></div>
+          <div class="loading-label">generating…</div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (result.status === 'error') {
+    return `
+      <div class="img-cell" id="cell_${modelId}_${pi}_${ri}" onclick="runSingle('${modelId}', ${pi}, ${ri})">
+        <div class="img-error">
+          <div class="err-icon">⚠</div>
+          <div class="err-msg">${escHtml(result.error || 'Unknown error')}</div>
+          <button class="btn run-single" style="margin-top:6px;font-size:0.68rem;">Retry</button>
+        </div>
+      </div>
+    `;
+  }
+
+  // done
+  const genSecs = result.genTime ? (result.genTime/1000).toFixed(1)+'s' : '–';
+  const cost = result.cost ? '$'+result.cost.toFixed(4) : '–';
+
+  return `
+    <div class="img-cell" id="cell_${modelId}_${pi}_${ri}" onclick="openModal('${modelId}', ${pi}, ${ri})">
+      <img src="${escAttr(result.imageUrl)}" loading="lazy" alt="Attempt ${ri+1}">
+      <div class="attempt-badge">#${ri+1}</div>
+      <div class="img-overlay">
+        <div class="img-meta">
+          <div class="meta-row"><span class="meta-label">time</span><span class="meta-val">${genSecs}</span></div>
+          <div class="meta-row"><span class="meta-label">cost</span><span class="meta-val cost-pill">${cost}</span></div>
+        </div>
+        <div class="img-actions">
+          <a href="${escAttr(result.imageUrl)}" download="novelviz_p${pi+1}_r${ri+1}.jpg" class="btn" style="text-decoration:none;text-align:center;" onclick="event.stopPropagation()">↓</a>
+          <button class="btn" onclick="event.stopPropagation();runSingle('${modelId}', ${pi}, ${ri})">↻</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function updateModelHeader(modelId) {
+  const stats = computeModelStats(modelId);
+  const headerStats = document.querySelector(`#view_${modelId} .model-stats`);
+  if (!headerStats) return;
+  headerStats.innerHTML = `
+    <div class="stat"><div class="meta-label">generated</div><div class="stat-val">${stats.done} / ${liveConfig.PROMPTS.length * liveConfig.RUNS_PER_PROMPT}</div></div>
+    <div class="stat"><div class="meta-label">avg gen time</div><div class="stat-val">${stats.avgTime}</div></div>
+    <div class="stat"><div class="meta-label">total cost</div><div class="stat-val cost-pill">$${stats.totalCost}</div></div>
+    <div class="stat"><div class="meta-label">errors</div><div class="stat-val" style="color: ${stats.errors > 0 ? 'var(--red)' : 'var(--text-dim)'}">${stats.errors}</div></div>
+  `;
+}
+
+function computeModelStats(modelId) {
+  const state = getModelState(modelId);
+  let done = 0, errors = 0, totalTime = 0, timeCount = 0, totalCost = 0;
+  Object.values(state).forEach(r => {
+    if (!r) return;
+    if (r.status === 'done') {
+      done++;
+      if (r.genTime) { totalTime += r.genTime; timeCount++; }
+      if (r.cost) totalCost += r.cost;
+    }
+    if (r.status === 'error') errors++;
+  });
+  const avgTime = timeCount > 0 ? (totalTime / timeCount / 1000).toFixed(1)+'s' : '–';
+  return { done, errors, avgTime, totalCost: totalCost.toFixed(4) };
+}
+
+// ── FAL API call ─────────────────────────────────────────────────────────────
+async function generateImage(modelEndpoint, prompt, imageSize) {
+  const apiKey = liveConfig.FAL_API_KEY;
+  if (!apiKey || apiKey.startsWith('YOUR')) {
+    throw new Error('No fal.ai API key set. Open Config panel and enter your key.');
+  }
+
+  const submitRes = await fetch(`https://queue.fal.run/${modelEndpoint}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ prompt, image_size: imageSize, num_images: 1 })
+  });
+
+  if (!submitRes.ok) {
+    const err = await submitRes.text();
+    throw new Error(`Submit failed ${submitRes.status}: ${err.slice(0, 200)}`);
+  }
+
+  const submitData = await submitRes.json();
+  const requestId = submitData.request_id;
+
+  if (!requestId) {
+    // direct response (some endpoints)
+    const imgs = submitData.images || submitData.data?.images;
+    if (imgs?.[0]?.url) return imgs[0].url;
+    throw new Error('No request_id or image in response');
+  }
+
+  // Poll queue
+  for (let i = 0; i < 120; i++) {
+    await sleep(1000);
+    const statusRes = await fetch(`https://queue.fal.run/${modelEndpoint}/requests/${requestId}/status`, {
+      headers: { 'Authorization': `Key ${apiKey}` }
+    });
+    if (!statusRes.ok) continue;
+    const statusData = await statusRes.json();
+
+    if (statusData.status === 'COMPLETED') {
+      const resultRes = await fetch(`https://queue.fal.run/${modelEndpoint}/requests/${requestId}`, {
+        headers: { 'Authorization': `Key ${apiKey}` }
+      });
+      const result = await resultRes.json();
+      const imgs = result.images || result.data?.images;
+      if (imgs?.[0]?.url) return imgs[0].url;
+      throw new Error('No image URL in completed result');
+    }
+
+    if (statusData.status === 'FAILED' || statusData.status === 'ERROR') {
+      throw new Error(`Job failed: ${statusData.error || statusData.status}`);
+    }
+  }
+
+  throw new Error('Timeout after 120s');
+}
+
+// ── Run Logic ────────────────────────────────────────────────────────────────
+async function runSingle(modelId, pi, ri) {
+  if (isRunning) return;
+  await executeGeneration(modelId, pi, ri);
+}
+
+async function runPromptRow(modelId, pi) {
+  if (isRunning) return;
+  isRunning = true;
+  setRunningUI(true);
+  try {
+    for (let ri = 0; ri < liveConfig.RUNS_PER_PROMPT; ri++) {
+      if (abortRequested) break;
+      await executeGeneration(modelId, pi, ri);
+    }
+  } finally {
+    isRunning = false;
+    abortRequested = false;
+    setRunningUI(false);
+  }
+}
+
+async function runAll() {
+  if (isRunning) {
+    abortRequested = true;
+    document.getElementById('runAllBtn').textContent = 'Stopping…';
+    return;
+  }
+  isRunning = true;
+  abortRequested = false;
+  document.getElementById('runAllBtn').textContent = '■ Stop';
+  setRunningUI(true);
+
+  const model = liveConfig.MODELS.find(m => m.id === activeModelId);
+  const total = liveConfig.PROMPTS.length * liveConfig.RUNS_PER_PROMPT;
+  let done = 0;
+
+  for (let pi = 0; pi < liveConfig.PROMPTS.length; pi++) {
+    for (let ri = 0; ri < liveConfig.RUNS_PER_PROMPT; ri++) {
+      if (abortRequested) break;
+      const existing = getResult(activeModelId, pi, ri);
+      if (existing?.status === 'done') { done++; continue; }
+
+      setProgress(`${++done}/${total} — prompt ${pi+1}, run ${ri+1}`);
+      await executeGeneration(activeModelId, pi, ri);
+    }
+    if (abortRequested) break;
+  }
+
+  isRunning = false;
+  abortRequested = false;
+  document.getElementById('runAllBtn').textContent = '▶ Run All';
+  setRunningUI(false);
+  toast('Run complete');
+}
+
+async function executeGeneration(modelId, pi, ri) {
+  const model = liveConfig.MODELS.find(m => m.id === modelId);
+  const prompt = liveConfig.PROMPTS[pi];
+  if (!prompt) return;
+
+  // Mark loading
+  setCellLoading(modelId, pi, ri, true);
+  updateRowStatus(modelId, pi);
+
+  const start = Date.now();
+  try {
+    const imageUrl = await generateImage(model.endpoint, prompt, liveConfig.IMAGE_SIZE);
+    const genTime = Date.now() - start;
+    const result = {
+      status: 'done',
+      imageUrl,
+      genTime,
+      cost: model.costPerImage,
+      prompt,
+      model: model.endpoint,
+      timestamp: new Date().toISOString()
+    };
+    setResult(modelId, pi, ri, result);
+    updateCell(modelId, pi, ri, result);
+    updateRowStatus(modelId, pi);
+    updateModelHeader(modelId);
+  } catch (err) {
+    const result = { status: 'error', error: err.message, prompt, model: model.endpoint };
+    setResult(modelId, pi, ri, result);
+    updateCell(modelId, pi, ri, result);
+    updateRowStatus(modelId, pi);
+    toast('Error: ' + err.message, true);
+  }
+}
+
+function setCellLoading(modelId, pi, ri, loading) {
+  const cell = document.getElementById(`cell_${modelId}_${pi}_${ri}`);
+  if (!cell) return;
+  if (loading) {
+    cell.innerHTML = `<div class="img-loading"><div class="spinner"></div><div class="loading-label">generating…</div></div>`;
+  }
+}
+
+function updateCell(modelId, pi, ri, result) {
+  const cell = document.getElementById(`cell_${modelId}_${pi}_${ri}`);
+  if (!cell) return;
+  cell.outerHTML = renderImageCell(modelId, pi, ri, result);
+}
+
+function updateRowStatus(modelId, pi) {
+  const runs = liveConfig.RUNS_PER_PROMPT;
+  const results = Array.from({length: runs}, (_, ri) => getResult(modelId, pi, ri));
+  const doneCount = results.filter(r => r && r.status === 'done').length;
+  const allDone = doneCount === runs;
+  const hasError = results.some(r => r && r.status === 'error');
+
+  const statusEl = document.querySelector(`#row_${modelId}_${pi} .prompt-row-status`);
+  if (!statusEl) return;
+
+  statusEl.className = 'prompt-row-status';
+  if (allDone) { statusEl.classList.add('status-done'); statusEl.textContent = 'done'; }
+  else if (doneCount > 0 || hasError) { statusEl.classList.add('status-partial'); statusEl.textContent = `${doneCount}/${runs}`; }
+  else { statusEl.classList.add('status-pending'); statusEl.textContent = 'pending'; }
+}
+
+// ── UI helpers ───────────────────────────────────────────────────────────────
+function setRunningUI(running) {
+  const label = document.getElementById('progressLabel');
+  if (running) { label.textContent = 'running'; label.className = 'progress-indicator running'; }
+  else { label.textContent = 'idle'; label.className = 'progress-indicator'; }
+}
+
+function setProgress(text) {
+  document.getElementById('progressLabel').textContent = text;
+}
+
+function clearModelData() {
+  if (!confirm(`Clear all results for ${activeModelId}?`)) return;
+  const state = loadState();
+  state[activeModelId] = {};
+  saveState(state);
+  renderActiveTab();
+  toast(`Cleared ${activeModelId}`);
+}
+
+function clearAllData() {
+  if (!confirm('Clear ALL results for ALL models?')) return;
+  saveState({});
+  renderActiveTab();
+  toast('All data cleared');
+}
+
+// ── Modal ────────────────────────────────────────────────────────────────────
+function openModal(modelId, pi, ri) {
+  const result = getResult(modelId, pi, ri);
+  if (!result || result.status !== 'done') return;
+  const model = liveConfig.MODELS.find(m => m.id === modelId);
+
+  modalContext = { modelId, pi, ri };
+
+  document.getElementById('modalImg').src = result.imageUrl;
+  document.getElementById('modalTitle').textContent = `Prompt #${pi+1} — Attempt ${ri+1}`;
+  document.getElementById('modalDownload').href = result.imageUrl;
+  document.getElementById('modalDownload').download = `novelviz_${modelId}_p${pi+1}_r${ri+1}.jpg`;
+  document.getElementById('modalPrompt').textContent = result.prompt || liveConfig.PROMPTS[pi];
+
+  document.getElementById('modalMeta').innerHTML = [
+    ['Model', model.label],
+    ['Gen Time', result.genTime ? (result.genTime/1000).toFixed(2)+'s' : '–'],
+    ['Cost', result.cost ? '$'+result.cost.toFixed(4) : '–'],
+    ['Generated', result.timestamp ? new Date(result.timestamp).toLocaleString() : '–'],
+    ['Image Size', liveConfig.IMAGE_SIZE],
+    ['Prompt #', `${pi+1} of ${liveConfig.PROMPTS.length}`],
+  ].map(([label, val]) => `
+    <div class="modal-meta-item">
+      <label>${label}</label>
+      <span>${escHtml(String(val))}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeModal(e) {
+  if (e.target.id === 'modalBg') document.getElementById('modalBg').classList.remove('open');
+}
+
+async function rerunFromModal() {
+  if (!modalContext) return;
+  document.getElementById('modalBg').classList.remove('open');
+  await executeGeneration(modalContext.modelId, modalContext.pi, modalContext.ri);
+}
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor = isError ? 'var(--red)' : 'var(--border-bright)';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Utils ────────────────────────────────────────────────────────────────────
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(str) {
+  return String(str).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>

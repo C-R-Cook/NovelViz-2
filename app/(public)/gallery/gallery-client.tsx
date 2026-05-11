@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import "./gallery-redesign.css";
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
@@ -144,6 +146,60 @@ function mergeGalleryServerImages(
   return next;
 }
 
+function useGalleryMotionPrefs() {
+  const [finePointer, setFinePointer] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mqFine = window.matchMedia("(pointer: fine)");
+    const mqReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => {
+      setFinePointer(mqFine.matches);
+      setReducedMotion(mqReduce.matches);
+    };
+    sync();
+    mqFine.addEventListener("change", sync);
+    mqReduce.addEventListener("change", sync);
+    return () => {
+      mqFine.removeEventListener("change", sync);
+      mqReduce.removeEventListener("change", sync);
+    };
+  }, []);
+
+  return { finePointer, reducedMotion };
+}
+
+function GallerySectionLabel({
+  label,
+  sub,
+  right,
+}: {
+  label: string;
+  sub?: string;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="gallery-section-label-row">
+      <div className="gallery-section-label-text">
+        <span className="gallery-section-label">{label}</span>
+        {sub ? <span className="gallery-section-sublabel">{sub}</span> : null}
+      </div>
+      <div className="gallery-section-label-line" aria-hidden />
+      {right ? <span className="gallery-section-label-right">{right}</span> : null}
+    </div>
+  );
+}
+
+function GallerySectionDivider() {
+  return (
+    <div className="gallery-section-divider" aria-hidden>
+      <div className="gallery-divider-line" />
+      <span className="gallery-divider-gem">✦</span>
+      <div className="gallery-divider-line" />
+    </div>
+  );
+}
+
 type GallerySquareCardProps = {
   image: GalleryImageCard;
   carouselIds: string[];
@@ -157,6 +213,9 @@ type GallerySquareCardProps = {
   onLike: (id: string) => void;
   openModal: (carouselIds: string[], index: number) => void;
   locked: boolean;
+  widthMode?: "carousel" | "fluid";
+  reducedMotion?: boolean;
+  staggerIndex?: number;
 };
 
 function GallerySquareCard({
@@ -172,6 +231,9 @@ function GallerySquareCard({
   onLike,
   openModal,
   locked,
+  widthMode = "carousel",
+  reducedMotion = false,
+  staggerIndex = 0,
 }: GallerySquareCardProps) {
   const displayUserName = image.userName?.trim() || "Anonymous reader";
   const alreadyLiked = image.likedByViewer;
@@ -191,12 +253,26 @@ function GallerySquareCard({
         })
       : null;
 
+  const faceWidthClass =
+    widthMode === "fluid"
+      ? "relative w-full min-w-0 max-w-full"
+      : "relative w-[66vw] min-w-[66vw] md:w-[180px] md:min-w-[180px] lg:w-[200px] lg:min-w-[200px] xl:w-[220px] xl:min-w-[220px]";
+  const imageSizes =
+    widthMode === "fluid"
+      ? "(max-width: 767px) 92vw, (max-width: 1200px) 30vw, 220px"
+      : "(max-width: 767px) 66vw, (min-width: 768px) 180px, (min-width: 1024px) 200px, 220px";
+
   return (
     <article
       tabIndex={0}
       role="button"
       aria-label={`Open image: ${image.bookTitle}`}
-      className="group outline-none"
+      className={`group outline-none gallery-image-card-wrap ${reducedMotion ? "" : "gallery-card-mount"}`}
+      style={
+        reducedMotion
+          ? undefined
+          : { animationDelay: `${Math.min(staggerIndex, 16) * 55}ms` }
+      }
       onClick={() => openModal(carouselIds, index)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") openModal(carouselIds, index);
@@ -204,7 +280,7 @@ function GallerySquareCard({
     >
       <div
         data-gallery-card
-        className="relative w-[66vw] min-w-[66vw] md:w-[180px] md:min-w-[180px] lg:w-[200px] lg:min-w-[200px] xl:w-[220px] xl:min-w-[220px] aspect-square overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm transition-transform duration-200 ease-out md:group-hover:scale-[1.03]"
+        className={`${faceWidthClass} aspect-square overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm`}
       >
         <Image
           src={image.imageUrl}
@@ -212,8 +288,11 @@ function GallerySquareCard({
           fill
           unoptimized
           className={`object-cover transition-[filter] duration-200 ease-out ${locked ? "blur-[24px]" : "blur-0"}`}
-          sizes="(max-width: 767px) 66vw, (min-width: 768px) 180px, (min-width: 1024px) 200px, 220px"
+          sizes={imageSizes}
         />
+        {!locked && badgeMode === "featured" && viewerUserId !== null ? (
+          <GalleryCardCornerBadge kind="featured-star" />
+        ) : null}
         {!locked && padlockVariant ? (
           <GalleryCardCornerBadge kind="library-padlock" variant={padlockVariant} />
         ) : null}
@@ -300,8 +379,7 @@ function GallerySquareCard({
   );
 }
 
-type CarouselRowProps = {
-  title: string;
+type GalleryCardStripSharedProps = {
   images: GalleryImageCard[];
   badgeMode: "off" | "featured" | "library";
   viewerUserId: string | null;
@@ -312,7 +390,57 @@ type CarouselRowProps = {
   onLike: (id: string) => void;
   openModal: (carouselIds: string[], index: number) => void;
   isImageLocked: (image: GalleryImageCard) => boolean;
+  reducedMotion: boolean;
 };
+
+type CarouselRowProps = GalleryCardStripSharedProps & {
+  title: string;
+  enableDragScroll?: boolean;
+  finePointer?: boolean;
+  onCarouselPointerDragMoved?: () => void;
+};
+
+function GalleryLibraryMasonry({
+  images,
+  badgeMode,
+  viewerUserId,
+  isAdmin,
+  globalSpoilerProtection,
+  canLike,
+  likingIds,
+  onLike,
+  openModal,
+  isImageLocked,
+  reducedMotion,
+}: GalleryCardStripSharedProps) {
+  const carouselIds = images.map((i) => i.id);
+
+  return (
+    <div className="gallery-library-masonry">
+      {images.map((image, idx) => (
+        <div key={image.id} className="gallery-library-masonry-cell">
+          <GallerySquareCard
+            image={image}
+            carouselIds={carouselIds}
+            index={idx}
+            badgeMode={badgeMode}
+            viewerUserId={viewerUserId}
+            isAdmin={isAdmin}
+            globalSpoilerProtection={globalSpoilerProtection}
+            canLike={canLike}
+            likingIds={likingIds}
+            onLike={onLike}
+            openModal={openModal}
+            locked={isImageLocked(image)}
+            widthMode="fluid"
+            reducedMotion={reducedMotion}
+            staggerIndex={idx}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function CarouselRow({
   title,
@@ -326,10 +454,78 @@ function CarouselRow({
   onLike,
   openModal,
   isImageLocked,
+  reducedMotion,
+  enableDragScroll = false,
+  finePointer = false,
+  onCarouselPointerDragMoved,
 }: CarouselRowProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef<{
+    pointerId: number | null;
+    startX: number;
+    scrollLeft0: number;
+    moved: boolean;
+  }>({ pointerId: null, startX: 0, scrollLeft0: 0, moved: false });
+  const [scrollerDragging, setScrollerDragging] = useState(false);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(true);
+
+  const onPointerDownCapture = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!enableDragScroll || !finePointer || reducedMotion) return;
+      if (e.button !== 0) return;
+      const el = scrollRef.current;
+      if (!el) return;
+      dragRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        scrollLeft0: el.scrollLeft,
+        moved: false,
+      };
+      try {
+        el.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [enableDragScroll, finePointer, reducedMotion],
+  );
+
+  const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (d.pointerId !== e.pointerId) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const dx = e.clientX - d.startX;
+    if (!d.moved && Math.abs(dx) > 6) {
+      d.moved = true;
+      setScrollerDragging(true);
+    }
+    if (d.moved) {
+      el.scrollLeft = d.scrollLeft0 - dx * 1.35;
+    }
+  }, []);
+
+  const endDrag = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const d = dragRef.current;
+      if (d.pointerId !== e.pointerId) return;
+      const el = scrollRef.current;
+      if (el) {
+        try {
+          el.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (d.moved) {
+        onCarouselPointerDragMoved?.();
+      }
+      dragRef.current = { pointerId: null, startX: 0, scrollLeft0: 0, moved: false };
+      setScrollerDragging(false);
+    },
+    [onCarouselPointerDragMoved],
+  );
 
   function updateScrollState() {
     const el = scrollRef.current;
@@ -367,12 +563,31 @@ function CarouselRow({
 
   const carouselIds = images.map((i) => i.id);
 
+  const scrollBehaviorClass =
+    enableDragScroll && finePointer && !reducedMotion ? "scroll-auto" : "scroll-smooth";
+
+  const scrollerClass = [
+    "flex gap-4 overflow-x-auto pb-2 pr-4 touch-pan-x overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+    scrollBehaviorClass,
+    enableDragScroll && finePointer && !reducedMotion ? "gallery-featured-scroller" : "",
+    scrollerDragging ? "gallery-featured-scroller--dragging" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="relative">
       <div
         ref={scrollRef}
-        className="flex gap-4 overflow-x-auto pb-2 pr-4 scroll-smooth touch-pan-x overscroll-x-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className={scrollerClass}
         aria-label={title}
+        onPointerDownCapture={onPointerDownCapture}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onPointerLeave={(e) => {
+          if (dragRef.current.pointerId === e.pointerId) endDrag(e);
+        }}
       >
         {images.map((image, idx) => (
           <GallerySquareCard
@@ -389,6 +604,9 @@ function CarouselRow({
             onLike={onLike}
             openModal={openModal}
             locked={isImageLocked(image)}
+            widthMode="carousel"
+            reducedMotion={reducedMotion}
+            staggerIndex={idx}
           />
         ))}
       </div>
@@ -423,6 +641,8 @@ function CarouselRow({
 
 export function GalleryClient(props: GalleryClientProps) {
   const router = useRouter();
+  const { finePointer, reducedMotion } = useGalleryMotionPrefs();
+  const modalOpenBlockUntilRef = useRef(0);
   const isMember = props.layout === "member";
   const isLoggedIn = isMember;
   const isAdmin = isMember && props.isAdmin;
@@ -455,9 +675,19 @@ export function GalleryClient(props: GalleryClientProps) {
   const [addLibraryPending, setAddLibraryPending] = useState(false);
   const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
   const [legendOpen, setLegendOpen] = useState(false);
+  const [headerVisible, setHeaderVisible] = useState(false);
   const [spoilerSettingsByBookId, setSpoilerSettingsByBookId] = useState<Record<string, SpoilerProtection>>(
     props.layout === "member" ? props.spoilerSettingsByBookId : {},
   );
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setHeaderVisible(true);
+      return;
+    }
+    const t = window.setTimeout(() => setHeaderVisible(true), 100);
+    return () => window.clearTimeout(t);
+  }, [reducedMotion]);
 
   useEffect(() => {
     setImagesById((prev) => mergeGalleryServerImages(serverImagesById, prev));
@@ -559,9 +789,14 @@ export function GalleryClient(props: GalleryClientProps) {
   }
 
   function openModal(carouselIds: string[], index: number) {
+    if (Date.now() < modalOpenBlockUntilRef.current) return;
     setModalSlideDir(0);
     setModalState({ carouselIds, index });
   }
+
+  const scheduleModalOpenBlockAfterDrag = useCallback(() => {
+    modalOpenBlockUntilRef.current = Date.now() + 450;
+  }, []);
 
   function closeModal() {
     setModalState(null);
@@ -618,26 +853,6 @@ export function GalleryClient(props: GalleryClientProps) {
     props.layout === "member" &&
     modalActiveImage &&
     props.libraryBookIds.includes(modalActiveImage.bookId);
-
-  function SectionHeader({
-    heading,
-    subtitle,
-    right,
-  }: {
-    heading: string;
-    subtitle: string;
-    right?: ReactNode;
-  }) {
-    return (
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-text-muted">{heading}</div>
-          <div className="mt-2 text-sm text-text-secondary">{subtitle}</div>
-        </div>
-        {right}
-      </div>
-    );
-  }
 
   async function toggleGlobalSpoiler() {
     if (props.layout !== "member") return;
@@ -762,7 +977,9 @@ export function GalleryClient(props: GalleryClientProps) {
     onLike: likeImage,
     openModal,
     isImageLocked,
-  } satisfies Omit<CarouselRowProps, "title" | "images" | "badgeMode">;
+    reducedMotion,
+    onCarouselPointerDragMoved: scheduleModalOpenBlockAfterDrag,
+  } satisfies Omit<CarouselRowProps, "title" | "images" | "badgeMode" | "enableDragScroll" | "finePointer">;
 
   function GlobalSpoilerPill() {
     if (props.layout !== "member") return null;
@@ -852,103 +1069,163 @@ export function GalleryClient(props: GalleryClientProps) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
-      <header className="flex flex-wrap items-start justify-between gap-4 gap-y-2">
-        <div className="min-w-0 space-y-2">
-          <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Gallery</h1>
-          <p className="text-sm text-text-secondary">Images created by readers, chapter by chapter</p>
-        </div>
-        {props.layout === "member" ? (
-          <div className="flex shrink-0 items-center gap-2 pt-0.5">
-            <BadgeLegend />
-            <GlobalSpoilerPill />
-          </div>
-        ) : null}
-      </header>
-
-      {props.layout === "guest" ? (
-        <div className="mt-8 space-y-10">
-          <section className="space-y-4">
-            <SectionHeader
-              heading="LATEST FEATURED"
-              subtitle="Hand-picked images from our community"
-            />
-            <CarouselRow
-              {...carouselRowProps}
-              badgeMode="off"
-              title="Latest featured"
-              images={latestFeaturedResolved}
-            />
-          </section>
-
-          <section className="relative space-y-4">
-            <SectionHeader heading="YOUR LIBRARY" subtitle="Images from books you're reading" />
-            <div className="relative">
-              <CarouselRow
-                {...carouselRowProps}
-                badgeMode="off"
-                title="Library preview"
-                images={libraryBlurResolved}
-              />
-              <div
-                className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-bg-overlay/55 px-4 backdrop-blur-[2px]"
-                aria-hidden
-              />
-              <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4">
-                <div className="pointer-events-auto max-w-md rounded-xl border border-border/90 bg-bg-surface/95 px-6 py-5 text-center shadow-lg backdrop-blur-md">
-                  <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-bg-base">
-                    <LockIcon className="h-5 w-5 text-accent-text" />
-                  </div>
-                  <p className="text-sm font-medium text-text-primary">Create a free account to unlock your personalised gallery</p>
-                  <div className="mt-4">
-                    <Link
-                      href="/sign-up"
-                      className="inline-flex items-center justify-center rounded-md border border-accent/40 bg-accent/15 px-4 py-2.5 text-sm font-semibold text-accent-text transition hover:bg-accent/25"
-                    >
-                      Get Started
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : (
-        <div className="mt-8 space-y-10">
-          <section className="space-y-4">
-            <SectionHeader heading="FROM YOUR LIBRARY" subtitle="Images from books you're reading" />
-            {props.library.kind === "no_books" ? (
-              <div className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-6 text-center">
-                <p className="text-sm text-text-secondary">Add books to your library to see images from what you&apos;re reading.</p>
-                <div className="mt-4">
-                  <Link
-                    href="/discover"
-                    className="inline-flex items-center justify-center rounded-md border border-border bg-bg-raised px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-raised/80"
-                  >
-                    Discover Books
-                  </Link>
-                </div>
-              </div>
-            ) : props.library.kind === "no_images" ? (
-              <p className="rounded-lg border border-border/90 bg-bg-base/70 px-4 py-3 text-sm text-text-secondary">
-                No community images yet from your library books. Check back soon, or explore the featured carousel below.
+    <div className="gallery-root text-text-primary">
+      <div className="gallery-root-inner">
+        <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
+          <header className="flex flex-wrap items-start justify-between gap-4 gap-y-2">
+            <div className="min-w-0">
+              <p
+                className={`gallery-eyebrow ${headerVisible ? "gallery-concept-hero-in" : "opacity-0 translate-y-2"}`}
+              >
+                Reader Community
               </p>
-            ) : (
-              <CarouselRow
-                {...carouselRowProps}
-                badgeMode="library"
-                title="From your library"
-                images={fromLibraryResolved}
-              />
-            )}
-          </section>
+              <h1
+                className={`gallery-title tracking-tight text-2xl sm:text-3xl ${headerVisible ? "gallery-concept-hero-in gallery-concept-hero-in--delay" : "opacity-0 translate-y-3"}`}
+              >
+                Gallery
+              </h1>
+              <p
+                className={`gallery-subtitle mt-2 ${headerVisible ? "gallery-concept-hero-in gallery-concept-hero-in--delay2" : "opacity-0 translate-y-3"}`}
+              >
+                Images created by readers, chapter by chapter
+              </p>
+            </div>
+            {props.layout === "member" ? (
+              <div className="flex shrink-0 items-center gap-2 pt-0.5">
+                <BadgeLegend />
+                <GlobalSpoilerPill />
+              </div>
+            ) : null}
+          </header>
 
-          <section className="space-y-4">
-            <SectionHeader heading="FEATURED" subtitle="Beloved images from across the catalogue" />
-            <CarouselRow {...carouselRowProps} badgeMode="featured" title="Featured" images={featuredResolved} />
-          </section>
+          {props.layout === "guest" ? (
+            <div className="mt-8 space-y-10">
+              <section className="space-y-4">
+                <GallerySectionLabel
+                  label="LATEST FEATURED"
+                  sub="Hand-picked images from our community"
+                  right={finePointer && !reducedMotion ? "← drag to explore →" : undefined}
+                />
+                <CarouselRow
+                  {...carouselRowProps}
+                  badgeMode="off"
+                  title="Latest featured"
+                  images={latestFeaturedResolved}
+                  finePointer={finePointer}
+                  enableDragScroll
+                />
+              </section>
+
+              <GallerySectionDivider />
+
+              <section className="relative space-y-4">
+                <GallerySectionLabel
+                  label="YOUR LIBRARY"
+                  sub="Images from books you're reading"
+                />
+                <div className="relative">
+                  <CarouselRow
+                    {...carouselRowProps}
+                    badgeMode="off"
+                    title="Library preview"
+                    images={libraryBlurResolved}
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-bg-overlay/55 px-4 backdrop-blur-[2px]"
+                    aria-hidden
+                  />
+                  <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center p-4">
+                    <div className="gallery-guest-overlay-card pointer-events-auto">
+                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-border bg-bg-base">
+                        <LockIcon className="h-5 w-5 text-accent-text" />
+                      </div>
+                      <p className="text-sm font-medium text-text-primary">
+                        Create a free account to unlock your personalised gallery
+                      </p>
+                      <div className="mt-4">
+                        <Link href="/sign-up" className="gallery-guest-overlay-cta">
+                          Get Started
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          ) : (
+            <div className="mt-8 space-y-10">
+              <section className="space-y-4">
+                <GallerySectionLabel
+                  label="FROM YOUR LIBRARY"
+                  sub="Images from books you're reading"
+                  right={
+                    props.library.kind === "images" ? `${fromLibraryResolved.length} images` : undefined
+                  }
+                />
+                {props.library.kind === "no_books" ? (
+                  <div className="gallery-empty-state">
+                    <p className="text-sm text-text-secondary">
+                      Add books to your library to see images from what you&apos;re reading.
+                    </p>
+                    <div className="mt-4">
+                      <Link href="/discover" className="gallery-empty-state-cta">
+                        Discover Books
+                      </Link>
+                    </div>
+                  </div>
+                ) : props.library.kind === "no_images" ? (
+                  <p className="gallery-empty-state text-sm text-text-secondary">
+                    No community images yet from your library books. Check back soon, or explore the featured
+                    carousel below.
+                  </p>
+                ) : (
+                  <GalleryLibraryMasonry
+                    {...carouselRowProps}
+                    badgeMode="library"
+                    images={fromLibraryResolved}
+                  />
+                )}
+              </section>
+
+              <GallerySectionDivider />
+
+              <section className="space-y-4">
+                <GallerySectionLabel
+                  label="FEATURED"
+                  sub="Beloved images from across the catalogue"
+                  right={finePointer && !reducedMotion ? "← drag to explore →" : undefined}
+                />
+                <CarouselRow
+                  {...carouselRowProps}
+                  badgeMode="featured"
+                  title="Featured"
+                  images={featuredResolved}
+                  finePointer={finePointer}
+                  enableDragScroll
+                />
+              </section>
+            </div>
+          )}
+
+          <div className="gallery-cta-banner">
+            <div className="gallery-cta-content">
+              <p className="gallery-cta-eyebrow">Create your own</p>
+              <h2 className="gallery-cta-heading">Imagine your story.</h2>
+              <p className="gallery-cta-sub">
+                Generate images from the chapters you&apos;ve read — spoilers never included.
+              </p>
+            </div>
+            <div className="gallery-cta-actions">
+              <Link href="/books" className="gallery-cta-primary">
+                START READING →
+              </Link>
+              <Link href="/books" className="gallery-cta-secondary">
+                BROWSE BOOKS
+              </Link>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
       {modalState && modalActiveImage ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">

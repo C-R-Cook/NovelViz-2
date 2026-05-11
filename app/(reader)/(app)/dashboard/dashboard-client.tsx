@@ -1,5 +1,6 @@
 "use client";
 
+import { FeatureRequestsQueue } from "@/app/(reader)/(app)/dashboard/feature-requests-queue";
 import { ForReviewQueue } from "@/app/(reader)/(app)/dashboard/for-review-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
@@ -72,6 +73,20 @@ export type DashboardClientProps = {
     totalBooks: number;
     pendingReviewCount: number;
     bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };
+    featureRequestsQueue: {
+      requestId: string;
+      imageId: string;
+      createdAtMs: number;
+      imageUrl: string;
+      userPrompt: string;
+      chapterNumberAtTime: number;
+      bookId: string;
+      bookTitle: string;
+      bookAuthor: string;
+      bookCoverImageUrl: string | null;
+      username: string;
+    }[];
+    featureRequestsPendingCount: number;
   } | null;
   adminBooksAll: {
     initialBooks: AdminBookRow[];
@@ -121,7 +136,11 @@ export function DashboardClient({
 
   const [tab, setTab] = useState<DashboardTabSlug>(initialTab);
   const [pendingBooks, setPendingBooks] = useState(admin?.pendingBooks ?? []);
+  const [featureRequestQueue, setFeatureRequestQueue] = useState(
+    admin?.featureRequestsQueue ?? [],
+  );
   const [actionId, setActionId] = useState<string | null>(null);
+  const [featureActionId, setFeatureActionId] = useState<string | null>(null);
 
   const showTabBar = tabs.length > 1;
 
@@ -133,6 +152,10 @@ export function DashboardClient({
 
   useEffect(() => {
     setPendingBooks(admin?.pendingBooks ?? []);
+  }, [admin]);
+
+  useEffect(() => {
+    setFeatureRequestQueue(admin?.featureRequestsQueue ?? []);
   }, [admin]);
 
   function pushTab(next: DashboardTabSlug) {
@@ -174,6 +197,29 @@ export function DashboardClient({
         router.refresh();
       } finally {
         setActionId(null);
+      }
+    },
+    [router],
+  );
+
+  const runFeatureRequestDecision = useCallback(
+    async (requestId: string, action: "approve" | "reject") => {
+      setFeatureActionId(requestId);
+      try {
+        const res = await fetch(`/api/feature-requests/${requestId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action }),
+        });
+        if (!res.ok) {
+          const j = (await res.json()) as { error?: string };
+          window.alert(j.error ?? "Update failed");
+          return;
+        }
+        setFeatureRequestQueue((prev) => prev.filter((r) => r.requestId !== requestId));
+        router.refresh();
+      } finally {
+        setFeatureActionId(null);
       }
     },
     [router],
@@ -357,6 +403,14 @@ export function DashboardClient({
             onModeration={(id, status) => void runModeration(id, status)}
           />
         ) : null;
+      case "feature-requests":
+        return admin ? (
+          <FeatureRequestsQueue
+            items={featureRequestQueue}
+            actionRequestId={featureActionId}
+            onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
+          />
+        ) : null;
       case "all-books":
         return adminBooksAll ? (
           <AdminBooksClient
@@ -434,7 +488,14 @@ export function DashboardClient({
                 data-active-tab={tab === t ? "true" : undefined}
                 onClick={() => pushTab(t)}
               >
-                {dashboardTabLabel(t)}
+                <span className="inline-flex items-center gap-1.5">
+                  {dashboardTabLabel(t)}
+                  {t === "feature-requests" && admin && admin.featureRequestsPendingCount > 0 ? (
+                    <span className="rounded-full bg-text-muted/15 px-2 py-0.5 text-xs font-medium text-text-muted">
+                      {admin.featureRequestsPendingCount}
+                    </span>
+                  ) : null}
+                </span>
               </button>
             ))}
           </div>

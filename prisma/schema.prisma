@@ -76,6 +76,12 @@ enum SpoilerProtection {
   UNLOCKED
 }
 
+enum FeatureRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Book {
   id                           String     @id @default(cuid())
   title                        String
@@ -172,6 +178,8 @@ model User {
   generatedImages GeneratedImage[]
   likes           Like[]
   bookRequests    BookRequest[]
+  featureRequests FeatureRequest[] @relation("FeatureRequests")
+  featureReviews  FeatureRequest[] @relation("FeatureReviews")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -254,14 +262,31 @@ model GeneratedImage {
   embeddingTokens     Int?
   subjectTokens         Int?
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  book  Book   @relation(fields: [bookId], references: [id], onDelete: Cascade)
-  likes Like[]
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  book           Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  likes          Like[]
+  featureRequest FeatureRequest?
 
   createdAt DateTime @default(now())
 
   @@index([userId, bookId])
   @@index([isPublic])
+}
+
+model FeatureRequest {
+  id           String               @id @default(cuid())
+  imageId      String               @unique
+  image        GeneratedImage       @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  requestedBy  String
+  requester    User                 @relation("FeatureRequests", fields: [requestedBy], references: [id], onDelete: Cascade)
+  status       FeatureRequestStatus @default(PENDING)
+  reviewedBy   String?
+  reviewer     User?                @relation("FeatureReviews", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([status])
+  @@index([requestedBy])
 }
 
 model Like {

@@ -3,7 +3,7 @@
 import { ChapterManagerClient } from "@/app/admin/books/[id]/chapter-manager-client";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
-import type { BookGenre, BookStatus, ListingPreferenceAfterReview } from "@db";
+import type { BookGenre, BookStatus, ListingPreferenceAfterReview, FeatureRequestStatus } from "@db";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
@@ -22,7 +22,17 @@ export type PartnerBookDetailModel = {
   chapterCount: number;
 };
 
-type TabKey = "details" | "chapters";
+export type PartnerPublicImageRow = {
+  id: string;
+  imageUrl: string;
+  chapterNumberAtTime: number;
+  userPrompt: string;
+  isFeatured: boolean;
+  username: string;
+  featureRequest: { id: string; status: FeatureRequestStatus } | null;
+};
+
+type TabKey = "details" | "chapters" | "images";
 
 function statusActionChipClass(status: BookStatus): string {
   const base =
@@ -65,6 +75,96 @@ function statusActionChipLabel(status: BookStatus): string {
   return status.replace(/_/g, " ");
 }
 
+function PartnerBookImagesSection({
+  images,
+  requestBusyId,
+  onRequestFeature,
+}: {
+  images: PartnerPublicImageRow[];
+  requestBusyId: string | null;
+  onRequestFeature: (imageId: string) => void;
+}) {
+  if (images.length === 0) {
+    return (
+      <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Images</h2>
+        <p className="mt-3 text-sm text-text-secondary">
+          No public images yet. Images created by readers will appear here once they make them public.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Public images</h2>
+      <p className="mt-1 text-xs text-text-secondary">
+        Request featuring on the Discover community strip (admin review).
+      </p>
+      <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {images.map((img) => {
+          const pending = img.featureRequest?.status === "PENDING";
+          const rejected = img.featureRequest?.status === "REJECTED";
+          const featured = img.isFeatured;
+          return (
+            <li
+              key={img.id}
+              className="flex flex-col overflow-hidden rounded-lg border border-border/80 bg-bg-base/60"
+            >
+              <div className="relative mx-auto aspect-square w-full max-w-[200px] shrink-0 overflow-hidden bg-bg-surface">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.imageUrl} alt="" className="h-full w-full object-cover" />
+              </div>
+              <div className="flex min-h-[4.5rem] flex-1 flex-col justify-between gap-2 p-3">
+                <p className="text-xs text-text-muted">
+                  @{img.username} · Ch. {img.chapterNumberAtTime}
+                </p>
+                <div className="flex flex-wrap items-end justify-end gap-2">
+                  {featured ? (
+                    <span className="rounded-md bg-accent-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/35">
+                      ★ Featured
+                    </span>
+                  ) : null}
+                  {pending ? (
+                    <span className="rounded-md bg-bg-raised px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-text-muted ring-1 ring-border">
+                      Pending review
+                    </span>
+                  ) : null}
+                  {rejected ? (
+                    <span className="rounded-md bg-error/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-error/90 ring-1 ring-error/25">
+                      Request rejected
+                    </span>
+                  ) : null}
+                  {!featured && !pending && !rejected ? (
+                    <button
+                      type="button"
+                      disabled={requestBusyId === img.id}
+                      onClick={() => onRequestFeature(img.id)}
+                      className="rounded-md bg-bg-raised px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary ring-1 ring-border transition hover:bg-bg-surface disabled:opacity-50"
+                    >
+                      {requestBusyId === img.id ? "…" : "Request Feature"}
+                    </button>
+                  ) : null}
+                  {rejected ? (
+                    <button
+                      type="button"
+                      disabled={requestBusyId === img.id}
+                      onClick={() => onRequestFeature(img.id)}
+                      className="rounded-md bg-bg-raised px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary ring-1 ring-border transition hover:bg-bg-surface disabled:opacity-50"
+                    >
+                      {requestBusyId === img.id ? "…" : "Re-request"}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 function actionRowGradientClass(status: BookStatus): string {
   switch (status) {
     case "draft":
@@ -84,7 +184,13 @@ function actionRowGradientClass(status: BookStatus): string {
   }
 }
 
-export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDetailModel }) {
+export function PartnerBookDetailClient({
+  book: initial,
+  publicImages: initialPublicImages,
+}: {
+  book: PartnerBookDetailModel;
+  publicImages: PartnerPublicImageRow[];
+}) {
   const router = useRouter();
   const ingestFileRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("details");
@@ -114,6 +220,44 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
     initial.listingPreferenceAfterReview ?? "published",
   );
   const statusPickerRef = useRef<HTMLDivElement>(null);
+
+  const [publicImages, setPublicImages] = useState(initialPublicImages);
+  const [featureRequestBusyId, setFeatureRequestBusyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPublicImages(initialPublicImages);
+  }, [initialPublicImages]);
+
+  async function submitFeatureRequest(imageId: string) {
+    setFeatureRequestBusyId(imageId);
+    try {
+      const res = await fetch("/api/feature-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageId }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { error?: string; id?: string; status?: FeatureRequestStatus };
+      if (res.status === 409) {
+        window.alert(j.error ?? "A request already exists for this image.");
+        return;
+      }
+      if (!res.ok) {
+        window.alert(j.error ?? "Request failed");
+        return;
+      }
+      if (typeof j.id === "string" && j.status) {
+        setPublicImages((prev) =>
+          prev.map((row) =>
+            row.id === imageId
+              ? { ...row, featureRequest: { id: j.id as string, status: j.status as FeatureRequestStatus } }
+              : row,
+          ),
+        );
+      }
+    } finally {
+      setFeatureRequestBusyId(null);
+    }
+  }
 
   useEffect(() => {
     setBook(initial);
@@ -394,6 +538,19 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
             }`}
           >
             Chapter Review
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === "images"}
+            onClick={() => setActiveTab("images")}
+            className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+              activeTab === "images"
+                ? "border-b-2 border-accent text-text-primary"
+                : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            Images
           </button>
         </div>
       ) : null}
@@ -751,9 +908,24 @@ export function PartnerBookDetailClient({ book: initial }: { book: PartnerBookDe
       ) : null}
 
       {mergeBookAndChapterPanels ? (
-        <div className="mt-8">
-          <ChapterManagerClient bookId={book.id} status={book.status} />
-        </div>
+        <>
+          <div className="mt-6">
+            <PartnerBookImagesSection
+              images={publicImages}
+              requestBusyId={featureRequestBusyId}
+              onRequestFeature={(id) => void submitFeatureRequest(id)}
+            />
+          </div>
+          <div className="mt-8">
+            <ChapterManagerClient bookId={book.id} status={book.status} />
+          </div>
+        </>
+      ) : activeTab === "images" ? (
+        <PartnerBookImagesSection
+          images={publicImages}
+          requestBusyId={featureRequestBusyId}
+          onRequestFeature={(id) => void submitFeatureRequest(id)}
+        />
       ) : activeTab === "chapters" ? (
         <ChapterManagerClient bookId={book.id} status={book.status} />
       ) : null}

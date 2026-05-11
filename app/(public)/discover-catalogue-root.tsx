@@ -19,6 +19,7 @@ export async function DiscoverCatalogueRoot() {
         author: true,
         genre: true,
         coverImageUrl: true,
+        _count: { select: { userBooks: true } },
       },
     }),
   ]);
@@ -46,6 +47,7 @@ export async function DiscoverCatalogueRoot() {
         author: book.author,
         genre: book.genre,
         coverImageUrl: book.coverImageUrl ?? "",
+        readerCount: book._count.userBooks,
       }))}
       featuredLibrary={featuredLibrary}
       isLoggedIn={user !== null}

@@ -10,6 +10,7 @@ export type DiscoverCatalogueBook = {
   author: string;
   coverImageUrl: string;
   genre: BookGenre | null;
+  readerCount: number;
 };
 
 function catalogueFilters(genre?: BookGenre): Prisma.BookWhereInput {
@@ -33,6 +34,7 @@ export async function getDiscoverFeaturedBooks(): Promise<DiscoverCatalogueBook[
       author: true,
       coverImageUrl: true,
       genre: true,
+      _count: { select: { userBooks: true } },
     },
   });
   return rows.map((b) => ({
@@ -41,6 +43,7 @@ export async function getDiscoverFeaturedBooks(): Promise<DiscoverCatalogueBook[
     author: b.author,
     genre: b.genre,
     coverImageUrl: b.coverImageUrl!,
+    readerCount: b._count.userBooks,
   }));
 }
 
@@ -80,6 +83,7 @@ export async function getDiscoverBooksPage(input: {
       author: true,
       coverImageUrl: true,
       genre: true,
+      _count: { select: { userBooks: true } },
     },
   });
 
@@ -94,6 +98,7 @@ export async function getDiscoverBooksPage(input: {
       author: b.author,
       genre: b.genre,
       coverImageUrl: b.coverImageUrl!,
+      readerCount: b._count.userBooks,
     })),
     nextCursor,
   };

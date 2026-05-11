@@ -13,7 +13,7 @@ import {
   queryPartnerBooksPage,
 } from "@/lib/partner-books-list";
 import { prisma } from "@/lib/prisma";
-import { UserRole } from "@db";
+import { FeatureRequestStatus, UserRole } from "@db";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
@@ -145,6 +145,20 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
     totalBooks: number;
     pendingReviewCount: number;
     bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };
+    featureRequestsQueue: {
+      requestId: string;
+      imageId: string;
+      createdAtMs: number;
+      imageUrl: string;
+      userPrompt: string;
+      chapterNumberAtTime: number;
+      bookId: string;
+      bookTitle: string;
+      bookAuthor: string;
+      bookCoverImageUrl: string | null;
+      username: string;
+    }[];
+    featureRequestsPendingCount: number;
   } | null = null;
 
   let adminBooksAll: {
@@ -164,6 +178,8 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       bookRequestTitleRows,
       allBooksFirstPage,
       statsPayload,
+      featureRequestsPendingRows,
+      featureRequestsPendingCount,
     ] = await Promise.all([
       prisma.book.findMany({
         where: { status: "pending_review", deletedAt: null },
@@ -189,6 +205,24 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         dir: "desc",
       }),
       getAdminStatsPayload(vendorWindowDays),
+      prisma.featureRequest.findMany({
+        where: { status: FeatureRequestStatus.PENDING },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: {
+          image: {
+            select: {
+              id: true,
+              imageUrl: true,
+              userPrompt: true,
+              chapterNumberAtTime: true,
+              book: { select: { id: true, title: true, author: true, coverImageUrl: true } },
+              user: { select: { username: true, name: true } },
+            },
+          },
+        },
+      }),
+      prisma.featureRequest.count({ where: { status: FeatureRequestStatus.PENDING } }),
     ]);
 
     const titleCount = new Map<string, number>();
@@ -200,12 +234,28 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    const featureRequestsQueue = featureRequestsPendingRows.map((fr) => ({
+      requestId: fr.id,
+      imageId: fr.imageId,
+      createdAtMs: fr.createdAt.getTime(),
+      imageUrl: fr.image.imageUrl,
+      userPrompt: fr.image.userPrompt ?? "",
+      chapterNumberAtTime: fr.image.chapterNumberAtTime,
+      bookId: fr.image.book.id,
+      bookTitle: fr.image.book.title,
+      bookAuthor: fr.image.book.author,
+      bookCoverImageUrl: fr.image.book.coverImageUrl,
+      username: fr.image.user.username ?? fr.image.user.name ?? "",
+    }));
+
     adminPayload = {
       pendingBooks,
       totalUsers,
       totalBooks,
       pendingReviewCount,
       bookRequests: { totalCount: bookRequestTitleRows.length, topBooks },
+      featureRequestsQueue,
+      featureRequestsPendingCount,
     };
     adminBooksAll = {
       initialBooks: allBooksFirstPage.rows,

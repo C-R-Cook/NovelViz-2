@@ -37,6 +37,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
       userPrompt: true,
       isFeatured: true,
       user: { select: { username: true, name: true } },
+      featureRequest: { select: { id: true, status: true } },
     },
   });
 
@@ -47,6 +48,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     userPrompt: img.userPrompt,
     isFeatured: img.isFeatured,
     username: img.user.username ?? img.user.name ?? "",
+    featureRequest: img.featureRequest,
   }));
 
   const book = {

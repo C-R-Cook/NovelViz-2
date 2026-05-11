@@ -23,6 +23,7 @@ export default async function BooksPage() {
         author: true,
         genre: true,
         coverImageUrl: true,
+        _count: { select: { userBooks: true } },
       },
     }),
   ]);
@@ -50,6 +51,7 @@ export default async function BooksPage() {
         author: book.author,
         genre: book.genre,
         coverImageUrl: book.coverImageUrl ?? "",
+        readerCount: book._count.userBooks,
       }))}
       featuredLibrary={featuredLibrary}
       isLoggedIn={user !== null}

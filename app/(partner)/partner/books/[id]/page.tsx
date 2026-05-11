@@ -29,6 +29,25 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
     forbidden();
   }
 
+  const publicImageRows = await prisma.generatedImage.findMany({
+    where: { bookId: id, isPublic: true },
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { username: true, name: true } },
+      featureRequest: { select: { id: true, status: true } },
+    },
+  });
+
+  const publicImages = publicImageRows.map((img) => ({
+    id: img.id,
+    imageUrl: img.imageUrl,
+    chapterNumberAtTime: img.chapterNumberAtTime,
+    userPrompt: img.userPrompt,
+    isFeatured: img.isFeatured,
+    username: img.user.username ?? img.user.name ?? "",
+    featureRequest: img.featureRequest,
+  }));
+
   const model: PartnerBookDetailModel = {
     id: book.id,
     title: book.title,
@@ -51,7 +70,7 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
       >
         ← Back to dashboard
       </Link>
-      <PartnerBookDetailClient book={model} />
+      <PartnerBookDetailClient book={model} publicImages={publicImages} />
     </div>
   );
 }

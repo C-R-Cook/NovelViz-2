@@ -42,31 +42,6 @@ type VisionImage = FeaturedImage & {
 
 const GENRE_PILLS = [{ value: "all", label: "All" }, ...GENRE_OPTIONS];
 
-const DISCOVER_MARQUEE_ITEMS = [
-  "Spoiler-free Q&A",
-  "Chapter-gated image generation",
-  "Published library",
-  "Community gallery",
-  "Reading progress tracking",
-  "No spoilers — ever",
-] as const;
-
-function DiscoverMarquee() {
-  const doubled = [...DISCOVER_MARQUEE_ITEMS, ...DISCOVER_MARQUEE_ITEMS];
-  return (
-    <div className="discover-concept-marquee" aria-hidden>
-      <div className="discover-concept-marquee-track">
-        {doubled.map((item, i) => (
-          <span key={`${item}-${i}`} className="discover-concept-marquee-item">
-            {item.toUpperCase()}
-            <span className="discover-concept-marquee-sep">✦</span>
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function SectionDivider() {
   return (
     <div className="discover-section-divider">
@@ -131,6 +106,41 @@ function zIndexFromDistance(distance: number): number {
   return 20;
 }
 
+/** Featured shelf: tilt / lift / neighbour lean (fine pointer + motion only). */
+function shelfFeaturedCardTransform({
+  index,
+  isSelected,
+  hovered,
+  finePointer,
+  reducedMotion,
+  shelfHoverIndex,
+}: {
+  index: number;
+  isSelected: boolean;
+  hovered: boolean;
+  finePointer: boolean;
+  reducedMotion: boolean;
+  shelfHoverIndex: number | null;
+}): string {
+  if (reducedMotion) {
+    if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
+    return "translateY(0) rotate(0deg) scale(1)";
+  }
+  if (!finePointer) {
+    if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
+    return "translateY(0) rotate(0deg) scale(1)";
+  }
+  if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
+  if (hovered) return "translateY(-14px) rotate(0deg) scale(1.03)";
+  const position = index + 1;
+  let tilt = position % 2 === 1 ? -1.5 : 1.5;
+  if (shelfHoverIndex !== null && Math.abs(index - shelfHoverIndex) === 1) {
+    if (index < shelfHoverIndex) tilt = Math.min(2, tilt + 0.5);
+    else tilt = Math.max(-2, tilt - 0.5);
+  }
+  return `translateY(0) rotate(${tilt}deg) scale(1)`;
+}
+
 function computeDepthStyle(
   index: number,
   activeIndex: number,
@@ -189,36 +199,55 @@ function ShelfFeaturedCard({
   index,
   isSelected,
   reducedMotion,
+  finePointer,
+  shelfHoverIndex,
+  onShelfHoverIndex,
   onSelect,
 }: {
   book: DiscoverCatalogueBook;
   index: number;
   isSelected: boolean;
   reducedMotion: boolean;
+  finePointer: boolean;
+  shelfHoverIndex: number | null;
+  onShelfHoverIndex: (i: number | null) => void;
   onSelect: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const pal = discoverGenrePalette(book.genre);
-  const tiltDeg = index % 2 === 0 ? -1.5 : 1.5;
+
+  const transform = shelfFeaturedCardTransform({
+    index,
+    isSelected,
+    hovered,
+    finePointer,
+    reducedMotion,
+    shelfHoverIndex,
+  });
+
+  const zIndex = isSelected ? 30 : hovered ? 20 : 1;
 
   return (
     <button
       type="button"
+      data-featured-active={isSelected ? "true" : "false"}
       onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => {
+        setHovered(true);
+        onShelfHoverIndex(index);
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+        onShelfHoverIndex(null);
+      }}
       className={`discover-shelf-card shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)] ${
         isSelected ? "discover-shelf-card--active" : ""
-      } ${hovered && !isSelected ? "discover-shelf-card--hover" : ""} ${!reducedMotion ? "discover-animate-in" : ""}`}
+      } ${hovered && !isSelected && finePointer ? "discover-shelf-card--hover" : ""} ${reducedMotion ? "discover-shelf-card--reduced-motion" : ""} ${!reducedMotion ? "discover-shelf-card-enter" : ""}`}
       style={{
         ...(!reducedMotion ? { animationDelay: `${index * 50}ms` } : {}),
         ...({ "--disc-shelf-accent": pal.accent } as CSSProperties),
-        transform: isSelected
-          ? "translateY(-16px) scale(1.05)"
-          : hovered
-            ? "translateY(-8px) rotate(-1deg)"
-            : `rotate(${tiltDeg}deg)`,
-        zIndex: isSelected ? 10 : hovered ? 5 : 1,
+        transform,
+        zIndex,
       }}
     >
       <div className="discover-shelf-card-inner relative aspect-[2/3] w-full overflow-hidden rounded">
@@ -228,7 +257,7 @@ function ShelfFeaturedCard({
             alt=""
             fill
             className={`object-cover transition-transform duration-500 ease-out ${
-              hovered || isSelected ? "scale-[1.08]" : "scale-100"
+              finePointer && !reducedMotion && hovered && !isSelected ? "scale-[1.06]" : "scale-100"
             }`}
             sizes="200px"
             priority={index < 2}
@@ -340,6 +369,7 @@ export function DiscoverCatalogueClient({
     moved: boolean;
   }>({ pointerId: null, startX: 0, scrollLeft0: 0, moved: false });
   const [featuredScrollerDragging, setFeaturedScrollerDragging] = useState(false);
+  const [featuredShelfHoverIndex, setFeaturedShelfHoverIndex] = useState<number | null>(null);
 
   const [visionImages, setVisionImages] = useState<VisionImage[]>([]);
   const [visionsLoading, setVisionsLoading] = useState(false);
@@ -418,7 +448,14 @@ export function DiscoverCatalogueClient({
     return allBooks.filter((book) => {
       const title = book.title.toLowerCase();
       const author = book.author.toLowerCase();
-      return title.includes(searchQuery) || author.includes(searchQuery);
+      const genreLabel = formatGenre(book.genre).toLowerCase();
+      const genreNormalized = (book.genre ?? "").toLowerCase().replace(/_/g, " ");
+      return (
+        title.includes(searchQuery) ||
+        author.includes(searchQuery) ||
+        genreLabel.includes(searchQuery) ||
+        genreNormalized.includes(searchQuery)
+      );
     });
   }, [allBooks, searchActive, searchQuery]);
 
@@ -552,6 +589,8 @@ export function DiscoverCatalogueClient({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!finePointer || reducedMotion) return;
       if (e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(".discover-shelf-card")) return;
       const el = featuredScrollerRef.current;
       if (!el) return;
       featuredDragRef.current = {
@@ -694,9 +733,9 @@ export function DiscoverCatalogueClient({
           style={carouselDepthStyle}
         >
           <div
-            className={`absolute inset-0 origin-center scale-100 overflow-hidden rounded-xl border border-border bg-bg-base shadow-sm will-change-transform ${
+            className={`absolute inset-0 origin-center scale-100 overflow-hidden rounded-xl border-0 bg-transparent shadow-none will-change-transform ${
               finePointer && !reducedMotion
-                ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.06] group-hover:shadow-lg group-hover:shadow-bg-overlay/45 group-focus-within:scale-[1.06] group-focus-within:shadow-lg group-focus-within:shadow-bg-overlay/45"
+                ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.05] group-hover:shadow-xl group-hover:shadow-bg-overlay/40 group-focus-within:scale-[1.05] group-focus-within:shadow-xl group-focus-within:shadow-bg-overlay/40"
                 : finePointer && reducedMotion
                   ? "transition-shadow duration-300 ease-out"
                   : "transition-transform duration-200 ease-out active:scale-[0.99]"
@@ -796,7 +835,7 @@ export function DiscoverCatalogueClient({
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search by title or author..."
+              placeholder="Search by title, author, or genre..."
               className="discover-search-input w-full rounded-xl border border-border bg-bg-surface px-10 py-3 text-sm text-text-primary transition duration-200 ease-out placeholder:text-text-muted"
             />
             {searchInput ? (
@@ -811,8 +850,6 @@ export function DiscoverCatalogueClient({
             ) : null}
           </div>
         </section>
-
-        {!searchActive && showFeatured ? <DiscoverMarquee /> : null}
 
         {!searchActive && showFeatured ? (
           <section className="mb-10 sm:mb-12">
@@ -832,7 +869,7 @@ export function DiscoverCatalogueClient({
               onPointerLeave={(e) => {
                 if (featuredDragRef.current.pointerId === e.pointerId) endFeaturedDrag(e);
               }}
-              className={`discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 py-6 [scrollbar-width:none] sm:mx-0 sm:px-8 [&::-webkit-scrollbar]:hidden ${
+              className={`discover-no-h-scrollbar discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 py-6 sm:mx-0 sm:px-8 ${
                 centerFeaturedRow ? "sm:justify-center" : ""
               } ${featuredScrollerDragging ? "discover-featured-scroller--dragging" : ""}`}
             >
@@ -843,6 +880,9 @@ export function DiscoverCatalogueClient({
                   index={i}
                   isSelected={i === selectedFeaturedIndex}
                   reducedMotion={reducedMotion}
+                  finePointer={finePointer}
+                  shelfHoverIndex={featuredShelfHoverIndex}
+                  onShelfHoverIndex={setFeaturedShelfHoverIndex}
                   onSelect={() => setSelectedFeaturedIndex(i)}
                 />
               ))}
@@ -865,19 +905,19 @@ export function DiscoverCatalogueClient({
                   <div className="mt-1 font-serif text-2xl text-white sm:text-3xl">{selectedBook.title}</div>
                   <div className="mt-1 text-sm italic text-white/50">by {selectedBook.author}</div>
                 </div>
-                <div className="flex flex-wrap items-center gap-4 sm:ml-auto">
+                <div className="flex flex-wrap items-center justify-end gap-5 sm:ml-auto sm:shrink-0">
+                  <div className="discover-panel-readers" aria-label={`${selectedBook.readerCount.toLocaleString()} readers`}>
+                    <span className="discover-panel-readers-count">
+                      {selectedBook.readerCount.toLocaleString()}
+                    </span>
+                    <span className="discover-panel-readers-label">Readers</span>
+                  </div>
                   <BookLibraryActions
                     bookId={selectedBook.id}
                     initialInLibrary={selectedLibraryEntry?.inLibrary ?? false}
                     isLoggedIn={isLoggedIn}
                     variant="discoverGold"
                   />
-                  <Link
-                    href={`/discover/${selectedBook.id}`}
-                    className="font-mono text-[11px] uppercase tracking-[0.2em] text-[rgba(180,140,100,0.75)] underline-offset-4 transition hover:text-[rgba(230,200,160,0.95)] hover:underline"
-                  >
-                    Open title →
-                  </Link>
                 </div>
               </div>
             ) : null}
@@ -999,7 +1039,7 @@ export function DiscoverCatalogueClient({
           <section className="mb-8">
             <h2 className="sr-only">Filter by genre</h2>
             <div
-              className={`-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              className={`discover-no-h-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 ${
                 !reducedMotion ? "discover-animate-in" : ""
               }`}
               style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
@@ -1078,7 +1118,7 @@ export function DiscoverCatalogueClient({
               <div className="relative">
                 <div
                   ref={browseScrollerRef}
-                  className="relative flex gap-0 overflow-x-auto overflow-y-visible py-5 pb-2 pr-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="discover-no-h-scrollbar relative flex gap-0 overflow-x-auto py-10 pb-4 pr-4"
                   style={{
                     perspective: "1000px",
                     transformStyle: "preserve-3d",

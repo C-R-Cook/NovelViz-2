@@ -6,6 +6,7 @@ export type DashboardTabSlug =
   | "my-books"
   | "stats"
   | "for-review"
+  | "feature-requests"
   | "all-books"
   | "admin-stats";
 
@@ -14,6 +15,7 @@ const ALL_TAB_ORDER: DashboardTabSlug[] = [
   "my-books",
   "stats",
   "for-review",
+  "feature-requests",
   "all-books",
   "admin-stats",
 ];
@@ -51,6 +53,8 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
       return "Stats";
     case "for-review":
       return "For Review";
+    case "feature-requests":
+      return "Feature Requests";
     case "all-books":
       return "All Books";
     case "admin-stats":

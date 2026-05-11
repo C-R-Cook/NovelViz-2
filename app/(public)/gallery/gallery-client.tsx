@@ -214,9 +214,6 @@ function GallerySquareCard({
           className={`object-cover transition-[filter] duration-200 ease-out ${locked ? "blur-[24px]" : "blur-0"}`}
           sizes="(max-width: 767px) 66vw, (min-width: 768px) 180px, (min-width: 1024px) 200px, 220px"
         />
-        {!locked && badgeMode === "featured" && viewerUserId !== null ? (
-          <GalleryCardCornerBadge kind="featured-star" />
-        ) : null}
         {!locked && padlockVariant ? (
           <GalleryCardCornerBadge kind="library-padlock" variant={padlockVariant} />
         ) : null}

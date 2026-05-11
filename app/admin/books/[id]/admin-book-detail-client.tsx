@@ -2,12 +2,14 @@
 "use client";
 
 import { ChapterManagerClient } from "./chapter-manager-client";
-import { EpubMetadataToggle } from "@/components/epub-metadata-toggle";
-import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
+import { formatGenre } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
-import type { BookGenre } from "@db";
-import type { BookStatus } from "@db";
-import type { ListingPreferenceAfterReview } from "@db";
+import type {
+  BookGenre,
+  BookStatus,
+  FeatureRequestStatus,
+  ListingPreferenceAfterReview,
+} from "@db";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -37,7 +39,10 @@ export type AdminBookPublicImageRow = {
   userPrompt: string;
   isFeatured: boolean;
   username: string;
+  featureRequest: { id: string; status: FeatureRequestStatus } | null;
 };
+
+type AdminBookTabKey = "details" | "images" | "chapters";
 
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
@@ -133,23 +138,23 @@ export function AdminBookDetailClient({
   const [coverUploadMsg, setCoverUploadMsg] = useState<string | null>(null);
 
   const [publicImages, setPublicImages] = useState(initialPublicImages);
-  const [featureToggleBusyId, setFeatureToggleBusyId] = useState<string | null>(null);
+  const [imageBusyId, setImageBusyId] = useState<string | null>(null);
+  const [adminTab, setAdminTab] = useState<AdminBookTabKey>("details");
 
   useEffect(() => {
     setPublicImages(initialPublicImages);
   }, [initialPublicImages]);
 
-  async function toggleImageFeatured(imageId: string, current: boolean) {
-    const next = !current;
-    setFeatureToggleBusyId(imageId);
-    setPublicImages((rows) =>
-      rows.map((row) => (row.id === imageId ? { ...row, isFeatured: next } : row)),
-    );
+  async function patchAdminImageFeature(imageId: string, isFeatured: boolean) {
+    const snap = publicImages.find((r) => r.id === imageId);
+    if (!snap) return;
+    setImageBusyId(imageId);
+    setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...row, isFeatured } : row)));
     try {
       const res = await fetch(`/api/admin/images/${imageId}/feature`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isFeatured: next }),
+        body: JSON.stringify({ isFeatured }),
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => ({}))) as { error?: string };
@@ -160,11 +165,107 @@ export function AdminBookDetailClient({
         rows.map((row) => (row.id === data.id ? { ...row, isFeatured: data.isFeatured } : row)),
       );
     } catch {
-      setPublicImages((rows) =>
-        rows.map((row) => (row.id === imageId ? { ...row, isFeatured: current } : row)),
-      );
+      setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...snap } : row)));
     } finally {
-      setFeatureToggleBusyId(null);
+      setImageBusyId(null);
+    }
+  }
+
+  async function patchFeatureRequestDecision(
+    requestId: string,
+    imageId: string,
+    action: "approve" | "reject",
+  ) {
+    const snap = publicImages.find((r) => r.id === imageId);
+    if (!snap) return;
+    setImageBusyId(imageId);
+    const nextFeatured = action === "approve";
+    const nextStatus: FeatureRequestStatus =
+      action === "approve" ? "APPROVED" : "REJECTED";
+    setPublicImages((rows) =>
+      rows.map((row) =>
+        row.id === imageId
+          ? {
+              ...row,
+              isFeatured: nextFeatured,
+              featureRequest: snap.featureRequest
+                ? { id: snap.featureRequest.id, status: nextStatus }
+                : row.featureRequest,
+            }
+          : row,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/feature-requests/${requestId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { id: string; imageId: string; status: FeatureRequestStatus };
+      setPublicImages((rows) =>
+        rows.map((row) =>
+          row.id === data.imageId
+            ? {
+                ...row,
+                isFeatured: data.status === "APPROVED",
+                featureRequest: { id: data.id, status: data.status },
+              }
+            : row,
+        ),
+      );
+    } catch {
+      setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...snap } : row)));
+    } finally {
+      setImageBusyId(null);
+    }
+  }
+
+  async function removeFeaturedWithOptionalRequest(imageId: string, requestId: string | null) {
+    const snap = publicImages.find((r) => r.id === imageId);
+    if (!snap) return;
+    setImageBusyId(imageId);
+    if (requestId) {
+      setPublicImages((rows) =>
+        rows.map((row) =>
+          row.id === imageId ? { ...row, isFeatured: false, featureRequest: null } : row,
+        ),
+      );
+      try {
+        const res = await fetch(`/api/feature-requests/${requestId}/remove`, { method: "DELETE" });
+        if (!res.ok) {
+          const j = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(j.error || res.statusText);
+        }
+      } catch {
+        setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...snap } : row)));
+      } finally {
+        setImageBusyId(null);
+      }
+      return;
+    }
+    setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...row, isFeatured: false } : row)));
+    try {
+      const res = await fetch(`/api/admin/images/${imageId}/feature`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFeatured: false }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { id: string; isFeatured: boolean };
+      setPublicImages((rows) =>
+        rows.map((row) => (row.id === data.id ? { ...row, isFeatured: data.isFeatured } : row)),
+      );
+    } catch {
+      setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...snap } : row)));
+    } finally {
+      setImageBusyId(null);
     }
   }
 
@@ -502,12 +603,6 @@ export function AdminBookDetailClient({
     }
   }
 
-  const showReviewToggle = book.status === "draft" || book.status === "pending_review";
-  const reviewToggleDisabled =
-    statusBusy ||
-    promotingBusy ||
-    rejectBusy ||
-    (book.status === "draft" && book.chapterCount <= 0);
   const adminActionBusy = statusBusy || promotingBusy || rejectBusy;
   const showRejectButton = book.status === "pending_review";
 
@@ -600,129 +695,249 @@ export function AdminBookDetailClient({
         ) : null}
       </div>
 
-      <section className="space-y-4">
-        <div className="relative overflow-hidden rounded-xl border border-border p-6">
-          <div
-            className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
-            aria-hidden
-          />
-          <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
-            <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
-              {book.coverImageUrl ? (
-                <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
-              ) : (
-                <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
-                  No cover image
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <InfoRow label="Title" value={book.title} />
-              <InfoRow label="Author" value={book.author} />
-              <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
-              <div className="sm:col-span-2">
-                <label className="flex items-center gap-2">
-                  <span className="w-28 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                    Published Year
-                  </span>
-                  <input
-                    type="number"
-                    value={publishedYear}
-                    onChange={(e) => setPublishedYear(e.target.value)}
-                    placeholder="e.g. 1847"
-                    className="max-w-[10rem] rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                  />
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void savePublishedYearOnly()}
-                    className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : "Save Year"}
-                  </button>
-                </label>
+      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Admin book tabs">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={adminTab === "details"}
+          onClick={() => setAdminTab("details")}
+          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+            adminTab === "details"
+              ? "border-b-2 border-accent text-text-primary"
+              : "text-text-muted hover:text-text-primary"
+          }`}
+        >
+          Details
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={adminTab === "images"}
+          onClick={() => setAdminTab("images")}
+          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+            adminTab === "images"
+              ? "border-b-2 border-accent text-text-primary"
+              : "text-text-muted hover:text-text-primary"
+          }`}
+        >
+          Images
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={adminTab === "chapters"}
+          onClick={() => setAdminTab("chapters")}
+          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
+            adminTab === "chapters"
+              ? "border-b-2 border-accent text-text-primary"
+              : "text-text-muted hover:text-text-primary"
+          }`}
+        >
+          Chapters
+        </button>
+      </div>
+
+      {adminTab === "details" ? (
+        <section className="space-y-4">
+          <div className="relative overflow-hidden rounded-xl border border-border p-6">
+            <div
+              className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
+              aria-hidden
+            />
+            <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
+              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
+                {book.coverImageUrl ? (
+                  <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
+                ) : (
+                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
+                    No cover image
+                  </div>
+                )}
               </div>
-              <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
-              <InfoRow label="Uploaded" value={book.createdAtLabel} />
-              <InfoRow label="Chapters" value={String(book.chapterCount)} />
-              {book.openLibraryKey ? (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <InfoRow label="Title" value={book.title} />
+                <InfoRow label="Author" value={book.author} />
+                <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
                 <div className="sm:col-span-2">
-                  <span className="mr-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-                    Open Library:
-                  </span>
-                  <Link
-                    href={`https://openlibrary.org${book.openLibraryKey}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-                  >
-                    Open Library ↗
-                  </Link>
+                  <label className="flex items-center gap-2">
+                    <span className="w-28 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Published Year
+                    </span>
+                    <input
+                      type="number"
+                      value={publishedYear}
+                      onChange={(e) => setPublishedYear(e.target.value)}
+                      placeholder="e.g. 1847"
+                      className="max-w-[10rem] rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                    />
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void savePublishedYearOnly()}
+                      className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save Year"}
+                    </button>
+                  </label>
                 </div>
-              ) : null}
-              {book.status === "pending_review" ? (
+                <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
+                <InfoRow label="Uploaded" value={book.createdAtLabel} />
+                <InfoRow label="Chapters" value={String(book.chapterCount)} />
+                {book.openLibraryKey ? (
+                  <div className="sm:col-span-2">
+                    <span className="mr-2 text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Open Library:
+                    </span>
+                    <Link
+                      href={`https://openlibrary.org${book.openLibraryKey}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
+                    >
+                      Open Library ↗
+                    </Link>
+                  </div>
+                ) : null}
+                {book.status === "pending_review" ? (
+                  <div className="sm:col-span-2">
+                    <InfoRow
+                      label="Partner visibility request"
+                      value={labelListingPreferenceAfterReview(
+                        book.listingPreferenceAfterReview ?? "published",
+                      )}
+                    />
+                  </div>
+                ) : null}
                 <div className="sm:col-span-2">
-                  <InfoRow
-                    label="Partner visibility request"
-                    value={labelListingPreferenceAfterReview(
-                      book.listingPreferenceAfterReview ?? "published",
-                    )}
-                  />
+                  <InfoRow label="Description" value={book.description ?? "No description"} multiline />
                 </div>
-              ) : null}
-              <div className="sm:col-span-2">
-                <InfoRow label="Description" value={book.description ?? "No description"} multiline />
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Featured Images</h2>
-        <p className="mt-1 text-xs text-text-secondary">
-          Mark public gallery images to appear on the Discover page strip for this title.
-        </p>
-        {publicImages.length === 0 ? (
-          <p className="mt-4 text-sm text-text-muted">No public images yet.</p>
-        ) : (
-          <ul className="mt-4 space-y-4">
-            {publicImages.map((img) => (
-              <li
-                key={img.id}
-                className="flex flex-wrap items-center gap-4 rounded-lg border border-border/80 bg-bg-base/60 p-3"
-              >
-                <div className="relative h-[100px] w-20 shrink-0 overflow-hidden rounded-md border border-border bg-bg-surface">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
-                  <img src={img.imageUrl} alt="" className="h-full w-full object-cover" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-text-muted">
-                    @{img.username} · Chapter {img.chapterNumberAtTime}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-sm text-text-secondary">{img.userPrompt}</p>
-                </div>
-                <button
-                  type="button"
-                  disabled={featureToggleBusyId === img.id}
-                  onClick={() => void toggleImageFeatured(img.id, img.isFeatured)}
-                  className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition disabled:opacity-50 ${
-                    img.isFeatured
-                      ? "bg-accent/20 text-accent-text ring-1 ring-accent/40"
-                      : "bg-bg-raised text-text-secondary ring-1 ring-border hover:bg-bg-base hover:text-text-primary"
-                  }`}
-                >
-                  {featureToggleBusyId === img.id ? "…" : img.isFeatured ? "★ Featured" : "★ Feature"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {adminTab === "images" ? (
+        <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">Public images</h2>
+          <p className="mt-1 text-xs text-text-secondary">
+            Review feature requests, feature images directly for the Discover strip, or remove them from the strip.
+          </p>
+          {publicImages.length === 0 ? (
+            <p className="mt-4 text-sm text-text-muted">No public images yet.</p>
+          ) : (
+            <ul className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {publicImages.map((img) => {
+                const fr = img.featureRequest;
+                const pending = fr?.status === "PENDING";
+                const approved = fr?.status === "APPROVED";
+                const rejected = fr?.status === "REJECTED";
+                const busy = imageBusyId === img.id;
+                const showRemove = Boolean(fr) || img.isFeatured;
+                return (
+                  <li
+                    key={img.id}
+                    className="flex flex-col overflow-hidden rounded-lg border border-border/80 bg-bg-base/60"
+                  >
+                    <div className="relative mx-auto aspect-square w-full max-w-[200px] shrink-0 overflow-hidden bg-bg-surface">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary storage URLs */}
+                      <img src={img.imageUrl} alt="" className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex min-h-[4.5rem] flex-1 flex-col gap-2 p-3">
+                      <p className="text-xs text-text-muted">
+                        @{img.username} · Ch. {img.chapterNumberAtTime}
+                      </p>
+                      <p className="line-clamp-2 text-xs text-text-secondary">{img.userPrompt}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {img.isFeatured ? (
+                          <span className="rounded-md bg-accent-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/35">
+                            ★ Featured
+                          </span>
+                        ) : null}
+                        {pending ? (
+                          <span className="rounded-md bg-bg-raised px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-text-muted ring-1 ring-border">
+                            Request pending
+                          </span>
+                        ) : null}
+                        {approved ? (
+                          <span className="rounded-md bg-success/15 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-text-primary ring-1 ring-success/35">
+                            Approved
+                          </span>
+                        ) : null}
+                        {rejected ? (
+                          <span className="rounded-md bg-error/10 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-error/90 ring-1 ring-error/25">
+                            Request rejected
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-auto flex flex-wrap justify-end gap-2">
+                        {pending && fr ? (
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void patchFeatureRequestDecision(fr.id, img.id, "approve")}
+                              className="rounded-md bg-success px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary transition hover:bg-success/90 disabled:opacity-50"
+                            >
+                              {busy ? "…" : "Approve"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => void patchFeatureRequestDecision(fr.id, img.id, "reject")}
+                              className="rounded-md border border-error/40 bg-transparent px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-error transition hover:bg-error/10 disabled:opacity-50"
+                            >
+                              {busy ? "…" : "Reject"}
+                            </button>
+                          </>
+                        ) : null}
+                        {rejected && fr ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void patchFeatureRequestDecision(fr.id, img.id, "approve")}
+                            className="rounded-md bg-success px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary transition hover:bg-success/90 disabled:opacity-50"
+                          >
+                            {busy ? "…" : "Approve"}
+                          </button>
+                        ) : null}
+                        {!img.isFeatured ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void patchAdminImageFeature(img.id, true)}
+                            className="rounded-md bg-bg-raised px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary ring-1 ring-border transition hover:bg-bg-surface disabled:opacity-50"
+                          >
+                            {busy ? "…" : "Feature directly"}
+                          </button>
+                        ) : null}
+                        {showRemove ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              void removeFeaturedWithOptionalRequest(img.id, fr?.id ?? null)
+                            }
+                            className="rounded-md px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-secondary ring-1 ring-border transition hover:bg-bg-surface disabled:opacity-50"
+                          >
+                            {busy ? "…" : "Remove from strip"}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
-      <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
-        <ChapterManagerClient bookId={book.id} status={book.status} />
-      </section>
+      {adminTab === "chapters" ? (
+        <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+          <ChapterManagerClient bookId={book.id} status={book.status} />
+        </section>
+      ) : null}
 
       {rejectOpen ? (
         <div

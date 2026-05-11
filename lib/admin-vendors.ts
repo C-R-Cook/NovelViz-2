@@ -43,6 +43,9 @@ type OpenAiEmbeddingsBucket = {
   }>;
 };
 
+/** OpenAI org usage APIs cap `limit` at 31 when `bucket_width` is `1d`; use `page` to paginate. */
+const OPENAI_USAGE_DAILY_PAGE_LIMIT = "31";
+
 function sumBucketUsd(bucket: OpenAiCostBucket): number {
   let sum = 0;
   for (const r of bucket.results ?? []) {
@@ -111,7 +114,7 @@ async function fetchOpenAiCostsAllBuckets(adminKey: string, startSec: number): P
     const params = new URLSearchParams({
       start_time: String(startSec),
       bucket_width: "1d",
-      limit: "180",
+      limit: OPENAI_USAGE_DAILY_PAGE_LIMIT,
     });
     if (page) params.set("page", page);
     const res = await fetch(`https://api.openai.com/v1/organization/costs?${params}`, {
@@ -140,7 +143,7 @@ async function fetchOpenAiEmbeddingsBuckets(adminKey: string, startSec: number):
     const params = new URLSearchParams({
       start_time: String(startSec),
       bucket_width: "1d",
-      limit: "180",
+      limit: OPENAI_USAGE_DAILY_PAGE_LIMIT,
     });
     if (page) params.set("page", page);
     const res = await fetch(`https://api.openai.com/v1/organization/usage/embeddings?${params}`, {

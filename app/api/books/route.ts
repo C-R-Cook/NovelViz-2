@@ -73,6 +73,7 @@ export async function GET(request: Request) {
       author: true,
       genre: true,
       coverImageUrl: true,
+      _count: { select: { userBooks: true } },
     },
   });
 
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
     author: book.author,
     genre: book.genre,
     coverImageUrl: book.coverImageUrl ?? "",
+    readerCount: book._count.userBooks,
   }));
 
   return NextResponse.json({

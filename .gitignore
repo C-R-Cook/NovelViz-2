@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+/tmp/
 
 # debug
 npm-debug.log*
@@ -42,3 +43,6 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# T2I admin tester — local JPEG output (not for production deploy)
+/t2i-output/

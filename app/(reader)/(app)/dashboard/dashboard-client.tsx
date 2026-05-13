@@ -427,6 +427,18 @@ export function DashboardClient({
         if (!adminStats || !admin) return null;
         return (
           <div className="space-y-10">
+            <section aria-labelledby="dashboard-admin-tools" className="rounded-xl border border-border bg-bg-base/50 p-4">
+              <h2 id="dashboard-admin-tools" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
+                Tools
+              </h2>
+              <p className="mt-2 text-sm text-text-secondary">
+                <Link href="/admin/t2i-tester" className="font-medium text-accent-text underline-offset-2 hover:underline">
+                  T2I Tester
+                </Link>
+                <span className="text-text-muted"> — fal.ai model comparison; saves JPEGs under server folder t2i-output/ (not the gallery).</span>
+              </p>
+            </section>
+
             <section aria-labelledby="dashboard-admin-quick-stats">
               <h2 id="dashboard-admin-quick-stats" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
                 Quick stats

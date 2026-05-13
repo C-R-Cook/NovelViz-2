@@ -370,6 +370,11 @@ export function AdminBooksClient({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <Link href="/admin/t2i-tester" className="text-accent-text underline-offset-2 hover:underline">
+          T2I Tester
+        </Link>
+      </div>
       <div className="flex flex-col gap-4">
         {variant === "page" ? (
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">

@@ -42,7 +42,7 @@ export type AdminBookPublicImageRow = {
   featureRequest: { id: string; status: FeatureRequestStatus } | null;
 };
 
-type AdminBookTabKey = "details" | "images" | "chapters";
+type AdminBookTabKey = "details" | "images";
 
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
@@ -722,19 +722,6 @@ export function AdminBookDetailClient({
         >
           Images
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={adminTab === "chapters"}
-          onClick={() => setAdminTab("chapters")}
-          className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-            adminTab === "chapters"
-              ? "border-b-2 border-accent text-text-primary"
-              : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          Chapters
-        </button>
       </div>
 
       {adminTab === "details" ? (
@@ -813,6 +800,9 @@ export function AdminBookDetailClient({
                 </div>
               </div>
             </div>
+          </div>
+          <div className="rounded-xl border border-border bg-bg-surface/85 p-6">
+            <ChapterManagerClient bookId={book.id} status={book.status} />
           </div>
         </section>
       ) : null}
@@ -930,12 +920,6 @@ export function AdminBookDetailClient({
               })}
             </ul>
           )}
-        </section>
-      ) : null}
-
-      {adminTab === "chapters" ? (
-        <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
-          <ChapterManagerClient bookId={book.id} status={book.status} />
         </section>
       ) : null}
 

@@ -7,21 +7,6 @@
   background: var(--bg-base);
 }
 
-.gallery-root::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(
-    ellipse 55% 30% at 50% 0%,
-    var(--glow-color, rgba(160, 100, 20, 0.1)),
-    transparent 70%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
 .gallery-root-inner {
   position: relative;
   z-index: 1;

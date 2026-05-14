@@ -10,9 +10,6 @@ export type T2ITesterModelDef = {
 
 export const T2I_TESTER_MODELS: T2ITesterModelDef[] = [
   { id: "flux-schnell", label: "flux/schnell", endpoint: "fal-ai/flux/schnell", costPerImage: 0.003, description: "Baseline — dev/test only" },
-  { id: "flux-dev", label: "flux/dev", endpoint: "fal-ai/flux/dev", costPerImage: 0.025, description: "Better quality" },
-  { id: "flux-2-dev", label: "flux-2/dev", endpoint: "fal-ai/flux-2", costPerImage: 0.012, description: "FLUX.2 open, cheap" },
-  { id: "flux-2-pro", label: "flux-2/pro", endpoint: "fal-ai/flux-2-pro", costPerImage: 0.03, description: "FLUX.2 production" },
   { id: "flux-pro-11", label: "flux-pro/v1.1", endpoint: "fal-ai/flux-pro/v1.1", costPerImage: 0.04, description: "High quality" },
   {
     id: "flux-kontext-pro",
@@ -21,15 +18,7 @@ export const T2I_TESTER_MODELS: T2ITesterModelDef[] = [
     costPerImage: 0.04,
     description: "Good consistency",
   },
-  {
-    id: "flux-kontext-max",
-    label: "kontext/max",
-    endpoint: "fal-ai/flux-pro/kontext/max/text-to-image",
-    costPerImage: 0.08,
-    description: "Max prompt adherence",
-  },
   { id: "flux-pro-ultra", label: "flux-pro/ultra", endpoint: "fal-ai/flux-pro/v1.1-ultra", costPerImage: 0.06, description: "Best FLUX.1 quality" },
-  { id: "nano-banana-2", label: "nano-banana-2", endpoint: "fal-ai/nano-banana-2", costPerImage: 0.08, description: "Gemini 3.1 Flash" },
   {
     id: "seedream-v4",
     label: "seedream/v4",
@@ -43,6 +32,41 @@ export const T2I_TESTER_MODELS: T2ITesterModelDef[] = [
     endpoint: "fal-ai/bytedance/seedream/v4.5/text-to-image",
     costPerImage: 0.04,
     description: "ByteDance latest",
+  },
+  {
+    id: "wan-2-7",
+    label: "wan/2.7",
+    endpoint: "fal-ai/wan/v2.7/text-to-image",
+    costPerImage: 0.03,
+    description: "Alibaba, reasoning pre-pass",
+  },
+  {
+    id: "kling-image-v3",
+    label: "kling-image/v3",
+    endpoint: "fal-ai/kling-image/v3/text-to-image",
+    costPerImage: 0.028,
+    description: "Latest Kling image model",
+  },
+  {
+    id: "qwen-2512",
+    label: "qwen-image/2512",
+    endpoint: "fal-ai/qwen-image-2512",
+    costPerImage: 0.02,
+    description: "Improved face rendering",
+  },
+  {
+    id: "gpt-image-15",
+    label: "gpt-image-1.5",
+    endpoint: "fal-ai/gpt-image-1.5",
+    costPerImage: 0.034,
+    description: "OpenAI medium quality",
+  },
+  {
+    id: "grok-imagine",
+    label: "grok-imagine",
+    endpoint: "fal-ai/grok-imagine",
+    costPerImage: 0.02,
+    description: "xAI Aurora engine",
   },
 ];
 

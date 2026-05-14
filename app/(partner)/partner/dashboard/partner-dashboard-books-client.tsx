@@ -12,14 +12,19 @@ type ListResponse = {
   pageSize: number;
 };
 
+const DASHBOARD_TAB = "my-books";
+
 export function PartnerDashboardBooksClient({
   initialBooks,
   initialHasMore,
   pageSize,
+  variant = "table",
 }: {
   initialBooks: PartnerDashboardBookRow[];
   initialHasMore: boolean;
   pageSize: number;
+  /** `dashboard`: grid rows for embedded dashboard shell (header rendered above this component). */
+  variant?: "table" | "dashboard";
 }) {
   const [books, setBooks] = useState(initialBooks);
   const [hasMore, setHasMore] = useState(initialHasMore);
@@ -60,6 +65,83 @@ export function PartnerDashboardBooksClient({
     return (
       <div className="px-6 py-10 text-center text-sm text-text-secondary">
         You haven&apos;t uploaded any books yet.
+      </div>
+    );
+  }
+
+  if (variant === "dashboard") {
+    return (
+      <div className="space-y-4">
+        {loadErr ? <p className="px-2 pt-2 text-sm text-error">{loadErr}</p> : null}
+        <div className="dashboard-books-grid-head">
+          <span>Book</span>
+          <span>Status</span>
+          <span className="text-center">Readers</span>
+          <span className="text-center">Queries</span>
+          <span className="text-center">Images</span>
+          <span className="text-right">Actions</span>
+        </div>
+        {books.map((book, i) => (
+          <div
+            key={book.id}
+            className="dashboard-books-grid-row dashboard-stagger-item--x"
+            style={{ animationDelay: `${i * 70}ms` }}
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="relative h-[42px] w-8 shrink-0 overflow-hidden rounded border border-border-subtle bg-bg-surface">
+                {book.coverImageUrl ? (
+                  <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="32px" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-[10px] text-text-muted">-</div>
+                )}
+              </div>
+              <div className="min-w-0">
+                <Link
+                  href={`/partner/books/${book.id}`}
+                  className="block truncate font-serif text-sm text-text-primary hover:text-accent-text"
+                >
+                  {book.title}
+                </Link>
+                <div className="truncate text-[10px] italic text-text-secondary">{book.author}</div>
+              </div>
+            </div>
+            <div className="flex justify-start">
+              <StatusBadge status={book.status} />
+            </div>
+            <div className="text-center font-mono text-xs tabular-nums text-accent/90">{book.readerCount.toLocaleString()}</div>
+            <div className="text-center font-mono text-xs tabular-nums text-accent/90">{book.queryCount.toLocaleString()}</div>
+            <div className="text-center font-mono text-xs tabular-nums text-accent/90">{book.imageCount.toLocaleString()}</div>
+            <div className="flex flex-wrap justify-end gap-1">
+              <Link
+                href={`/partner/books/${book.id}/stats?from=${encodeURIComponent(`/dashboard?tab=${DASHBOARD_TAB}`)}`}
+                className="rounded border border-border px-2 py-1 font-mono text-[8px] uppercase tracking-wide text-text-secondary hover:border-accent/40"
+              >
+                Stats
+              </Link>
+              <Link
+                href={`/partner/books/${book.id}`}
+                className="rounded border border-accent/30 bg-accent/10 px-2 py-1 font-mono text-[8px] uppercase tracking-wide text-accent hover:bg-accent/20"
+              >
+                Manage
+              </Link>
+            </div>
+          </div>
+        ))}
+
+        {hasMore ? (
+          <div className="flex justify-center pb-2">
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => void loadMore()}
+              className="rounded-lg bg-bg-raised px-5 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : `Load next ${pageSize}`}
+            </button>
+          </div>
+        ) : (
+          <p className="pb-2 text-center text-xs text-text-muted">End of list</p>
+        )}
       </div>
     );
   }
@@ -128,7 +210,7 @@ export function PartnerDashboardBooksClient({
                 </td>
                 <td className="px-4 py-3">
                   <Link
-                    href={`/partner/books/${book.id}/stats?from=${encodeURIComponent("/dashboard?tab=my-books")}`}
+                    href={`/partner/books/${book.id}/stats?from=${encodeURIComponent(`/dashboard?tab=${DASHBOARD_TAB}`)}`}
                     className="inline-flex rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-accent/40 hover:bg-bg-raised"
                   >
                     Stats

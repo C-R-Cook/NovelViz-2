@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ReaderClient } from "./reader-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -91,10 +92,8 @@ export default async function ReaderBookPage({ params }: PageProps) {
     : null;
 
   return (
-    <ReaderClient
-      book={book}
-      chapters={chapters}
-      initialProgress={initialProgress}
-    />
+    <Suspense fallback={null}>
+      <ReaderClient book={book} chapters={chapters} initialProgress={initialProgress} />
+    </Suspense>
   );
 }

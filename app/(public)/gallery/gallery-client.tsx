@@ -11,6 +11,7 @@ import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
+import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
 import { HelpCircle, LockKeyholeOpen, Star } from "lucide-react";
 import type { SpoilerProtection } from "@db";
 
@@ -208,6 +209,8 @@ type GallerySquareCardProps = {
   viewerUserId: string | null;
   isAdmin: boolean;
   globalSpoilerProtection: boolean;
+  /** Lock overlay copy (chapter vs unstarted); may differ from `image.lockKind` when using session-only gallery reveal. */
+  overlayLockKind: GalleryLockKind;
   canLike: boolean;
   likingIds: Record<string, boolean>;
   onLike: (id: string) => void;
@@ -226,6 +229,7 @@ function GallerySquareCard({
   viewerUserId,
   isAdmin,
   globalSpoilerProtection,
+  overlayLockKind,
   canLike,
   likingIds,
   onLike,
@@ -361,15 +365,15 @@ function GallerySquareCard({
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-4 text-center">
             <LockIcon className="h-9 w-9 text-accent-text/95" />
 
-            {image.lockKind === "unstarted" ? (
+            {overlayLockKind === "unstarted" ? (
               <p className="max-w-[14rem] text-sm font-medium leading-snug text-text-primary">Start reading {image.bookTitle}</p>
             ) : null}
 
-            {image.lockKind === "chapter" ? (
+            {overlayLockKind === "chapter" ? (
               <p className="text-sm font-medium leading-snug text-text-primary">Chapter {image.chapterNumberAtTime}</p>
             ) : null}
 
-            {image.lockKind === "guest_blur" ? (
+            {overlayLockKind === "guest_blur" ? (
               <span className="sr-only">Preview locked — create an account to unlock your library gallery</span>
             ) : null}
           </div>
@@ -385,6 +389,7 @@ type GalleryCardStripSharedProps = {
   viewerUserId: string | null;
   isAdmin: boolean;
   globalSpoilerProtection: boolean;
+  overlayLockKind: (image: GalleryImageCard) => GalleryLockKind;
   canLike: boolean;
   likingIds: Record<string, boolean>;
   onLike: (id: string) => void;
@@ -406,6 +411,7 @@ function GalleryLibraryMasonry({
   viewerUserId,
   isAdmin,
   globalSpoilerProtection,
+  overlayLockKind,
   canLike,
   likingIds,
   onLike,
@@ -427,6 +433,7 @@ function GalleryLibraryMasonry({
             viewerUserId={viewerUserId}
             isAdmin={isAdmin}
             globalSpoilerProtection={globalSpoilerProtection}
+            overlayLockKind={overlayLockKind(image)}
             canLike={canLike}
             likingIds={likingIds}
             onLike={onLike}
@@ -449,6 +456,7 @@ function CarouselRow({
   viewerUserId,
   isAdmin,
   globalSpoilerProtection,
+  overlayLockKind,
   canLike,
   likingIds,
   onLike,
@@ -599,6 +607,7 @@ function CarouselRow({
             viewerUserId={viewerUserId}
             isAdmin={isAdmin}
             globalSpoilerProtection={globalSpoilerProtection}
+            overlayLockKind={overlayLockKind(image)}
             canLike={canLike}
             likingIds={likingIds}
             onLike={onLike}
@@ -679,6 +688,8 @@ export function GalleryClient(props: GalleryClientProps) {
   const [spoilerSettingsByBookId, setSpoilerSettingsByBookId] = useState<Record<string, SpoilerProtection>>(
     props.layout === "member" ? props.spoilerSettingsByBookId : {},
   );
+  /** Session-only: gallery defaults to chapter gates on for INHERIT books; does not change account settings. */
+  const [gallerySessionRevealAll, setGallerySessionRevealAll] = useState(false);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -700,6 +711,37 @@ export function GalleryClient(props: GalleryClientProps) {
     setSpoilerSettingsByBookId(props.spoilerSettingsByBookId);
   }, [props.layout, memberSpoilerSettings]);
 
+  const getMemberChapterGateLock = useCallback(
+    (image: GalleryImageCard): { locked: boolean; lockKind: GalleryLockKind } => {
+      const bookSpoiler = spoilerSettingsByBookId[image.bookId] ?? "INHERIT";
+      const globalForSession = gallerySessionRevealAll ? false : true;
+      const mode = effectiveChapterGateMode(bookSpoiler, globalForSession);
+      const behind = isChapterBehindLock(mode, image.currentChapterNumber, image.chapterNumberAtTime);
+      if (!behind) return { locked: false, lockKind: "none" };
+      const lockKind: GalleryLockKind =
+        image.currentChapterNumber === undefined ? "unstarted" : "chapter";
+      return { locked: true, lockKind };
+    },
+    [spoilerSettingsByBookId, gallerySessionRevealAll],
+  );
+
+  const isImageLocked = useCallback(
+    (image: GalleryImageCard): boolean => {
+      if (isAdmin) return false;
+      if (!isMember) return image.isLocked;
+      return getMemberChapterGateLock(image).locked;
+    },
+    [isAdmin, isMember, getMemberChapterGateLock],
+  );
+
+  const galleryOverlayLockKind = useCallback(
+    (image: GalleryImageCard): GalleryLockKind => {
+      if (!isMember || isAdmin) return image.lockKind;
+      return getMemberChapterGateLock(image).lockKind;
+    },
+    [isMember, isAdmin, getMemberChapterGateLock],
+  );
+
   const resolveList = (list: GalleryImageCard[]) => list.map((img) => imagesById[img.id] ?? img);
 
   const latestFeaturedResolved = props.layout === "guest" ? resolveList(props.latestFeatured) : [];
@@ -707,11 +749,6 @@ export function GalleryClient(props: GalleryClientProps) {
   const fromLibraryResolved =
     props.layout === "member" && props.library.kind === "images" ? resolveList(props.library.images) : [];
   const featuredResolved = props.layout === "member" ? resolveList(props.featured) : [];
-
-  function isImageLocked(image: GalleryImageCard): boolean {
-    if (isAdmin) return false;
-    return image.isLocked;
-  }
 
   async function likeImage(imageId: string) {
     if (!canLike) return;
@@ -854,17 +891,6 @@ export function GalleryClient(props: GalleryClientProps) {
     modalActiveImage &&
     props.libraryBookIds.includes(modalActiveImage.bookId);
 
-  async function toggleGlobalSpoiler() {
-    if (props.layout !== "member") return;
-    const next = !props.globalSpoilerProtection;
-    await fetch("/api/user/spoiler-protection", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: next }),
-    });
-    router.refresh();
-  }
-
   async function unlockBookSpoilers(bookId: string) {
     setModalCtaError(null);
     setModalUnlockPending(true);
@@ -971,7 +997,9 @@ export function GalleryClient(props: GalleryClientProps) {
   const carouselRowProps = {
     viewerUserId,
     isAdmin,
-    globalSpoilerProtection: props.layout === "member" ? props.globalSpoilerProtection : true,
+    globalSpoilerProtection:
+      props.layout === "member" ? (isAdmin ? props.globalSpoilerProtection : !gallerySessionRevealAll) : true,
+    overlayLockKind: galleryOverlayLockKind,
     canLike,
     likingIds,
     onLike: likeImage,
@@ -983,16 +1011,18 @@ export function GalleryClient(props: GalleryClientProps) {
 
   function GlobalSpoilerPill() {
     if (props.layout !== "member") return null;
-    const hidden = props.globalSpoilerProtection;
+    const hidden = !gallerySessionRevealAll;
     return (
       <button
         type="button"
-        onClick={() => void toggleGlobalSpoiler()}
+        onClick={() => setGallerySessionRevealAll((v) => !v)}
         className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 ${
           hidden
             ? "border-error/35 bg-error/10 text-error"
             : "border-success/35 bg-success/10 text-success"
         }`}
+        aria-pressed={gallerySessionRevealAll}
+        title="For this visit to the gallery only. Your account default is unchanged."
       >
         {hidden ? "Show everything" : "Hide spoilers"}
       </button>

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
@@ -94,6 +94,8 @@ type Props = {
 
 export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const deepLinkConsumed = useRef(false);
   const total = chapters.length;
 
   const [selectedChapterId, setSelectedChapterId] = useState<string>(() => {
@@ -127,6 +129,23 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   const [historyInitialized, setHistoryInitialized] = useState(false);
 
   const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("imagine");
+
+  useEffect(() => {
+    if (deepLinkConsumed.current) return;
+    const tab = searchParams.get("tab");
+    const qRaw = searchParams.get("q");
+    if (!tab && !qRaw) return;
+    deepLinkConsumed.current = true;
+    if (qRaw) {
+      setQuestion(qRaw);
+      setActiveAiTab("ask");
+    } else if (tab === "ask") {
+      setActiveAiTab("ask");
+    } else if (tab === "imagine") {
+      setActiveAiTab("imagine");
+    }
+    router.replace(`/reader/${book.id}`, { scroll: false });
+  }, [searchParams, router, book.id]);
 
   const [imgPrompt, setImgPrompt] = useState("");
   const [imgLoading, setImgLoading] = useState(false);

@@ -17,6 +17,7 @@ export function ForReviewQueue({
   pendingBooks,
   actionId,
   onModeration,
+  className,
 }: {
   pendingBooks: ForReviewBook[];
   actionId: string | null;
@@ -24,6 +25,8 @@ export function ForReviewQueue({
     bookId: string,
     payload: { status: "published" | "unlisted" | "rejected"; rejectionReason?: string },
   ) => void;
+  /** Optional wrapper class for dashboard shell layout. */
+  className?: string;
 }) {
   const [rejectBook, setRejectBook] = useState<ForReviewBook | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -54,7 +57,7 @@ export function ForReviewQueue({
 
   return (
     <>
-      <section aria-labelledby="for-review-queue-heading" className="space-y-4">
+      <section aria-labelledby="for-review-queue-heading" className={className ? `${className} space-y-4` : "space-y-4"}>
         <div>
           <h2 id="for-review-queue-heading" className="text-lg font-semibold text-text-primary">
             For review

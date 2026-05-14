@@ -5,7 +5,8 @@ import {
   queryAdminBooksPage,
 } from "@/lib/admin-books-list";
 import { getAdminStatsPayload, normalizeVendorWindowDays } from "@/lib/admin-stats";
-import { parseDashboardTab, type DashboardUserRole } from "@/lib/dashboard-tab";
+import { type DashboardUserRole } from "@/lib/dashboard-tab";
+import { formatGenre } from "@/lib/genre";
 import { fetchPartnerAnalytics } from "@/lib/partner-analytics";
 import {
   PARTNER_BOOKS_PAGE_SIZE,
@@ -39,6 +40,12 @@ function toDashboardUserRole(r: UserRole): DashboardUserRole {
   return "admin";
 }
 
+function roleDisplayLabel(r: UserRole): string {
+  if (r === UserRole.reader) return "Reader";
+  if (r === UserRole.partner) return "Publisher";
+  return "Administrator";
+}
+
 async function DashboardContent({ searchParams }: DashboardPageProps) {
   const session = await getCurrentUser();
   if (!session) {
@@ -46,7 +53,6 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
   }
 
   const sp = searchParams ? await searchParams : {};
-  const rawTabSingle = typeof sp?.tab === "string" ? sp.tab : Array.isArray(sp?.tab) ? sp.tab[0] : undefined;
   const rawVendorDaysSingle =
     typeof sp?.vendorDays === "string"
       ? sp.vendorDays
@@ -63,6 +69,12 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       username: true,
       email: true,
       role: true,
+      country: true,
+      ageRange: true,
+      gender: true,
+      genrePreferences: true,
+      subscribedToMailingList: true,
+      createdAt: true,
     },
   });
   if (!dbUser) {
@@ -72,7 +84,11 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
   const userId = dbUser.id;
   const role = dbUser.role;
   const dashboardRole = toDashboardUserRole(role);
-  const initialTab = parseDashboardTab(dashboardRole, rawTabSingle);
+
+  const memberSinceLabel = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(dbUser.createdAt);
 
   const [
     libraryBookCount,
@@ -81,6 +97,8 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
     readingProgress,
     recentQueries,
     recentImages,
+    queryByBook,
+    imageByBook,
   ] = await Promise.all([
     prisma.userBook.count({ where: { userId, isActive: true } }),
     prisma.query.count({ where: { userId } }),
@@ -92,23 +110,59 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       },
       orderBy: { updatedAt: "desc" },
       include: {
-        book: { select: { id: true, title: true, author: true, coverImageUrl: true } },
+        book: {
+          select: {
+            id: true,
+            title: true,
+            author: true,
+            coverImageUrl: true,
+            genre: true,
+            _count: { select: { chapters: true } },
+          },
+        },
         currentChapter: { select: { title: true, sequenceNumber: true } },
       },
     }),
     prisma.query.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 3,
-      include: { book: { select: { title: true } } },
+      take: 40,
+      select: {
+        id: true,
+        questionText: true,
+        chapterNumberAtTime: true,
+        createdAt: true,
+        book: { select: { title: true } },
+      },
     }),
     prisma.generatedImage.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
-      take: 3,
-      include: { book: { select: { title: true } } },
+      take: 24,
+      select: {
+        id: true,
+        imageUrl: true,
+        userPrompt: true,
+        chapterNumberAtTime: true,
+        isPublic: true,
+        createdAt: true,
+        book: { select: { title: true } },
+      },
+    }),
+    prisma.query.groupBy({
+      by: ["bookId"],
+      where: { userId },
+      _count: { _all: true },
+    }),
+    prisma.generatedImage.groupBy({
+      by: ["bookId"],
+      where: { userId },
+      _count: { _all: true },
     }),
   ]);
+
+  const qCountMap = new Map(queryByBook.map((r) => [r.bookId, r._count._all]));
+  const imgCountMap = new Map(imageByBook.map((r) => [r.bookId, r._count._all]));
 
   let partnerPayload: {
     stats: { totalBooks: number; totalReaders: number; totalQueries: number; totalImages: number };
@@ -116,13 +170,41 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
     initialBooks: Awaited<ReturnType<typeof queryPartnerBooksPage>>["rows"];
     initialHasMore: boolean;
     pageSize: number;
+    ownFeatureRequests: {
+      id: string;
+      status: FeatureRequestStatus;
+      createdAtMs: number;
+      bookTitle: string;
+      chapterNumberAtTime: number;
+      userPrompt: string;
+      imageUrl: string;
+    }[];
+    ownFeatureRequestsPendingCount: number;
   } | null = null;
 
   if (role === UserRole.partner || role === UserRole.admin) {
-    const [stats, analytics, page0] = await Promise.all([
+    const [stats, analytics, page0, ownFrRows, ownFrPending] = await Promise.all([
       fetchPartnerDashboardStats(userId),
       fetchPartnerAnalytics(userId),
       queryPartnerBooksPage({ ownerId: userId, skip: 0 }),
+      prisma.featureRequest.findMany({
+        where: { requestedBy: userId },
+        orderBy: { createdAt: "desc" },
+        take: 40,
+        include: {
+          image: {
+            select: {
+              imageUrl: true,
+              userPrompt: true,
+              chapterNumberAtTime: true,
+              book: { select: { title: true } },
+            },
+          },
+        },
+      }),
+      prisma.featureRequest.count({
+        where: { requestedBy: userId, status: FeatureRequestStatus.PENDING },
+      }),
     ]);
     partnerPayload = {
       stats,
@@ -130,6 +212,16 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       initialBooks: page0.rows,
       initialHasMore: page0.hasMore,
       pageSize: PARTNER_BOOKS_PAGE_SIZE,
+      ownFeatureRequests: ownFrRows.map((fr) => ({
+        id: fr.id,
+        status: fr.status,
+        createdAtMs: fr.createdAt.getTime(),
+        bookTitle: fr.image.book.title,
+        chapterNumberAtTime: fr.image.chapterNumberAtTime,
+        userPrompt: fr.image.userPrompt ?? "",
+        imageUrl: fr.image.imageUrl,
+      })),
+      ownFeatureRequestsPendingCount: ownFrPending,
     };
   }
 
@@ -159,6 +251,13 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       username: string;
     }[];
     featureRequestsPendingCount: number;
+    recentUsers: {
+      id: string;
+      username: string | null;
+      email: string;
+      role: UserRole;
+      createdAtMs: number;
+    }[];
   } | null = null;
 
   let adminBooksAll: {
@@ -180,6 +279,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       statsPayload,
       featureRequestsPendingRows,
       featureRequestsPendingCount,
+      recentUsersRows,
     ] = await Promise.all([
       prisma.book.findMany({
         where: { status: "pending_review", deletedAt: null },
@@ -223,6 +323,17 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         },
       }),
       prisma.featureRequest.count({ where: { status: FeatureRequestStatus.PENDING } }),
+      prisma.user.findMany({
+        take: 80,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      }),
     ]);
 
     const titleCount = new Map<string, number>();
@@ -256,6 +367,13 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       bookRequests: { totalCount: bookRequestTitleRows.length, topBooks },
       featureRequestsQueue,
       featureRequestsPendingCount,
+      recentUsers: recentUsersRows.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        role: u.role,
+        createdAtMs: u.createdAt.getTime(),
+      })),
     };
     adminBooksAll = {
       initialBooks: allBooksFirstPage.rows,
@@ -268,33 +386,47 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
   return (
     <DashboardClient
       role={dashboardRole}
-      initialTab={initialTab}
+      roleDisplayLabel={roleDisplayLabel(role)}
       reader={{
         displayName:
           dbUser.username?.trim() ||
           dbUser.name?.trim() ||
           dbUser.email.split("@")[0] ||
           "Reader",
+        username: dbUser.username,
         email: dbUser.email,
         stats: { libraryBookCount, queryCount, generatedImageCount },
-        currentlyReading: readingProgress.map((rp) => ({
-          bookId: rp.book.id,
-          title: rp.book.title,
-          author: rp.book.author,
-          coverImageUrl: rp.book.coverImageUrl,
-          currentChapterNumber: rp.currentChapterNumber,
-          chapterTitle: rp.currentChapter.title,
-        })),
+        currentlyReading: readingProgress.map((rp) => {
+          const chCount = Math.max(1, rp.book._count.chapters);
+          const pct = Math.round((rp.currentChapterNumber / chCount) * 100);
+          return {
+            bookId: rp.book.id,
+            title: rp.book.title,
+            author: rp.book.author,
+            coverImageUrl: rp.book.coverImageUrl,
+            currentChapterNumber: rp.currentChapterNumber,
+            chapterTitle: rp.currentChapter.title,
+            genreLabel: formatGenre(rp.book.genre),
+            chapterCount: rp.book._count.chapters,
+            queryCount: qCountMap.get(rp.book.id) ?? 0,
+            imageCount: imgCountMap.get(rp.book.id) ?? 0,
+            progressPercent: Math.min(100, pct),
+          };
+        }),
         recentQueries: recentQueries.map((q) => ({
           id: q.id,
           questionText: q.questionText,
           bookTitle: q.book.title,
+          chapterNumberAtTime: q.chapterNumberAtTime,
           createdAtMs: q.createdAt.getTime(),
         })),
         recentImages: recentImages.map((img) => ({
           id: img.id,
           imageUrl: img.imageUrl,
           bookTitle: img.book.title,
+          chapterNumberAtTime: img.chapterNumberAtTime,
+          userPrompt: img.userPrompt,
+          isPublic: img.isPublic,
           createdAtMs: img.createdAt.getTime(),
         })),
       }}
@@ -302,6 +434,22 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       admin={adminPayload}
       adminBooksAll={adminBooksAll}
       adminStats={adminStats}
+      account={{
+        viewerId: session.id,
+        user: {
+          name: dbUser.name,
+          username: dbUser.username,
+          email: dbUser.email,
+          country: dbUser.country,
+          ageRange: dbUser.ageRange,
+          gender: dbUser.gender,
+          genrePreferences: dbUser.genrePreferences,
+          subscribedToMailingList: dbUser.subscribedToMailingList,
+        },
+        stats: { libraryBookCount, queryCount, generatedImageCount },
+        memberSinceLabel,
+        isProduction: process.env.NODE_ENV === "production",
+      }}
     />
   );
 }

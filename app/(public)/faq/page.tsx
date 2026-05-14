@@ -5,8 +5,8 @@
  * ---------------------
  * 1. Scroll to `SECTIONS` below. That array is the entire FAQ.
  * 2. Page order = array order: first section appears at the top, last at the bottom.
- * 3. To add a **section**: push a new object `{ title: "Your heading", items: [...] }`
- *    anywhere in the array (usually grouped with related topics).
+ * 3. To add a **section**: push `{ title: "Your heading", items: [...] }`. Optionally add `id: "anchor-slug"`
+ *    so you can link to it as `/faq#anchor-slug` (see **Publisher partnership**).
  * 4. To add a **question** inside a section: add `{ q: "…", a: "…" }` to that section’s `items`.
  *    - `q` = question shown in the accordion header (keep it unique; it’s also the React `key`).
  *    - `a` = answer shown when expanded (plain text; use \n for line breaks if you ever need them).
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 type FAQItem = { q: string; a: string };
 
 /** One block on the page: a section title + any number of accordion items. */
-type FAQSection = { title: string; items: FAQItem[] };
+type FAQSection = { title: string; items: FAQItem[]; /** Optional anchor for links (e.g. `/faq#publisher-partnership`). */ id?: string };
 
 // --- Accordion styling (native `<details>` / `<summary>`). Gold accent when open. ---
 
@@ -134,6 +134,34 @@ const SECTIONS: FAQSection[] = [
     ],
   },
 
+  // ----- Publisher partnership -----
+  {
+    id: "publisher-partnership",
+    title: "Publisher partnership",
+    items: [
+      {
+        q: "How do readers discover my books?",
+        a: "We can feature your work to a highly targeted audience of people who are already deep in a reading experience. Discovery feels natural — readers never get the sense that they are being served an advertisement.",
+      },
+      {
+        q: "Can we link to where readers buy the book?",
+        a: "Yes. You can point readers to retailers, your press page, or anywhere you sell — so the path from curiosity to purchase stays clear.",
+      },
+      {
+        q: "What does it cost to partner with NovelViz?",
+        a: "Free for partners, always.",
+      },
+      {
+        q: "Can users read my book on your site?",
+        a: "No. NovelViz is not a place to read a full book the way you would on a free ebook site. Readers use it as a spoiler-safe companion—chapter-aware questions, images, and help—while they read the copy they already bought or borrowed. Your listing connects engaged readers with your work; it does not replace your retail channels or put the complete text out for casual browsing.",
+      },
+      {
+        q: "How is my book stored and used to generate answers and images?",
+        a: "When a partner title goes live, the manuscript is split into many small, labelled segments by chapter—we call those chunks—and stored in our database. We also build embeddings (compact numeric fingerprints) that help the system find the right passage when a reader asks something. Each time someone gets an answer or an image, only the chunks from chapters they have already reached are used for that request. The material stays inside NovelViz’s systems to run those features for logged-in readers; it is not presented as a browsable book, and readers cannot read ahead of their saved progress.",
+      },
+    ],
+  },
+
   // ----- Account & Privacy -----
   {
     title: "Account & Privacy",
@@ -170,7 +198,11 @@ export default function FAQPage() {
 
       <div className="mt-12 space-y-12">
         {SECTIONS.map((section, sectionIndex) => (
-          <section key={section.title} aria-labelledby={`faq-section-${sectionIndex}`}>
+          <section
+            key={section.title}
+            id={section.id}
+            aria-labelledby={`faq-section-${sectionIndex}`}
+          >
             <h2 id={`faq-section-${sectionIndex}`} className={SECTION_HEADING_CLASS}>
               {section.title}
             </h2>

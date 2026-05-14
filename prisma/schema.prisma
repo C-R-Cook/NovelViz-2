@@ -82,6 +82,12 @@ enum FeatureRequestStatus {
   REJECTED
 }
 
+enum PartnerApplicationStatus {
+  pending
+  approved
+  rejected
+}
+
 model Book {
   id                           String     @id @default(cuid())
   title                        String
@@ -180,9 +186,52 @@ model User {
   bookRequests    BookRequest[]
   featureRequests FeatureRequest[] @relation("FeatureRequests")
   featureReviews  FeatureRequest[] @relation("FeatureReviews")
+  partnerApplications PartnerApplication[]
+  partnerRequests     PartnerRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PartnerRequest {
+  id               String   @id @default(uuid())
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name             String
+  email            String
+  accountUsername  String?
+  pseudonym        String?
+  publisherName    String
+  websiteUrl       String?
+  catalogueNote    String   @db.Text
+  createdAt        DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PartnerApplication {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationName String
+  contactEmail     String
+  roleOrTitle      String?
+  websiteUrl       String?
+  catalogSummary   String @db.Text
+  genresPublished  String @db.Text
+  audienceReach    String?
+  motivation       String @db.Text
+  additionalNotes  String? @db.Text
+
+  status PartnerApplicationStatus @default(pending)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 model UserBook {

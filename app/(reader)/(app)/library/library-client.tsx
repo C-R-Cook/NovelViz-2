@@ -1,32 +1,32 @@
 "use client";
 
-import { formatGenre } from "@/lib/genre";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { LibraryContextPanel } from "./library-context-panel";
+import { LibraryOpenBook } from "./library-open-book";
+import type { LibraryBookRow, LibraryTotals } from "./library-types";
+import "./library-redesign.css";
 
-export type LibraryBookRow = {
-  userBookId: string;
-  bookId: string;
-  title: string;
-  author: string;
-  genre: string | null;
-  coverImageUrl: string | null;
-  chapterTotal: number;
-  progress: { currentChapterNumber: number } | null;
-  removedFromCatalogue: boolean;
-};
+export type { LibraryBookRow, LibraryTotals } from "./library-types";
 
-type Props = {
-  readingBooks: LibraryBookRow[];
-  gridBooks: LibraryBookRow[];
-  totalCount: number;
-};
+function subscribeReducedMotion(cb: () => void) {
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+}
 
-function useLibraryMotionPrefs() {
+function getReducedMotionSnapshot() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
+}
+
+function useFinePointer() {
   const [finePointer, setFinePointer] = useState(false);
-
   useEffect(() => {
     const mqFine = window.matchMedia("(pointer: fine)");
     const sync = () => setFinePointer(mqFine.matches);
@@ -34,8 +34,7 @@ function useLibraryMotionPrefs() {
     mqFine.addEventListener("change", sync);
     return () => mqFine.removeEventListener("change", sync);
   }, []);
-
-  return { finePointer };
+  return finePointer;
 }
 
 function RemoveFromLibraryIcon({ className }: { className?: string }) {
@@ -47,6 +46,25 @@ function RemoveFromLibraryIcon({ className }: { className?: string }) {
         d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
       />
     </svg>
+  );
+}
+
+function ShelfCoverImage({ src, title }: { src: string; title: string }) {
+  const [bad, setBad] = useState(false);
+  if (bad) {
+    return (
+      <div
+        className="absolute inset-0 flex items-center justify-center px-2 text-center font-serif text-[11px] leading-tight text-text-primary"
+        style={{
+          background: "color-mix(in srgb, var(--accent) 32%, var(--bg-surface))",
+        }}
+      >
+        {title}
+      </div>
+    );
+  }
+  return (
+    <Image src={src} alt={title} fill className="object-contain" sizes="130px" onError={() => setBad(true)} />
   );
 }
 
@@ -62,116 +80,57 @@ function EmptyLibraryIcon({ className }: { className?: string }) {
   );
 }
 
-function LibraryBookCard({
-  book,
-  finePointer,
-  layout,
-  showProgressLine,
-  onRemoveRequest,
-}: {
-  book: LibraryBookRow;
-  finePointer: boolean;
-  layout: "carousel" | "grid";
-  showProgressLine: boolean;
-  onRemoveRequest: (bookId: string) => void;
-}) {
-  const gridHoverClass = finePointer
-    ? "hover:scale-[1.04] hover:shadow-xl hover:shadow-bg-overlay/55 focus-visible:scale-[1.04] focus-visible:shadow-xl"
-    : "active:scale-[0.99]";
-  const hasProgress = book.progress !== null;
-  const cta = hasProgress ? "Continue Reading" : "Start Reading";
-  const widthClass = layout === "carousel" ? "w-[10.5rem] shrink-0 sm:w-[12rem]" : "";
-  const totalLabel = book.chapterTotal > 0 ? String(book.chapterTotal) : "—";
+type Props = {
+  books: LibraryBookRow[];
+  totals: LibraryTotals;
+  defaultActiveBookId: string;
+};
 
-  const onRemoveClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onRemoveRequest(book.bookId);
-    },
-    [book.bookId, onRemoveRequest],
-  );
-
-  return (
-    <div className={`group relative ${widthClass}`}>
-      <Link
-        href={`/reader/${book.bookId}`}
-        className={`group relative block aspect-[2/3] cursor-pointer overflow-hidden rounded-md shadow-sm shadow-bg-overlay/20 outline-none transition-all duration-200 ease-out ${gridHoverClass} focus-visible:ring-2 focus-visible:ring-accent/50 ${
-          book.removedFromCatalogue ? "opacity-85" : ""
-        }`}
-      >
-        {book.coverImageUrl ? (
-          <Image
-            src={book.coverImageUrl}
-            alt={book.title}
-            fill
-            className={`object-cover transition-transform duration-200 ease-out ${
-              finePointer ? "group-hover:scale-[1.02]" : ""
-            }`}
-            sizes={
-              layout === "carousel"
-                ? "(max-width: 640px) 42vw, 12rem"
-                : "(max-width: 640px) 45vw, (max-width: 1024px) 22vw, 18vw"
-            }
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-surface px-2 text-center text-xs text-text-muted">
-            No cover
-          </div>
-        )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-overlay via-bg-overlay/30 to-transparent" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-bg-overlay/60 via-bg-overlay/25 to-transparent opacity-0 transition-opacity duration-200 ease-out group-hover:opacity-100" />
-        {book.genre ? (
-          <div className="absolute right-2 top-2 z-10 max-w-[55%] truncate rounded-full bg-bg-overlay/50 px-2 py-0.5 text-[10px] font-medium text-text-primary/90 backdrop-blur-sm">
-            {formatGenre(book.genre)}
-          </div>
-        ) : null}
-        <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5 pt-10 transition-transform duration-200 ease-out sm:p-3 ${
-            finePointer ? "group-hover:-translate-y-1" : ""
-          }`}
-        >
-          {showProgressLine && book.progress ? (
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-text-secondary drop-shadow">
-              Chapter {book.progress.currentChapterNumber} of {totalLabel}
-            </p>
-          ) : null}
-          <p className="line-clamp-2 text-xs font-bold leading-snug text-text-primary drop-shadow sm:text-sm">
-            {book.title}
-          </p>
-          <p className="mt-0.5 line-clamp-1 text-[10px] text-text-secondary drop-shadow sm:text-xs">{book.author}</p>
-          <div
-            className={`mt-1.5 transition-all duration-200 ease-out ${
-              finePointer
-                ? "translate-y-1 opacity-0 group-hover:translate-y-0 group-hover:opacity-100"
-                : "opacity-0"
-            }`}
-          >
-            <span className="pointer-events-none inline-block rounded-md bg-accent-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/40">
-              {cta}
-            </span>
-          </div>
-        </div>
-      </Link>
-      <button
-        type="button"
-        className={`absolute bottom-2 left-2 z-20 rounded-md border border-border bg-bg-base/90 p-1.5 text-text-muted shadow-md backdrop-blur-sm transition hover:border-error/35 hover:text-error focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-          finePointer
-            ? "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-            : "pointer-events-auto opacity-80"
-        }`}
-        aria-label={`Remove ${book.title} from library`}
-        onClick={onRemoveClick}
-      >
-        <RemoveFromLibraryIcon className="h-3.5 w-3.5" />
-      </button>
-    </div>
-  );
-}
-
-export function LibraryClient({ readingBooks, gridBooks, totalCount }: Props) {
+export function LibraryClient({ books, totals, defaultActiveBookId }: Props) {
   const router = useRouter();
-  const { finePointer } = useLibraryMotionPrefs();
+  const finePointer = useFinePointer();
+  const reducedMotion = useSyncExternalStore(
+    subscribeReducedMotion,
+    getReducedMotionSnapshot,
+    getReducedMotionServerSnapshot,
+  );
+
+  const [activeBookId, setActiveBookId] = useState(defaultActiveBookId);
+  /** Start open when the shelf has books so the hero is not stuck closed before the first effect frame. */
+  const [bookOpen, setBookOpen] = useState(() => books.length > 0);
+  const [panelVisible, setPanelVisible] = useState(false);
+  const [headerIn, setHeaderIn] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  const bookIdSet = useMemo(() => new Set(books.map((b) => b.bookId)), [books]);
+  const effectiveActiveBookId =
+    activeBookId && bookIdSet.has(activeBookId) ? activeBookId : (books[0]?.bookId ?? "");
+
+  useEffect(() => {
+    if (books.length === 0) {
+      setBookOpen(false);
+      return;
+    }
+    setBookOpen(true);
+    const t1 = setTimeout(() => setHeaderIn(true), 80);
+    return () => {
+      clearTimeout(t1);
+    };
+  }, [books.length]);
+
+  const activeBook = useMemo(
+    () => books.find((b) => b.bookId === effectiveActiveBookId) ?? books[0] ?? null,
+    [books, effectiveActiveBookId],
+  );
+
+  const handleAnimationComplete = useCallback(() => {
+    setPanelVisible(true);
+  }, []);
+
+  const handleBookSelect = useCallback((id: string) => {
+    if (id === effectiveActiveBookId) return;
+    setActiveBookId(id);
+  }, [effectiveActiveBookId]);
 
   const removeFromLibrary = useCallback(
     async (bookId: string) => {
@@ -183,84 +142,203 @@ export function LibraryClient({ readingBooks, gridBooks, totalCount }: Props) {
     [router],
   );
 
-  const n = totalCount;
+  const n = totals.books;
 
   return (
-    <div className="min-h-screen bg-bg-base pb-20 pt-6 text-text-primary sm:pt-10">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6">
-        <header className="mb-10 sm:mb-12">
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">My Library</h1>
-          <p className="mt-2 text-sm text-text-muted">Your personal bookshelf</p>
-          <p className="mt-3 text-sm font-medium text-text-secondary">
-            {n} book{n === 1 ? "" : "s"}
-          </p>
+    <div className="library-root pb-20 pt-6 text-text-primary sm:pt-10">
+      <div className="library-root-inner">
+        <header className="library-header">
+          <div>
+            <div className={`library-eyebrow ${headerIn ? "library-header-in" : ""}`}>Your collection</div>
+            <div className={`library-title-wrap ${headerIn ? "library-header-in" : ""}`}>
+              <h1 className="library-title">My Library</h1>
+            </div>
+          </div>
+          <Link href="/books" className={`library-add-btn ${headerIn ? "library-header-in" : ""}`}>
+            + Add book
+          </Link>
         </header>
 
         {n === 0 ? (
-          <div className="mx-auto flex max-w-md flex-col items-center py-16 text-center">
+          <div className="library-empty">
             <EmptyLibraryIcon className="mx-auto h-14 w-14 text-text-muted" />
-            <p className="mt-6 font-serif text-xl text-text-primary">Your library is empty</p>
+            <p className="library-empty-title">Your library is empty</p>
             <p className="mt-3 text-sm text-text-muted">Browse Discover to find your next book.</p>
-            <Link
-              href="/books"
-              className="mt-8 inline-flex rounded-lg bg-accent-muted px-4 py-2.5 text-sm font-medium text-accent-text ring-1 ring-accent/45 transition hover:bg-accent/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            >
+            <Link href="/books" className="library-empty-link">
               Browse Discover
             </Link>
           </div>
-        ) : (
+        ) : activeBook ? (
           <>
-            {readingBooks.length > 0 ? (
-              <section className="mb-12 sm:mb-14" aria-labelledby="library-reading-heading">
-                <h2
-                  id="library-reading-heading"
-                  className="mb-4 px-1 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted"
-                >
-                  Currently Reading
-                </h2>
-                <div className="-mx-4 flex gap-4 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:thin] sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent">
-                  {readingBooks.map((book) => (
-                    <LibraryBookCard
-                      key={book.userBookId}
-                      book={book}
-                      finePointer={finePointer}
-                      layout="carousel"
-                      showProgressLine
-                      onRemoveRequest={removeFromLibrary}
-                    />
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            <section aria-labelledby="library-all-heading">
-              <h2
-                id="library-all-heading"
-                className="mb-4 px-1 text-[11px] font-medium uppercase tracking-[0.22em] text-text-muted"
-              >
-                All Books
-              </h2>
-              {gridBooks.length === 0 ? (
-                <p className="px-1 text-sm text-text-muted">
-                  Every book you&apos;re reading appears above. More titles you add will show here.
-                </p>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5">
-                  {gridBooks.map((book) => (
-                    <LibraryBookCard
-                      key={book.userBookId}
-                      book={book}
-                      finePointer={finePointer}
-                      layout="grid"
-                      showProgressLine={false}
-                      onRemoveRequest={removeFromLibrary}
-                    />
-                  ))}
-                </div>
-              )}
+            <section className="library-hero" aria-label="Featured book">
+              <div className="library-hero-book">
+                <LibraryOpenBook book={activeBook} isOpen={bookOpen} onAnimationComplete={handleAnimationComplete} />
+              </div>
+              <div className="library-context-col">
+                <LibraryContextPanel book={activeBook} visible={panelVisible} />
+              </div>
             </section>
+
+            <section aria-labelledby="library-shelf-heading">
+              <div className="library-section-label-row">
+                <h2 id="library-shelf-heading" className="library-section-label">
+                  Your bookshelf
+                </h2>
+                <div className="library-section-label-line" />
+                <span className="library-section-label-meta">
+                  {books.length} book{books.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              <div className="library-shelf-wrap">
+                <div className="library-shelf-hairline" aria-hidden />
+                <div className="library-shelf-shadow-line" aria-hidden />
+
+                <div className="library-no-h-scrollbar library-shelf-row">
+                  {books.map((book, index) => {
+                    const isActive = book.bookId === effectiveActiveBookId;
+                    const tilt = index % 2 === 0 ? -1.5 : 1.5;
+                    const hovered = hoveredId === book.bookId;
+                    const ch = book.progress?.currentChapterNumber ?? 1;
+                    const total = Math.max(1, book.chapterTotal);
+                    const pct = Math.round((ch / total) * 100);
+
+                    let transform: string;
+                    if (isActive) {
+                      transform = "translateY(-16px) rotate(0deg) scale(1)";
+                    } else if (finePointer && hovered) {
+                      transform = "translateY(-10px) rotate(0deg) scale(1.02)";
+                    } else {
+                      transform = reducedMotion
+                        ? "translateY(0) rotate(0deg) scale(1)"
+                        : `translateY(0) rotate(${tilt}deg) scale(1)`;
+                    }
+
+                    const w = isActive ? 130 : 100;
+                    const h = isActive ? 175 : 148;
+
+                    return (
+                      <div
+                        key={book.userBookId}
+                        className="library-shelf-item-wrap"
+                        style={{
+                          width: w,
+                          height: h,
+                          zIndex: isActive ? 10 : hovered ? 5 : 1,
+                        }}
+                      >
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className={`library-shelf-card ${isActive ? "library-shelf-card--active" : ""} ${
+                            finePointer && hovered && !isActive ? "library-shelf-card--hover" : ""
+                          } ${reducedMotion ? "library-shelf-card--reduced-motion" : ""} library-shelf-card-enter`}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            transform,
+                            animationDelay: reducedMotion ? "0ms" : `${400 + index * 90}ms`,
+                          }}
+                          onClick={() => handleBookSelect(book.bookId)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleBookSelect(book.bookId);
+                            }
+                          }}
+                          onMouseEnter={() => setHoveredId(book.bookId)}
+                          onMouseLeave={() => setHoveredId(null)}
+                          aria-pressed={isActive}
+                          aria-label={`Select ${book.title}`}
+                        >
+                          <div className="library-shelf-card-inner">
+                            {book.coverImageUrl ? (
+                              <div className="library-shelf-card-cover">
+                                <ShelfCoverImage src={book.coverImageUrl} title={book.title} />
+                              </div>
+                            ) : (
+                              <div
+                                className="library-shelf-card-cover absolute inset-0 flex items-center justify-center px-2 text-center font-serif text-[11px] leading-tight text-text-primary"
+                                style={{
+                                  background: "color-mix(in srgb, var(--accent) 32%, var(--bg-surface))",
+                                }}
+                              >
+                                {book.title}
+                              </div>
+                            )}
+                            <div className="library-shelf-card-overlay" aria-hidden />
+                            <div className="library-shelf-card-bottom">
+                              <div className="library-shelf-card-title-mini">{book.title}</div>
+                              <div className="library-shelf-card-progress">
+                                <div className="library-shelf-card-progress-fill" style={{ width: `${pct}%` }} />
+                              </div>
+                            </div>
+                            {isActive ? (
+                              <span className="library-shelf-gem" aria-hidden>
+                                ✦
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="library-remove-fab"
+                          aria-label={`Remove ${book.title} from library`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void removeFromLibrary(book.bookId);
+                          }}
+                        >
+                          <RemoveFromLibraryIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <Link href="/books" className="library-shelf-add" style={{ width: 100, height: 148 }}>
+                    <span className="library-shelf-add-icon">+</span>
+                    <span className="library-shelf-add-label">Add book</span>
+                  </Link>
+                </div>
+
+                <div className="library-no-h-scrollbar library-shelf-titles">
+                  {books.map((book) => {
+                    const isActive = book.bookId === effectiveActiveBookId;
+                    const w = isActive ? 130 : 100;
+                    return (
+                      <button
+                        key={`t-${book.userBookId}`}
+                        type="button"
+                        className={`library-shelf-title-cell ${isActive ? "library-shelf-title-cell--active" : ""}`}
+                        style={{ width: w }}
+                        onClick={() => handleBookSelect(book.bookId)}
+                      >
+                        <div className="library-shelf-title-text">{book.title}</div>
+                      </button>
+                    );
+                  })}
+                  <div className="library-shelf-title-spacer" style={{ width: 100 }} aria-hidden />
+                </div>
+              </div>
+            </section>
+
+            <div className="library-stats-grid">
+              <div className="library-stat-card" data-i="0">
+                <div className="library-stat-label">Books in library</div>
+                <div className="library-stat-value">{totals.books}</div>
+              </div>
+              <div className="library-stat-card" data-i="1">
+                <div className="library-stat-label">Total questions asked</div>
+                <div className="library-stat-value">{totals.queries}</div>
+              </div>
+              <div className="library-stat-card" data-i="2">
+                <div className="library-stat-label">Total images created</div>
+                <div className="library-stat-value">{totals.images}</div>
+              </div>
+            </div>
           </>
-        )}
+        ) : null}
       </div>
     </div>
   );

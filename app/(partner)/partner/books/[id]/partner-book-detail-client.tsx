@@ -32,7 +32,7 @@ export type PartnerPublicImageRow = {
   featureRequest: { id: string; status: FeatureRequestStatus } | null;
 };
 
-type TabKey = "details" | "chapters" | "images";
+type TabKey = "details" | "images";
 
 function statusActionChipClass(status: BookStatus): string {
   const base =
@@ -502,7 +502,7 @@ export function PartnerBookDetailClient({
   const canToggleCatalogueStatus = book.status === "published" || book.status === "unlisted";
   const statusLabel = book.status === "published" ? "Live" : "Un-listed";
 
-  /** Single scroll: book form then chapters while still in draft (before submit for review). */
+  /** Draft: single scroll — metadata and chapter review share the top of the page; images follow. */
   const mergeBookAndChapterPanels = book.status === "draft";
 
   return (
@@ -525,19 +525,6 @@ export function PartnerBookDetailClient({
             }`}
           >
             Book Details
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "chapters"}
-            onClick={() => setActiveTab("chapters")}
-            className={`rounded-t-md px-3 py-2 text-sm font-medium transition ${
-              activeTab === "chapters"
-                ? "border-b-2 border-accent text-text-primary"
-                : "text-text-muted hover:text-text-primary"
-            }`}
-          >
-            Chapter Review
           </button>
           <button
             type="button"
@@ -651,7 +638,7 @@ export function PartnerBookDetailClient({
             onClick={() => ingestFileRef.current?.click()}
             className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
           >
-            {ingestBusy ? "Uploading..." : "Re-upload EPUB/TXT"}
+            {ingestBusy ? "Uploading..." : "Re-upload EPUB"}
           </button>
           {showReviewToggle ? (
             <button
@@ -766,168 +753,166 @@ export function PartnerBookDetailClient({
       </div>
 
       {mergeBookAndChapterPanels || activeTab === "details" ? (
-        <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (book.status === "rejected") {
-                void resubmitRejectedAsDraft();
-                return;
-              }
-              void saveMetadata(e);
-            }}
-            className="space-y-4"
-          >
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
-              <div className="space-y-2">
-                {/* TODO: Add partner cover upload endpoint and action. */}
-                <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
-                  {book.coverImageUrl ? (
-                    <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
-                      No cover image
-                    </div>
-                  )}
-                </div>
-                <div className="w-36 space-y-2">
-                  {book.status === "rejected" ? (
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="w-full rounded-lg bg-error px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-error/40 transition hover:bg-error/90 disabled:opacity-50"
-                    >
-                      {saving ? "Updating…" : "Resubmit"}
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
-                  )}
-                  {saveMsg ? <p className="text-sm text-success">{saveMsg}</p> : null}
-                  {saveErr ? <p className="text-sm text-error">{saveErr}</p> : null}
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-16 lg:grid-cols-[minmax(0,0.64fr)_14rem]">
-                  <div className="space-y-3">
-                    <Field
-                      label="Title"
-                      value={title}
-                      onChange={setTitle}
-                      required
-                      disabled={lockTitle}
-                      inputClassName="max-w-[23rem]"
-                      suffix={
-                        <MetaFieldLockButton
-                          locked={lockTitle}
-                          onToggle={() => setLockTitle((v) => !v)}
-                          label="Lock title metadata"
-                        />
-                      }
-                    />
-                    <Field
-                      label="Author"
-                      value={author}
-                      onChange={setAuthor}
-                      required
-                      disabled={lockAuthor}
-                      inputClassName="max-w-[23rem]"
-                      suffix={
-                        <MetaFieldLockButton
-                          locked={lockAuthor}
-                          onToggle={() => setLockAuthor((v) => !v)}
-                          label="Lock author metadata"
-                        />
-                      }
-                    />
+        <>
+          <section className="rounded-xl border border-border bg-bg-surface/85 p-6">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (book.status === "rejected") {
+                  void resubmitRejectedAsDraft();
+                  return;
+                }
+                void saveMetadata(e);
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
+                <div className="space-y-2">
+                  {/* TODO: Add partner cover upload endpoint and action. */}
+                  <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
+                    {book.coverImageUrl ? (
+                      <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
+                        No cover image
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-3">
-                    <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                        Genre
-                      </span>
-                      <select
-                        value={genre}
-                        onChange={(e) => setGenre(e.target.value as BookGenre | "")}
-                        disabled={lockGenre}
-                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                  <div className="w-36 space-y-2">
+                    {book.status === "rejected" ? (
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="w-full rounded-lg bg-error px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-error/40 transition hover:bg-error/90 disabled:opacity-50"
                       >
-                        <option value="">Select genre</option>
-                        {GENRE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                      <MetaFieldLockButton
-                        locked={lockGenre}
-                        onToggle={() => setLockGenre((v) => !v)}
-                        label="Lock genre metadata"
-                      />
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                        Year
-                      </span>
-                      <input
-                        type="number"
-                        value={publishedYear}
-                        onChange={(e) => setPublishedYear(e.target.value)}
-                        disabled={lockYear}
-                        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                      />
-                      <MetaFieldLockButton
-                        locked={lockYear}
-                        onToggle={() => setLockYear((v) => !v)}
-                        label="Lock year metadata"
-                      />
-                    </label>
+                        {saving ? "Updating…" : "Resubmit"}
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
+                      >
+                        {saving ? "Saving..." : "Save"}
+                      </button>
+                    )}
+                    {saveMsg ? <p className="text-sm text-success">{saveMsg}</p> : null}
+                    {saveErr ? <p className="text-sm text-error">{saveErr}</p> : null}
                   </div>
                 </div>
-                <label className="block space-y-1.5">
-                  <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
-                    Description
-                  </span>
-                  <textarea
-                    rows={6}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                  />
-                </label>
+
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-16 lg:grid-cols-[minmax(0,0.64fr)_14rem]">
+                    <div className="space-y-3">
+                      <Field
+                        label="Title"
+                        value={title}
+                        onChange={setTitle}
+                        required
+                        disabled={lockTitle}
+                        inputClassName="max-w-[23rem]"
+                        suffix={
+                          <MetaFieldLockButton
+                            locked={lockTitle}
+                            onToggle={() => setLockTitle((v) => !v)}
+                            label="Lock title metadata"
+                          />
+                        }
+                      />
+                      <Field
+                        label="Author"
+                        value={author}
+                        onChange={setAuthor}
+                        required
+                        disabled={lockAuthor}
+                        inputClassName="max-w-[23rem]"
+                        suffix={
+                          <MetaFieldLockButton
+                            locked={lockAuthor}
+                            onToggle={() => setLockAuthor((v) => !v)}
+                            label="Lock author metadata"
+                          />
+                        }
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <label className="flex items-center gap-2">
+                        <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
+                          Genre
+                        </span>
+                        <select
+                          value={genre}
+                          onChange={(e) => setGenre(e.target.value as BookGenre | "")}
+                          disabled={lockGenre}
+                          className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                        >
+                          <option value="">Select genre</option>
+                          {GENRE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <MetaFieldLockButton
+                          locked={lockGenre}
+                          onToggle={() => setLockGenre((v) => !v)}
+                          label="Lock genre metadata"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
+                          Year
+                        </span>
+                        <input
+                          type="number"
+                          value={publishedYear}
+                          onChange={(e) => setPublishedYear(e.target.value)}
+                          disabled={lockYear}
+                          className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                        />
+                        <MetaFieldLockButton
+                          locked={lockYear}
+                          onToggle={() => setLockYear((v) => !v)}
+                          label="Lock year metadata"
+                        />
+                      </label>
+                    </div>
+                  </div>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Description
+                    </span>
+                    <textarea
+                      rows={6}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                    />
+                  </label>
+                </div>
               </div>
-            </div>
-          </form>
-        </section>
+            </form>
+          </section>
+          <section className="mt-6 rounded-xl border border-border bg-bg-surface/85 p-6">
+            <ChapterManagerClient bookId={book.id} status={book.status} />
+          </section>
+        </>
       ) : null}
 
       {mergeBookAndChapterPanels ? (
-        <>
-          <div className="mt-6">
-            <PartnerBookImagesSection
-              images={publicImages}
-              requestBusyId={featureRequestBusyId}
-              onRequestFeature={(id) => void submitFeatureRequest(id)}
-            />
-          </div>
-          <div className="mt-8">
-            <ChapterManagerClient bookId={book.id} status={book.status} />
-          </div>
-        </>
+        <div className="mt-6">
+          <PartnerBookImagesSection
+            images={publicImages}
+            requestBusyId={featureRequestBusyId}
+            onRequestFeature={(id) => void submitFeatureRequest(id)}
+          />
+        </div>
       ) : activeTab === "images" ? (
         <PartnerBookImagesSection
           images={publicImages}
           requestBusyId={featureRequestBusyId}
           onRequestFeature={(id) => void submitFeatureRequest(id)}
         />
-      ) : activeTab === "chapters" ? (
-        <ChapterManagerClient bookId={book.id} status={book.status} />
       ) : null}
     </div>
   );

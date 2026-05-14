@@ -3,7 +3,7 @@
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 
 export type FeatureRequestQueueItem = {
   requestId: string;
@@ -20,12 +20,7 @@ export type FeatureRequestQueueItem = {
 };
 
 function ActivityTimestamp({ ms }: { ms: number }) {
-  const [text, setText] = useState("…");
-
-  useEffect(() => {
-    setText(formatActivityAtUtc(new Date(ms)));
-  }, [ms]);
-
+  const text = useMemo(() => formatActivityAtUtc(new Date(ms)), [ms]);
   return <p className="mt-1 text-xs text-text-muted">{text}</p>;
 }
 
@@ -38,13 +33,18 @@ export function FeatureRequestsQueue({
   items,
   actionRequestId,
   onDecision,
+  className,
 }: {
   items: FeatureRequestQueueItem[];
   actionRequestId: string | null;
   onDecision: (requestId: string, action: "approve" | "reject") => void;
+  className?: string;
 }) {
   return (
-    <section aria-labelledby="feature-requests-queue-heading" className="space-y-4">
+    <section
+      aria-labelledby="feature-requests-queue-heading"
+      className={className ? `${className} space-y-4` : "space-y-4"}
+    >
       <div>
         <h2 id="feature-requests-queue-heading" className="text-lg font-semibold text-text-primary">
           Feature requests

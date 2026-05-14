@@ -257,7 +257,7 @@ export function AccountPageClient({
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 xl:max-w-6xl">
       <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary">
         My Account
       </h1>
@@ -265,7 +265,8 @@ export function AccountPageClient({
         Manage your profile and reading preferences.
       </p>
 
-      <div className="mt-10 space-y-8">
+      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
+        <div className="flex min-w-0 flex-col gap-6 lg:gap-8">
         <section className={sectionClass} aria-labelledby="public-profile-heading">
           <h2 id="public-profile-heading" className="text-lg font-semibold text-text-primary">
             Public profile
@@ -380,8 +381,9 @@ export function AccountPageClient({
             </form>
           </div>
         </section>
+        </div>
 
-        <section className={sectionClass} aria-labelledby="prefs-heading">
+        <section className={`${sectionClass} min-w-0`} aria-labelledby="prefs-heading">
           <h2 id="prefs-heading" className="text-lg font-semibold text-text-primary">
             Reading preferences
           </h2>
@@ -505,11 +507,11 @@ export function AccountPageClient({
           </form>
         </section>
 
-        <section className={sectionClass} aria-labelledby="stats-heading">
+        <section className={`${sectionClass} lg:col-span-2`} aria-labelledby="stats-heading">
           <h2 id="stats-heading" className="text-lg font-semibold text-text-primary">
             Reading stats
           </h2>
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
             <div className="rounded-lg border border-border/80 bg-bg-base/80 px-4 py-3">
               <dt className="text-text-muted">Member since</dt>
               <dd className="mt-1 font-medium text-text-primary">{memberSinceLabel}</dd>
@@ -530,7 +532,7 @@ export function AccountPageClient({
         </section>
 
         <section
-          className={`${sectionClass} border-error/30`}
+          className={`${sectionClass} border-error/30 lg:col-span-2`}
           aria-labelledby="danger-heading"
         >
           <h2 id="danger-heading" className="text-lg font-semibold text-error">

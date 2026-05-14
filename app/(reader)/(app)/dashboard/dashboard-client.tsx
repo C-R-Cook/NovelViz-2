@@ -1,46 +1,47 @@
 "use client";
 
+import { AccountPageClient, type AccountPageClientProps } from "@/app/(reader)/(app)/account/account-client";
+import { DashboardPartnerSection } from "@/app/(reader)/(app)/dashboard/dashboard-partner-section";
 import { FeatureRequestsQueue } from "@/app/(reader)/(app)/dashboard/feature-requests-queue";
 import { ForReviewQueue } from "@/app/(reader)/(app)/dashboard/for-review-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
+import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
 import type { AdminBookRow } from "@/lib/admin-books-list";
 import {
+  dashboardNavForRole,
+  dashboardPageTitle,
   dashboardTabLabel,
-  dashboardTabsForRole,
   defaultDashboardTab,
   parseDashboardTab,
+  type DashboardNavBadge,
+  type DashboardNavEntry,
   type DashboardTabSlug,
   type DashboardUserRole,
 } from "@/lib/dashboard-tab";
 import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import type { PartnerDashboardBookRow } from "@/lib/partner-books-list";
+import { userInitials } from "@/lib/user-initials";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+
+import "./dashboard-redesign.css";
 
 const REJECT_REASON =
   "This book has been rejected during admin moderation review. The publisher may revise and resubmit after addressing the feedback provided.";
 
-const tabBase =
-  "rounded-t-lg border border-b-0 border-transparent px-4 py-2.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
-const tabInactive = "border-transparent text-text-muted hover:text-text-primary";
-const tabActive =
-  "border-accent/80 border-border bg-bg-surface text-accent-text";
-
-const card =
-  "rounded-xl border border-border bg-bg-surface/90 p-4 shadow-sm";
-
 export type DashboardClientProps = {
   role: DashboardUserRole;
-  initialTab: DashboardTabSlug;
+  roleDisplayLabel: string;
   reader: {
     displayName: string;
+    username: string | null;
     email: string;
     stats: { libraryBookCount: number; queryCount: number; generatedImageCount: number };
     currentlyReading: {
@@ -50,9 +51,28 @@ export type DashboardClientProps = {
       coverImageUrl: string | null;
       currentChapterNumber: number;
       chapterTitle: string | null;
+      genreLabel: string;
+      chapterCount: number;
+      queryCount: number;
+      imageCount: number;
+      progressPercent: number;
     }[];
-    recentQueries: { id: string; questionText: string; bookTitle: string; createdAtMs: number }[];
-    recentImages: { id: string; imageUrl: string; bookTitle: string; createdAtMs: number }[];
+    recentQueries: {
+      id: string;
+      questionText: string;
+      bookTitle: string;
+      chapterNumberAtTime: number;
+      createdAtMs: number;
+    }[];
+    recentImages: {
+      id: string;
+      imageUrl: string;
+      bookTitle: string;
+      chapterNumberAtTime: number;
+      userPrompt: string;
+      isPublic: boolean;
+      createdAtMs: number;
+    }[];
   };
   partner: {
     stats: { totalBooks: number; totalReaders: number; totalQueries: number; totalImages: number };
@@ -60,6 +80,16 @@ export type DashboardClientProps = {
     initialBooks: PartnerDashboardBookRow[];
     initialHasMore: boolean;
     pageSize: number;
+    ownFeatureRequests: {
+      id: string;
+      status: string;
+      createdAtMs: number;
+      bookTitle: string;
+      chapterNumberAtTime: number;
+      userPrompt: string;
+      imageUrl: string;
+    }[];
+    ownFeatureRequestsPendingCount: number;
   } | null;
   admin: {
     pendingBooks: {
@@ -87,6 +117,13 @@ export type DashboardClientProps = {
       username: string;
     }[];
     featureRequestsPendingCount: number;
+    recentUsers: {
+      id: string;
+      username: string | null;
+      email: string;
+      role: string;
+      createdAtMs: number;
+    }[];
   } | null;
   adminBooksAll: {
     initialBooks: AdminBookRow[];
@@ -94,15 +131,25 @@ export type DashboardClientProps = {
     pageSize: number;
   } | null;
   adminStats: AdminStatsPayload | null;
+  account: Pick<AccountPageClientProps, "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction">;
 };
 
-function StatMini({ label, value }: { label: string; value: number }) {
-  return (
-    <div className={card}>
-      <p className="text-xs uppercase tracking-wide text-text-muted">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-text-primary">{value}</p>
-    </div>
-  );
+function subscribeReducedMotion(onStoreChange: () => void) {
+  const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  mq.addEventListener("change", onStoreChange);
+  return () => mq.removeEventListener("change", onStoreChange);
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function getReducedMotionServerSnapshot() {
+  return false;
+}
+
+function useReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, getReducedMotionSnapshot, getReducedMotionServerSnapshot);
 }
 
 function truncate(s: string, max: number) {
@@ -111,51 +158,119 @@ function truncate(s: string, max: number) {
 }
 
 function ActivityTimestamp({ ms }: { ms: number }) {
-  const [text, setText] = useState("…");
+  const text = useMemo(() => formatActivityAtUtc(new Date(ms)), [ms]);
+  return <span className="font-mono text-[8px] tracking-wide text-text-muted">{text}</span>;
+}
 
-  useEffect(() => {
-    setText(formatActivityAtUtc(new Date(ms)));
-  }, [ms]);
+function navBadgeValue(
+  badge: DashboardNavBadge | undefined,
+  admin: DashboardClientProps["admin"],
+  partner: DashboardClientProps["partner"],
+): number {
+  if (!badge) return 0;
+  if (badge === "forReview") return admin?.pendingReviewCount ?? 0;
+  if (badge === "featureApprovals") return admin?.featureRequestsPendingCount ?? 0;
+  if (badge === "partnerFeatReq") return partner?.ownFeatureRequestsPendingCount ?? 0;
+  return 0;
+}
 
-  return <p className="mt-1 text-xs text-text-muted">{text}</p>;
+function SectionLabel({ label, right }: { label: string; right?: string }) {
+  return (
+    <div className="dashboard-slabel-row">
+      <span className="dashboard-slabel">{label}</span>
+      <span className="dashboard-slabel-line" aria-hidden />
+      {right ? <span className="dashboard-slabel-right">{right}</span> : null}
+    </div>
+  );
+}
+
+function GemDivider() {
+  return (
+    <div className="dashboard-section-divider" aria-hidden>
+      <span className="dashboard-divider-line" />
+      <span className="dashboard-divider-gem">✦</span>
+      <span className="dashboard-divider-line" />
+    </div>
+  );
+}
+
+function ProgressArc({ pct, size = 48 }: { pct: number; size?: number }) {
+  const r = (size - 5) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = (Math.min(100, Math.max(0, pct)) / 100) * circ;
+  return (
+    <svg width={size} height={size} className="shrink-0" style={{ transform: "rotate(-90deg)" }} aria-hidden>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="color-mix(in srgb, var(--text-primary) 8%, transparent)"
+        strokeWidth={2.5}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={2.5}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function KpiCard({ label, value, sub, delayMs = 0 }: { label: string; value: string | number; sub?: string; delayMs?: number }) {
+  return (
+    <div
+      className="dashboard-kpi dashboard-stagger-item"
+      style={delayMs ? { animationDelay: `${delayMs}ms` } : undefined}
+    >
+      <div className="dashboard-kpi-label">{label}</div>
+      <div className="dashboard-kpi-value">{typeof value === "number" ? value.toLocaleString() : value}</div>
+      {sub ? <div className="dashboard-kpi-sub">{sub}</div> : null}
+    </div>
+  );
 }
 
 export function DashboardClient({
   role,
-  initialTab,
+  roleDisplayLabel,
   reader,
   partner,
   admin,
   adminBooksAll,
   adminStats,
+  account,
 }: DashboardClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const tabs = useMemo(() => dashboardTabsForRole(role), [role]);
+  const navEntries = useMemo(() => dashboardNavForRole(role), [role]);
+  const reducedMotion = useReducedMotion();
 
-  const [tab, setTab] = useState<DashboardTabSlug>(initialTab);
-  const [pendingBooks, setPendingBooks] = useState(admin?.pendingBooks ?? []);
-  const [featureRequestQueue, setFeatureRequestQueue] = useState(
-    admin?.featureRequestsQueue ?? [],
+  const tab = useMemo(
+    () => parseDashboardTab(role, searchParams.get("tab") ?? undefined),
+    [role, searchParams],
   );
+
+  const [pendingBooks, setPendingBooks] = useState(admin?.pendingBooks ?? []);
+  const [featureRequestQueue, setFeatureRequestQueue] = useState(admin?.featureRequestsQueue ?? []);
   const [actionId, setActionId] = useState<string | null>(null);
   const [featureActionId, setFeatureActionId] = useState<string | null>(null);
 
-  const showTabBar = tabs.length > 1;
-
   useEffect(() => {
-    const raw = searchParams.get("tab");
-    const next = parseDashboardTab(role, raw ?? undefined);
-    setTab(next);
-  }, [searchParams, role]);
-
-  useEffect(() => {
-    setPendingBooks(admin?.pendingBooks ?? []);
+    queueMicrotask(() => {
+      setPendingBooks(admin?.pendingBooks ?? []);
+    });
   }, [admin]);
 
   useEffect(() => {
-    setFeatureRequestQueue(admin?.featureRequestsQueue ?? []);
+    queueMicrotask(() => {
+      setFeatureRequestQueue(admin?.featureRequestsQueue ?? []);
+    });
   }, [admin]);
 
   function pushTab(next: DashboardTabSlug) {
@@ -166,7 +281,6 @@ export function DashboardClient({
     const q = params.toString();
     const href = q ? `${pathname}?${q}` : pathname ?? "/dashboard";
     router.replace(href, { scroll: false });
-    setTab(next);
   }
 
   const runModeration = useCallback(
@@ -225,190 +339,514 @@ export function DashboardClient({
     [router],
   );
 
-  function readerPanel() {
+  const initials = userInitials(account.user.name ?? reader.displayName, reader.email);
+  const handleLabel = reader.username?.trim() ? `@${reader.username.trim()}` : reader.email;
+
+  function renderNavRow(entry: DashboardNavEntry) {
+    if (entry.kind === "divider") {
+      return <div key={entry.id} className="dashboard-nav-divider" />;
+    }
+    if (entry.kind === "link") {
+      const active = pathname === entry.href || pathname.startsWith(`${entry.href}/`);
+      return (
+        <Link
+          key={entry.id}
+          href={entry.href}
+          className="dashboard-nav-btn no-underline"
+          data-active={active ? "true" : "false"}
+        >
+          <span className="dashboard-nav-icon" aria-hidden>
+            {entry.icon}
+          </span>
+          <span className="dashboard-nav-label">{entry.label}</span>
+        </Link>
+      );
+    }
+    const { tab: slug, icon, badge } = entry;
+    const n = navBadgeValue(badge, admin, partner);
     return (
-      <div className="space-y-10">
-        <div>
-          <p className="text-lg text-text-primary">
-            Welcome back, <span className="font-semibold text-accent-text">{reader.displayName}</span>
-          </p>
-          <p className="mt-1 text-sm text-text-secondary">{reader.email}</p>
-          <Link
-            href="/library"
-            className="mt-4 inline-flex text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-          >
-            Open My Library →
-          </Link>
+      <button
+        key={slug}
+        type="button"
+        className="dashboard-nav-btn"
+        data-active={tab === slug ? "true" : "false"}
+        onClick={() => pushTab(slug)}
+      >
+        <span className="dashboard-nav-icon" aria-hidden>
+          {icon}
+        </span>
+        <span className="dashboard-nav-label">{dashboardTabLabel(slug)}</span>
+        {badge && n > 0 ? <span className="dashboard-nav-badge">{n > 99 ? "99+" : n}</span> : null}
+      </button>
+    );
+  }
+
+  function bookRow(b: (typeof reader.currentlyReading)[0], i: number, opts?: { staggerClass?: string }) {
+    const delay = reducedMotion ? 0 : i * 75;
+    const chTotal = Math.max(1, b.chapterCount);
+    const pctBar = Math.round((b.currentChapterNumber / chTotal) * 100);
+    return (
+      <Link
+        key={b.bookId}
+        href={`/reader/${b.bookId}`}
+        className={`dashboard-book-row ${opts?.staggerClass ?? "dashboard-stagger-item"} block no-underline`}
+        style={delay ? { animationDelay: `${delay}ms` } : undefined}
+      >
+        <div className="relative h-14 w-[42px] shrink-0 overflow-hidden rounded border border-border-subtle bg-bg-surface">
+          {b.coverImageUrl ? (
+            <Image src={b.coverImageUrl} alt="" fill className="object-cover brightness-[0.92]" sizes="42px" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-[10px] text-text-muted">—</div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="dashboard-book-genre">{b.genreLabel}</div>
+          <div className="dashboard-book-title">{b.title}</div>
+          <div className="dashboard-book-author">by {b.author}</div>
+          <div className="dashboard-book-progress-track">
+            <div className="dashboard-book-progress-fill" style={{ width: `${Math.min(100, pctBar)}%` }} />
+          </div>
+          <div className="dashboard-book-meta-row">
+            <span>
+              CH. {b.currentChapterNumber} / {chTotal}
+            </span>
+            <span className="text-accent/90">{b.progressPercent}%</span>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col items-center gap-1.5">
+          <div className="relative flex items-center justify-center">
+            <ProgressArc pct={b.progressPercent} />
+            <span className="pointer-events-none absolute font-mono text-[8px] text-accent/80">{b.progressPercent}%</span>
+          </div>
+          <div className="flex gap-2.5">
+            <div className="text-center">
+              <div className="font-mono text-[11px] text-accent/90">{b.queryCount}</div>
+              <div className="font-mono text-[7px] tracking-wide text-text-muted">Q&A</div>
+            </div>
+            <div className="text-center">
+              <div className="font-mono text-[11px] text-accent/90">{b.imageCount}</div>
+              <div className="font-mono text-[7px] tracking-wide text-text-muted">IMG</div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  function overviewSection() {
+    const first = reader.currentlyReading[0];
+    return (
+      <div>
+        <div
+          className={
+            role === "admin" && admin
+              ? "dashboard-kpi-grid dashboard-kpi-grid--3plus1"
+              : "dashboard-kpi-grid dashboard-kpi-grid--3"
+          }
+        >
+          <KpiCard label="Books in library" value={reader.stats.libraryBookCount} sub="Active in your library" delayMs={reducedMotion ? 0 : 80} />
+          <KpiCard label="Q&A sessions" value={reader.stats.queryCount} sub="Questions asked" delayMs={reducedMotion ? 0 : 140} />
+          <KpiCard label="Images created" value={reader.stats.generatedImageCount} sub="Across all books" delayMs={reducedMotion ? 0 : 200} />
+          {role === "admin" && admin ? (
+            <KpiCard
+              label="Pending reviews"
+              value={admin.pendingReviewCount}
+              sub="Books in queue"
+              delayMs={reducedMotion ? 0 : 260}
+            />
+          ) : null}
         </div>
 
-        <section aria-labelledby="reader-stats">
-          <h2 id="reader-stats" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Reading stats
-          </h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <StatMini label="Books in library" value={reader.stats.libraryBookCount} />
-            <StatMini label="Questions asked" value={reader.stats.queryCount} />
-            <StatMini label="Images generated" value={reader.stats.generatedImageCount} />
+        {role === "admin" && admin ? (
+          <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
+            <KpiCard label="Total users" value={admin.totalUsers} sub="Registered" delayMs={reducedMotion ? 0 : 80} />
+            <KpiCard label="Total books" value={admin.totalBooks} sub="In catalogue" delayMs={reducedMotion ? 0 : 140} />
+            <KpiCard
+              label="Book requests"
+              value={admin.bookRequests.totalCount}
+              sub="Recorded requests"
+              delayMs={reducedMotion ? 0 : 200}
+            />
+            <KpiCard
+              label="Feature approvals"
+              value={admin.featureRequestsPendingCount}
+              sub="Pending queue"
+              delayMs={reducedMotion ? 0 : 260}
+            />
           </div>
-        </section>
+        ) : null}
 
-        <section aria-labelledby="reader-continue">
-          <h2 id="reader-continue" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Currently reading
-          </h2>
+        {first ? (
+          <div className="dashboard-cta-band">
+            {!reducedMotion ? <DiscoverParticleField /> : null}
+            <div className="dashboard-cta-band-inner min-w-0">
+              <div className="dashboard-cta-eyebrow">Continue reading</div>
+              <div className="dashboard-cta-title">
+                You&apos;re on Chapter {first.currentChapterNumber} of {first.title}.
+              </div>
+              <div className="dashboard-cta-sub">
+                {Math.max(0, first.chapterCount - first.currentChapterNumber)} chapters remaining — your AI companion is ready.
+              </div>
+            </div>
+            <div className="dashboard-cta-actions">
+              <Link
+                href={`/reader/${first.bookId}`}
+                className="rounded border border-accent bg-accent px-5 py-2 font-mono text-[8px] font-bold uppercase tracking-widest text-text-primary transition hover:opacity-95"
+              >
+                Open reader →
+              </Link>
+              <Link
+                href={`/reader/${first.bookId}`}
+                className="rounded border border-border-subtle px-4 py-2 font-mono text-[8px] uppercase tracking-widest text-text-muted transition hover:border-accent/40 hover:text-text-secondary"
+              >
+                Ask question
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {role === "admin" && admin && pendingBooks.length > 0 ? (
+          <>
+            <SectionLabel label="For review" right={`${pendingBooks.length} pending`} />
+            <div className="mb-6">
+              <ForReviewQueue
+                pendingBooks={pendingBooks}
+                actionId={actionId}
+                onModeration={(id, status) => void runModeration(id, status)}
+                className="dashboard-for-review-wrap"
+              />
+            </div>
+            <GemDivider />
+          </>
+        ) : null}
+
+        <SectionLabel label="Currently reading" right={`${reader.currentlyReading.length} books`} />
+        <div className="flex flex-col gap-2">
           {reader.currentlyReading.length === 0 ? (
-            <p className="mt-3 text-sm text-text-secondary">
-              No books in progress. Add a book from Discover and open it to start reading.
-            </p>
+            <p className="text-sm text-text-secondary">No books in progress. Add a book from Discover and open it to start reading.</p>
           ) : (
-            <ul className="mt-4 space-y-4">
-              {reader.currentlyReading.map((b) => (
-                <li
-                  key={b.bookId}
-                  className="flex flex-wrap items-center gap-4 rounded-xl border border-border/80 bg-bg-base/80 p-4"
-                >
-                  <div className="relative h-20 w-14 shrink-0 overflow-hidden rounded border border-border bg-bg-surface">
-                    {b.coverImageUrl ? (
-                      <Image src={b.coverImageUrl} alt="" fill className="object-cover" sizes="56px" />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-text-muted">—</div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-text-primary">{b.title}</p>
-                    <p className="text-sm text-text-secondary">{b.author}</p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      Chapter {b.currentChapterNumber}
-                      {b.chapterTitle ? `: ${b.chapterTitle}` : ""}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/reader/${b.bookId}`}
-                    className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent"
-                  >
-                    Continue reading
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            reader.currentlyReading.map((b, i) => bookRow(b, i))
           )}
-        </section>
-
-        <section aria-labelledby="reader-activity">
-          <h2 id="reader-activity" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-            Recent activity
-            <span className="ml-2 font-normal normal-case text-text-secondary">(UTC)</span>
-          </h2>
-          <div className="mt-4 grid gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="text-xs font-medium text-text-secondary">Last questions</h3>
-              {reader.recentQueries.length === 0 ? (
-                <p className="mt-2 text-sm text-text-muted">No questions yet.</p>
-              ) : (
-                <ul className="mt-2 space-y-3">
-                  {reader.recentQueries.map((q) => (
-                    <li key={q.id} className="rounded-lg border border-border/80 bg-bg-surface px-3 py-2 text-sm">
-                      <p className="text-xs text-text-muted">{q.bookTitle}</p>
-                      <p className="mt-1 text-text-primary">{truncate(q.questionText, 160)}</p>
-                      <ActivityTimestamp ms={q.createdAtMs} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div>
-              <h3 className="text-xs font-medium text-text-secondary">Last images</h3>
-              {reader.recentImages.length === 0 ? (
-                <p className="mt-2 text-sm text-text-muted">No images yet.</p>
-              ) : (
-                <ul className="mt-2 space-y-3">
-                  {reader.recentImages.map((img) => (
-                    <li key={img.id} className="flex gap-3 rounded-lg border border-border/80 bg-bg-surface p-2">
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-border">
-                        <Image src={img.imageUrl} alt="" fill className="object-cover" sizes="64px" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-text-muted">{img.bookTitle}</p>
-                        <ActivityTimestamp ms={img.createdAtMs} />
-                        <Link
-                          href="/gallery"
-                          className="mt-1 inline-block text-xs font-medium text-accent-text hover:underline"
-                        >
-                          View in gallery
-                        </Link>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
     );
   }
 
-  function myBooksPanel() {
+  function readingSection() {
+    return (
+      <div>
+        <SectionLabel label="In progress" right={`${reader.currentlyReading.length} books`} />
+        <div className="flex flex-col gap-2">
+          {reader.currentlyReading.length === 0 ? (
+            <p className="text-sm text-text-secondary">No books in progress.</p>
+          ) : (
+            reader.currentlyReading.map((b, i) => bookRow(b, i))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function imagesSection() {
+    return (
+      <div>
+        <SectionLabel label="Recent images" right={`${reader.recentImages.length} shown`} />
+        {reader.recentImages.length === 0 ? (
+          <p className="text-sm text-text-secondary">No images yet.</p>
+        ) : (
+          <div className="dashboard-image-strip">
+            {reader.recentImages.map((img, i) => {
+              const delay = reducedMotion ? 0 : i * 65;
+              return (
+                <Link
+                  key={img.id}
+                  href="/gallery"
+                  className="dashboard-image-thumb dashboard-stagger-item block overflow-hidden"
+                  style={delay ? { animationDelay: `${delay}ms` } : undefined}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- storage URLs */}
+                  <img src={img.imageUrl} alt="" className="dashboard-image-thumb-img" />
+                  <div
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"
+                    aria-hidden
+                  />
+                  <span
+                    className={`pointer-events-none absolute right-1.5 top-1.5 rounded-full border px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-wide ${
+                      img.isPublic
+                        ? "border-success/45 bg-success/20 text-success"
+                        : "border-border-subtle bg-bg-overlay/40 text-text-muted"
+                    }`}
+                  >
+                    {img.isPublic ? "Public" : "Private"}
+                  </span>
+                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 p-2">
+                    <div className="mb-0.5 font-mono text-[7px] uppercase tracking-widest text-accent/90">Ch.{img.chapterNumberAtTime}</div>
+                    <div className="line-clamp-2 font-serif text-[9px] leading-snug text-text-primary/90">{truncate(img.userPrompt, 80)}</div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function queriesSection() {
+    return (
+      <div>
+        <SectionLabel label="Recent questions" right={`${reader.recentQueries.length} shown`} />
+        <div className="flex flex-col gap-2">
+          {reader.recentQueries.length === 0 ? (
+            <p className="text-sm text-text-secondary">No questions yet.</p>
+          ) : (
+            reader.recentQueries.map((q, i) => (
+              <div
+                key={q.id}
+                className="dashboard-query-card rounded-lg border border-border-subtle bg-bg-surface/40 px-4 py-3.5"
+                style={reducedMotion ? undefined : { animationDelay: `${i * 65}ms` }}
+              >
+                <div className="flex justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap gap-2">
+                      <span className="font-mono text-[8px] uppercase tracking-widest text-accent/80">{q.bookTitle}</span>
+                      <span className="font-mono text-[8px] text-text-muted">Ch. {q.chapterNumberAtTime}</span>
+                    </div>
+                    <p className="font-serif text-sm italic leading-relaxed text-text-primary">&ldquo;{truncate(q.questionText, 220)}&rdquo;</p>
+                  </div>
+                  <ActivityTimestamp ms={q.createdAtMs} />
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function partnerFeatureStatusClass(s: string) {
+    if (s === "PENDING") return "border-warning/50 bg-warning/15 text-warning";
+    if (s === "APPROVED") return "border-success/45 bg-success/15 text-success";
+    if (s === "REJECTED") return "border-error/40 bg-error/10 text-error";
+    return "border-border text-text-muted";
+  }
+
+  function partnerOwnFeatureRequestsSection() {
     if (!partner) return null;
     return (
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-text-primary">Your books</h2>
-            <p className="mt-1 text-sm text-text-secondary">Manage drafts, ingestion, and publishing.</p>
+      <div>
+        <SectionLabel label="Your feature requests" right={`${partner.ownFeatureRequests.length} shown`} />
+        {partner.ownFeatureRequests.length === 0 ? (
+          <p className="text-sm text-text-secondary">No feature requests yet.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {partner.ownFeatureRequests.map((fr, i) => (
+              <div
+                key={fr.id}
+                className="dashboard-stagger-item flex items-center gap-3.5 rounded-lg border border-border-subtle bg-bg-surface/35 px-4 py-3"
+                style={reducedMotion ? undefined : { animationDelay: `${i * 65}ms` }}
+              >
+                <div className="relative h-12 w-[38px] shrink-0 overflow-hidden rounded border border-border-subtle">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={fr.imageUrl} alt="" className="h-full w-full object-cover" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="mb-0.5 font-mono text-[8px] uppercase tracking-widest text-accent/60">
+                    {fr.bookTitle} · Ch. {fr.chapterNumberAtTime}
+                  </div>
+                  <p className="truncate font-serif text-sm italic text-text-primary/80">&ldquo;{truncate(fr.userPrompt, 120)}&rdquo;</p>
+                  <ActivityTimestamp ms={fr.createdAtMs} />
+                </div>
+                <span
+                  className={`shrink-0 rounded-full border px-2.5 py-1 font-mono text-[8px] uppercase tracking-wide ${partnerFeatureStatusClass(fr.status)}`}
+                >
+                  {fr.status === "PENDING" ? "Pending" : fr.status === "APPROVED" ? "Featured" : fr.status === "REJECTED" ? "Rejected" : fr.status}
+                </span>
+              </div>
+            ))}
           </div>
+        )}
+      </div>
+    );
+  }
+
+  function myBooksSection() {
+    if (!partner) return null;
+    return (
+      <div>
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+          <SectionLabel label="Your published books" right={`${partner.stats.totalBooks} in catalogue`} />
           <Link
             href="/partner/books/new"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-accent"
+            className="shrink-0 rounded border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-[8px] uppercase tracking-widest text-accent transition hover:bg-accent/20"
           >
-            Upload new book
+            + Upload new book
           </Link>
         </div>
-        <p className="text-xs text-text-muted">
-          <span className="font-medium text-text-secondary">{partner.stats.totalBooks}</span> books in your catalogue
-        </p>
-        <div className="rounded-xl border border-border">
-          <PartnerDashboardBooksClient
-            initialBooks={partner.initialBooks}
-            initialHasMore={partner.initialHasMore}
-            pageSize={partner.pageSize}
-          />
-        </div>
+        <PartnerDashboardBooksClient
+          initialBooks={partner.initialBooks}
+          initialHasMore={partner.initialHasMore}
+          pageSize={partner.pageSize}
+          variant="dashboard"
+        />
       </div>
     );
   }
 
-  function statsPanel() {
+  function analyticsSection() {
     if (!partner) return null;
     return (
-      <div className="space-y-6">
+      <div className="dashboard-analytics-shell">
         <PartnerDashboardAnalytics data={partner.analytics} />
       </div>
     );
   }
 
-  function tabContent() {
+  function allUsersSection() {
+    if (!admin?.recentUsers) return null;
+    if (admin.recentUsers.length === 0) {
+      return <p className="text-sm text-text-secondary">No users found.</p>;
+    }
+    return (
+      <div>
+        <SectionLabel label="All users" right={`${admin.recentUsers.length} shown`} />
+        <div className="overflow-x-auto rounded-lg border border-border-subtle">
+          <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+            <thead>
+              <tr className="border-b border-border-subtle font-mono text-[8px] uppercase tracking-widest text-text-muted">
+                <th className="px-3 py-2 font-medium">Email</th>
+                <th className="px-3 py-2 font-medium">Username</th>
+                <th className="px-3 py-2 font-medium">Role</th>
+                <th className="px-3 py-2 font-medium">Joined (UTC)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {admin.recentUsers.map((u, i) => (
+                <tr
+                  key={u.id}
+                  className="dashboard-stagger-item border-b border-border-subtle/80 last:border-0"
+                  style={reducedMotion ? undefined : { animationDelay: `${i * 45}ms` }}
+                >
+                  <td className="px-3 py-2 text-text-secondary">{u.email}</td>
+                  <td className="px-3 py-2 text-text-primary">{u.username ?? "—"}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-accent/90">{u.role}</td>
+                  <td className="px-3 py-2 text-xs text-text-muted">
+                    <ActivityTimestamp ms={u.createdAtMs} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  function adminStatsSection() {
+    if (!adminStats || !admin) return null;
+    return (
+      <div className="dashboard-adminstats-shell space-y-8">
+        <section aria-labelledby="dashboard-admin-tools">
+          <SectionLabel label="Tools" />
+          <p className="text-sm text-text-secondary">
+            <Link href="/admin/t2i-tester" className="font-medium text-accent-text underline-offset-2 hover:underline">
+              T2I Tester
+            </Link>
+            <span className="text-text-muted">
+              {" "}
+              — fal.ai model comparison; saves JPEGs under server folder t2i-output/ (not the gallery).
+            </span>
+          </p>
+        </section>
+
+        <section aria-labelledby="dashboard-admin-quick-stats">
+          <SectionLabel label="Quick stats" />
+          <div className="dashboard-kpi-grid dashboard-kpi-grid--3">
+            <KpiCard label="Total users" value={admin.totalUsers} />
+            <KpiCard label="Total books" value={admin.totalBooks} />
+            <KpiCard label="Pending review" value={admin.pendingReviewCount} />
+          </div>
+        </section>
+
+        <section aria-labelledby="dashboard-admin-book-requests">
+          <SectionLabel label="Book requests" />
+          <p className="text-sm text-text-secondary">
+            Total requests recorded:{" "}
+            <span className="font-semibold text-text-primary">{admin.bookRequests.totalCount}</span>
+          </p>
+          <h3 className="mt-3 font-mono text-[8px] font-semibold uppercase tracking-widest text-text-muted">Top requested titles</h3>
+          {admin.bookRequests.topBooks.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">No book requests yet.</p>
+          ) : (
+            <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-text-primary">
+              {admin.bookRequests.topBooks.map((row) => (
+                <li key={row.bookTitle}>
+                  <span className="font-medium">{row.bookTitle}</span>{" "}
+                  <span className="text-text-muted">({row.count} requests)</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <AdminStatsClient initialData={adminStats} />
+      </div>
+    );
+  }
+
+  function mainInner() {
     switch (tab) {
-      case "reader":
-        return readerPanel();
+      case "overview":
+        return overviewSection();
+      case "reading":
+        return readingSection();
+      case "images":
+        return imagesSection();
+      case "queries":
+        return queriesSection();
+      case "partner-program":
+        return (
+          <DashboardPartnerSection
+            lockedFullName={account.user.name?.trim() || reader.displayName}
+            lockedUsername={reader.username?.trim() || null}
+            lockedEmail={reader.email}
+          />
+        );
+      case "account":
+        return (
+          <div className="dashboard-account-shell">
+            <SectionLabel label="Profile" />
+            <AccountPageClient
+              viewerId={account.viewerId}
+              user={account.user}
+              stats={account.stats}
+              memberSinceLabel={account.memberSinceLabel}
+              isProduction={account.isProduction}
+            />
+          </div>
+        );
       case "my-books":
-        return myBooksPanel();
+        return myBooksSection();
       case "stats":
-        return statsPanel();
+        return analyticsSection();
+      case "feature-requests":
+        return partnerOwnFeatureRequestsSection();
       case "for-review":
         return admin ? (
           <ForReviewQueue
             pendingBooks={pendingBooks}
             actionId={actionId}
             onModeration={(id, status) => void runModeration(id, status)}
+            className="dashboard-for-review-wrap"
           />
         ) : null;
-      case "feature-requests":
+      case "feature-approvals":
         return admin ? (
           <FeatureRequestsQueue
             items={featureRequestQueue}
             actionRequestId={featureActionId}
             onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
+            className="dashboard-feature-queue-wrap"
           />
         ) : null;
       case "all-books":
@@ -423,100 +861,53 @@ export function DashboardClient({
             variant="embedded"
           />
         ) : null;
+      case "all-users":
+        return allUsersSection();
       case "admin-stats":
-        if (!adminStats || !admin) return null;
-        return (
-          <div className="space-y-10">
-            <section aria-labelledby="dashboard-admin-tools" className="rounded-xl border border-border bg-bg-base/50 p-4">
-              <h2 id="dashboard-admin-tools" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-                Tools
-              </h2>
-              <p className="mt-2 text-sm text-text-secondary">
-                <Link href="/admin/t2i-tester" className="font-medium text-accent-text underline-offset-2 hover:underline">
-                  T2I Tester
-                </Link>
-                <span className="text-text-muted"> — fal.ai model comparison; saves JPEGs under server folder t2i-output/ (not the gallery).</span>
-              </p>
-            </section>
-
-            <section aria-labelledby="dashboard-admin-quick-stats">
-              <h2 id="dashboard-admin-quick-stats" className="text-sm font-semibold uppercase tracking-wide text-text-muted">
-                Quick stats
-              </h2>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <StatMini label="Total users" value={admin.totalUsers} />
-                <StatMini label="Total books" value={admin.totalBooks} />
-                <StatMini label="Pending review" value={admin.pendingReviewCount} />
-              </div>
-            </section>
-
-            <section aria-labelledby="dashboard-admin-book-requests" className="rounded-xl border border-border bg-bg-base/50 p-5">
-              <h2 id="dashboard-admin-book-requests" className="text-lg font-semibold text-text-primary">
-                Book requests
-              </h2>
-              <p className="mt-1 text-sm text-text-secondary">
-                Total requests recorded:{" "}
-                <span className="font-semibold text-text-primary">{admin.bookRequests.totalCount}</span>
-              </p>
-              <h3 className="mt-4 text-xs font-semibold uppercase tracking-wide text-text-muted">Top requested titles</h3>
-              {admin.bookRequests.topBooks.length === 0 ? (
-                <p className="mt-2 text-sm text-text-muted">No book requests yet.</p>
-              ) : (
-                <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm text-text-primary">
-                  {admin.bookRequests.topBooks.map((row) => (
-                    <li key={row.bookTitle}>
-                      <span className="font-medium">{row.bookTitle}</span>{" "}
-                      <span className="text-text-muted">({row.count} requests)</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-
-            <AdminStatsClient initialData={adminStats} />
-          </div>
-        );
+        return adminStatsSection();
       default:
-        return readerPanel();
+        return overviewSection();
     }
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">Dashboard</h1>
-
-      {!showTabBar ? (
-        <div className="mt-8">{readerPanel()}</div>
-      ) : (
-        <>
-          <div className="mt-8 flex flex-wrap gap-1 border-b border-border" role="tablist" aria-label="Dashboard sections">
-            {tabs.map((t) => (
-              <button
-                key={t}
-                type="button"
-                role="tab"
-                aria-selected={tab === t}
-                className={`${tabBase} ${tab === t ? tabActive : tabInactive}`}
-                data-active-tab={tab === t ? "true" : undefined}
-                onClick={() => pushTab(t)}
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  {dashboardTabLabel(t)}
-                  {t === "feature-requests" && admin && admin.featureRequestsPendingCount > 0 ? (
-                    <span className="rounded-full bg-text-muted/15 px-2 py-0.5 text-xs font-medium text-text-muted">
-                      {admin.featureRequestsPendingCount}
-                    </span>
-                  ) : null}
-                </span>
-              </button>
-            ))}
+    <div className="dashboard-root">
+      <div className="dashboard-root-inner">
+        <header className="dashboard-topbar">
+          <span className="dashboard-brand">NovelViz</span>
+          <div className="dashboard-topbar-user">
+            <span className="hidden max-w-[14rem] truncate font-mono text-[8px] tracking-wide text-text-muted sm:inline">
+              {handleLabel}
+            </span>
+            <span className="max-w-[10rem] truncate font-mono text-[8px] tracking-wide text-text-muted sm:hidden">{handleLabel}</span>
+            <div className="dashboard-avatar" aria-hidden>
+              {initials}
+            </div>
           </div>
+        </header>
 
-          <div className="rounded-b-xl rounded-tr-xl border border-border border-t-0 bg-bg-surface/90 p-6 shadow-sm">
-            {tabContent()}
-          </div>
-        </>
-      )}
+        <div className="dashboard-body">
+          <aside className="dashboard-sidebar">
+            <div className="dashboard-sidebar-user">
+              <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
+              <div className="dashboard-sidebar-name">{reader.displayName}</div>
+            </div>
+            {navEntries.map(renderNavRow)}
+          </aside>
+
+          <main className="dashboard-main">
+            <div key={tab} className="dashboard-section-head dashboard-section-head--animate">
+              <div className="dashboard-section-eyebrow">
+                {reader.displayName} · {roleDisplayLabel}
+              </div>
+              {tab !== "partner-program" ? (
+                <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
+              ) : null}
+            </div>
+            {mainInner()}
+          </main>
+        </div>
+      </div>
     </div>
   );
 }

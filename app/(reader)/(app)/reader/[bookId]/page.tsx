@@ -93,7 +93,7 @@ export default async function ReaderBookPage({ params }: PageProps) {
 
   return (
     <Suspense fallback={null}>
-      <ReaderClient book={book} chapters={chapters} initialProgress={initialProgress} />
+      <ReaderClient book={book} chapters={chapters} initialProgress={initialProgress} viewerRole={dbUser.role} />
     </Suspense>
   );
 }

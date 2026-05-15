@@ -19,16 +19,16 @@ export const T2I_PROMPT_PRESETS: Record<string, string[]> = {
   // to avoid models pattern-matching to the 1939 film cast (copyright risk).
   // Note: silver shoes (book) not ruby slippers (film).
   'Wizard of Oz': [
-    'A young girl in a blue and white gingham dress with her hair in pigtails, carrying a small black terrier dog, standing on a dirt road through flat grey Kansas farmland, overcast sky, realist illustration style',
-    'A man made entirely of tin standing in a forest, joints rusted stiff, raised axe frozen mid-swing, surrounded by dense woodland, dappled light, detailed storybook illustration',
-    'A man constructed from stuffed cloth and straw, floppy limbs, dressed in tattered farm clothes and a pointed hat, standing in a cornfield on a wooden pole, bright summer day, painterly style',
-    'A large lion with a timid expression, oversized mane, cowering slightly despite its size, standing on a yellow brick road through a dark forest, warm afternoon light, children\'s book illustration style',
-    'A young girl in pigtails and a blue dress walking along a winding yellow brick road with a tin woodsman, a scarecrow, and a large cowardly lion, rolling green countryside, golden hour light, vintage storybook illustration',
-    'An elderly man behind a large curtain operating levers and controls in a grand throne room, green-tinted light flooding the space, ornate emerald architecture, detailed illustration',
-    'A vast emerald city with towering spires glowing green, seen from a distance across a poppy field in full bloom, dramatic sky, painterly fantasy illustration',
+    'A young girl in a blue and white gingham dress with her hair in pigtails, carrying a small black terrier dog, standing on a dirt road through flat grey Kansas farmland, overcast sky',
+    'A man made entirely of tin standing in a forest, joints rusted stiff, raised axe frozen mid-swing, surrounded by dense woodland, dappled light',
+    'A man constructed from stuffed cloth and straw, floppy limbs, dressed in tattered farm clothes and a pointed hat, standing in a cornfield on a wooden pole, bright summer day',
+    'A large lion with a timid expression, oversized mane, cowering slightly despite its size, standing on a yellow brick road through a dark forest, warm afternoon light',
+    'A young girl in pigtails and a blue dress walking along a winding yellow brick road with a tin woodsman, a scarecrow, and a large cowardly lion, rolling green countryside, golden hour light',
+    'An elderly man behind a large curtain operating levers and controls in a grand throne room, green-tinted light flooding the space, ornate emerald architecture',
+    'A vast emerald city with towering spires glowing green, seen from a distance across a poppy field in full bloom, dramatic sky',
     'A field of bright red poppies stretching to the horizon, several figures collapsed asleep among the flowers, green city visible in the far distance, warm hazy light',
-    'A small farmhouse being lifted into a swirling grey tornado, flat prairie landscape, dramatic stormy sky, debris spinning in the air, dramatic oil painting style',
-    'A yellow brick road winding through a lush fantasy landscape, surrounded by oversized colourful flowers and strange twisted trees, soft magical light, detailed vintage illustration',
+    'A small farmhouse being lifted into a swirling grey tornado, flat prairie landscape, dramatic stormy sky, debris spinning in the air',
+    'A yellow brick road winding through a lush fantasy landscape, surrounded by oversized colourful flowers and strange twisted trees, soft magical light',
   ],
   // Add more books here as you build prompt sets:
   // 'Frankenstein': [ ... ],

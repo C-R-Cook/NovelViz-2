@@ -14,6 +14,24 @@ export const maxDuration = 300;
 
 const LOG_PREFIX = "[api/admin/t2i-test POST]";
 
+const FAL_GPT_IMAGE_15_ENDPOINT = "fal-ai/gpt-image-1.5";
+const FAL_GROK_IMAGINE_IMAGE_ENDPOINT = "xai/grok-imagine-image";
+
+/** xai/grok-imagine-image uses aspect_ratio, not image_size (fal schema). */
+function grokAspectRatioFromTesterImageSize(testerSize: string): string {
+  switch (testerSize) {
+    case "square_hd":
+      return "1:1";
+    case "landscape_16_9":
+      return "16:9";
+    case "portrait_16_9":
+      return "9:16";
+    case "portrait_4_3":
+    default:
+      return "3:4";
+  }
+}
+
 export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) {
@@ -45,6 +63,10 @@ export async function POST(request: Request) {
   const imageSize = typeof body.imageSize === "string" ? body.imageSize.trim() : "portrait_4_3";
   const outputRunIdRaw = typeof body.outputRunId === "string" ? body.outputRunId.trim() : "";
 
+  const falImageSize = modelEndpoint === FAL_GPT_IMAGE_15_ENDPOINT ? "1024x1024" : imageSize;
+
+  const isGrokImagine = modelEndpoint === FAL_GROK_IMAGINE_IMAGE_ENDPOINT;
+
   if (!prompt) {
     return NextResponse.json({ error: "prompt is required" }, { status: 400 });
   }
@@ -75,11 +97,19 @@ export async function POST(request: Request) {
   let falUrl: string;
   try {
     const result = await fal.subscribe(modelEndpoint, {
-      input: {
-        prompt,
-        image_size: imageSize,
-        num_images: 1,
-      },
+      input: isGrokImagine
+        ? {
+            prompt,
+            num_images: 1,
+            aspect_ratio: grokAspectRatioFromTesterImageSize(imageSize),
+            resolution: "1k",
+            output_format: "jpeg",
+          }
+        : {
+            prompt,
+            image_size: falImageSize,
+            num_images: 1,
+          },
     });
 
     type FalImagePayload = {

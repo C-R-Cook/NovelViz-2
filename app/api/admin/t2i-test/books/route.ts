@@ -5,6 +5,9 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+/** Ensures this route is not statically skipped in dev/build edge cases. */
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {

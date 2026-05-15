@@ -8,30 +8,21 @@ export type T2ITesterModelDef = {
   description: string;
 };
 
+/** Finalist models for the comparison matrix (columns: cheapest → most expensive, then id A–Z for ties). */
 export const T2I_TESTER_MODELS: T2ITesterModelDef[] = [
-  { id: "flux-schnell", label: "flux/schnell", endpoint: "fal-ai/flux/schnell", costPerImage: 0.003, description: "Baseline — dev/test only" },
-  { id: "flux-pro-11", label: "flux-pro/v1.1", endpoint: "fal-ai/flux-pro/v1.1", costPerImage: 0.04, description: "High quality" },
   {
-    id: "flux-kontext-pro",
-    label: "kontext/pro",
-    endpoint: "fal-ai/flux-pro/kontext/text-to-image",
-    costPerImage: 0.04,
-    description: "Good consistency",
+    id: "grok-imagine",
+    label: "grok-imagine",
+    endpoint: "xai/grok-imagine-image",
+    costPerImage: 0.02,
+    description: "xAI Aurora engine",
   },
-  { id: "flux-pro-ultra", label: "flux-pro/ultra", endpoint: "fal-ai/flux-pro/v1.1-ultra", costPerImage: 0.06, description: "Best FLUX.1 quality" },
   {
     id: "seedream-v4",
     label: "seedream/v4",
     endpoint: "fal-ai/bytedance/seedream/v4/text-to-image",
     costPerImage: 0.03,
     description: "ByteDance",
-  },
-  {
-    id: "seedream-v45",
-    label: "seedream/v4.5",
-    endpoint: "fal-ai/bytedance/seedream/v4.5/text-to-image",
-    costPerImage: 0.04,
-    description: "ByteDance latest",
   },
   {
     id: "wan-2-7",
@@ -41,38 +32,26 @@ export const T2I_TESTER_MODELS: T2ITesterModelDef[] = [
     description: "Alibaba, reasoning pre-pass",
   },
   {
-    id: "kling-image-v3",
-    label: "kling-image/v3",
-    endpoint: "fal-ai/kling-image/v3/text-to-image",
-    costPerImage: 0.028,
-    description: "Latest Kling image model",
+    id: "seedream-v45",
+    label: "seedream/v4.5",
+    endpoint: "fal-ai/bytedance/seedream/v4.5/text-to-image",
+    costPerImage: 0.04,
+    description: "ByteDance latest",
   },
+  { id: "flux-pro-ultra", label: "flux-pro/ultra", endpoint: "fal-ai/flux-pro/v1.1-ultra", costPerImage: 0.06, description: "Best FLUX.1 quality" },
   {
-    id: "qwen-2512",
-    label: "qwen-image/2512",
-    endpoint: "fal-ai/qwen-image-2512",
-    costPerImage: 0.02,
-    description: "Improved face rendering",
-  },
-  {
-    id: "gpt-image-15",
-    label: "gpt-image-1.5",
-    endpoint: "fal-ai/gpt-image-1.5",
-    costPerImage: 0.034,
-    description: "OpenAI medium quality",
-  },
-  {
-    id: "grok-imagine",
-    label: "grok-imagine",
-    endpoint: "fal-ai/grok-imagine",
-    costPerImage: 0.02,
-    description: "xAI Aurora engine",
+    id: "wan-2-7-pro",
+    label: "wan/2.7-pro",
+    endpoint: "fal-ai/wan/v2.7/pro/text-to-image",
+    costPerImage: 0.075,
+    description: "Alibaba WAN 2.7 Pro",
   },
 ];
 
 export const T2I_TESTER_MODEL_LABELS = T2I_TESTER_MODELS.map((m) => m.label);
 
-export const T2I_TESTER_RUNS_PER_PROMPT = 5;
+/** One image per (model, prompt) in the matrix UI. */
+export const T2I_TESTER_RUNS_PER_PROMPT = 1;
 
 export const T2I_TESTER_DEFAULT_IMAGE_SIZE = "portrait_4_3";
 

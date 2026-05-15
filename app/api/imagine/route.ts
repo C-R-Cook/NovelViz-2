@@ -3,6 +3,7 @@ import cloudinary from "@/lib/cloudinary";
 import fal from "@/lib/fal";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
+import { resolveImagineFal } from "@/lib/imagine-fal";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -10,8 +11,6 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export const maxDuration = 300;
-
-const FAL_ENDPOINT = "fal-ai/flux/schnell" as const;
 const DEFAULT_ANTHROPIC_MODELS = ["claude-sonnet-4-5", "claude-sonnet-4-20250514"] as const;
 const IMAGINE_DEBUG_FLAG = "IMAGINE_DEBUG";
 
@@ -45,6 +44,15 @@ function extractFalImageUrl(data: unknown): string | null {
   if (Array.isArray(images) && images[0] && typeof images[0] === "object") {
     const img = images[0] as Record<string, unknown>;
     if (typeof img.url === "string") return img.url;
+  }
+  const nested = d.data;
+  if (nested && typeof nested === "object") {
+    const nd = nested as Record<string, unknown>;
+    const nestedImages = nd.images;
+    if (Array.isArray(nestedImages) && nestedImages[0] && typeof nestedImages[0] === "object") {
+      const img = nestedImages[0] as Record<string, unknown>;
+      if (typeof img.url === "string") return img.url;
+    }
   }
   const image = d.image;
   if (image && typeof image === "object") {
@@ -106,6 +114,7 @@ export async function GET(request: Request) {
 
   const dbUser = await prisma.user.findUnique({
     where: { clerkId: user.clerkId },
+    select: { id: true, role: true },
   });
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -143,14 +152,15 @@ export async function POST(request: Request) {
 
   const dbUser = await prisma.user.findUnique({
     where: { clerkId: user.clerkId },
+    select: { id: true, role: true },
   });
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { bookId?: unknown; userPrompt?: unknown };
+  let body: { bookId?: unknown; userPrompt?: unknown; falImagineModel?: unknown };
   try {
-    body = (await request.json()) as { bookId?: unknown; userPrompt?: unknown };
+    body = (await request.json()) as { bookId?: unknown; userPrompt?: unknown; falImagineModel?: unknown };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -384,17 +394,17 @@ Reader's request: ${userPrompt}`;
   }
 
   let imageUrl: string;
+  let modelStored: string;
   try {
-    const result = await fal.subscribe(FAL_ENDPOINT, {
-      input: {
-        prompt: enrichedPrompt,
-        image_size: "portrait_4_3",
-        num_images: 1,
-      },
-    });
-    const url = extractFalImageUrl(result.data);
+    const resolved = resolveImagineFal(dbUser.role, body.falImagineModel, enrichedPrompt);
+    modelStored = resolved.modelStored;
+    const result = await fal.subscribe(resolved.endpoint, { input: resolved.input });
+    const url =
+      extractFalImageUrl(result) ??
+      extractFalImageUrl((result as { data?: unknown }).data) ??
+      extractFalImageUrl((result as { data?: { data?: unknown } }).data?.data);
     if (!url) {
-      console.error("[api/imagine POST] unexpected fal response", result.data);
+      console.error("[api/imagine POST] unexpected fal response", result);
       return NextResponse.json({ error: "Image generation returned no URL" }, { status: 502 });
     }
     imageUrl = url;
@@ -434,7 +444,7 @@ Reader's request: ${userPrompt}`;
       fullPrompt: enrichedPrompt,
       imageUrl: finalImageUrl,
       isPublic: false,
-      model: FAL_ENDPOINT,
+      model: modelStored,
       promptTokens,
       completionTokens,
       embeddingTokens,

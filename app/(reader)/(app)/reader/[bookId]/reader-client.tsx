@@ -8,6 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal";
+import { UserRole } from "@db";
 
 export type ReaderBook = {
   id: string;
@@ -90,9 +92,10 @@ type Props = {
   book: ReaderBook;
   chapters: ReaderChapter[];
   initialProgress: ReaderProgress | null;
+  viewerRole: UserRole;
 };
 
-export function ReaderClient({ book, chapters, initialProgress }: Props) {
+export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkConsumed = useRef(false);
@@ -148,6 +151,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
   }, [searchParams, router, book.id]);
 
   const [imgPrompt, setImgPrompt] = useState("");
+  const [adminImagineFalModel, setAdminImagineFalModel] = useState<ImagineFalModelKey>(IMAGINE_FAL_DEFAULT_ADMIN_KEY);
   const [imgLoading, setImgLoading] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
 
@@ -321,7 +325,11 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
       const res = await fetch("/api/imagine", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId: book.id, userPrompt: trimmed }),
+        body: JSON.stringify({
+          bookId: book.id,
+          userPrompt: trimmed,
+          ...(viewerRole === UserRole.admin ? { falImagineModel: adminImagineFalModel } : {}),
+        }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -360,7 +368,7 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
     } finally {
       setImgLoading(false);
     }
-  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber, openHistoryImageModal]);
+  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber, openHistoryImageModal, viewerRole, adminImagineFalModel]);
 
   const setImagePublicState = useCallback(
     async (imageId: string, isPublic: boolean) => {
@@ -629,6 +637,21 @@ export function ReaderClient({ book, chapters, initialProgress }: Props) {
 
               {activeAiTab === "imagine" ? (
                 <div className="space-y-3 pt-1" role="tabpanel">
+                    {viewerRole === UserRole.admin ? (
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-text-primary">Image model (admin)</span>
+                        <select
+                          value={adminImagineFalModel}
+                          onChange={(e) => setAdminImagineFalModel(e.target.value as ImagineFalModelKey)}
+                          disabled={imgLoading}
+                          className="w-full max-w-md rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-60"
+                        >
+                          <option value="flux-schnell">flux/schnell (~$0.003 / image)</option>
+                          <option value="grok">Grok Imagine (~$0.02 / image)</option>
+                          <option value="seedream-v45">Seedream v4.5 (~$0.04 / image)</option>
+                        </select>
+                      </label>
+                    ) : null}
                     <textarea
                       value={imgPrompt}
                       onChange={(e) => setImgPrompt(e.target.value)}

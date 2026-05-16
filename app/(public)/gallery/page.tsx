@@ -1,5 +1,7 @@
 import { GalleryClient, type GalleryImageCard, type GalleryLockKind } from "./gallery-client";
 import { getCurrentUser } from "@/lib/auth";
+import { viewerVisibleCommentCountByImageIds } from "@/lib/gallery-comment-counts";
+import type { CommentVisibilityViewer } from "@/lib/comment-visibility";
 import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
 import { prisma } from "@/lib/prisma";
 import type { SpoilerProtection } from "@db";
@@ -49,6 +51,7 @@ const baseSelect = {
 function baseFields(
   image: GeneratedImageForGallery,
   likedByViewer: boolean,
+  commentCount = 0,
 ): Omit<GalleryImageCard, "isLocked" | "lockKind"> {
   return {
     id: image.id,
@@ -64,20 +67,21 @@ function baseFields(
     bookAuthor: image.book.author,
     userName: image.user.username ?? image.user.name ?? null,
     userId: image.userId,
+    commentCount,
   };
 }
 
-function toGuestFeaturedCard(image: GeneratedImageForGallery): GalleryImageCard {
+function toGuestFeaturedCard(image: GeneratedImageForGallery, commentCount = 0): GalleryImageCard {
   return {
-    ...baseFields(image, false),
+    ...baseFields(image, false, commentCount),
     isLocked: false,
     lockKind: "none",
   };
 }
 
-function toGuestBlurCard(image: GeneratedImageForGallery): GalleryImageCard {
+function toGuestBlurCard(image: GeneratedImageForGallery, commentCount = 0): GalleryImageCard {
   return {
-    ...baseFields(image, false),
+    ...baseFields(image, false, commentCount),
     isLocked: true,
     lockKind: "guest_blur",
   };
@@ -112,6 +116,26 @@ function memberLock(
   return { isLocked: true, lockKind };
 }
 
+function toCountImages(rows: GeneratedImageForGallery[]) {
+  return rows.map((img) => ({
+    id: img.id,
+    bookId: img.bookId,
+    chapterNumberAtTime: img.chapterNumberAtTime,
+  }));
+}
+
+async function commentCountsForGallery(
+  rows: GeneratedImageForGallery[],
+  ctx: {
+    viewer: CommentVisibilityViewer | null;
+    globalSpoilerProtection: boolean;
+    spoilerByBookId: Map<string, SpoilerProtection | undefined>;
+    progressByBookId: Map<string, number>;
+  },
+) {
+  return viewerVisibleCommentCountByImageIds(toCountImages(rows), ctx);
+}
+
 async function viewerLikedIdSet(userId: string, imageIds: string[]) {
   const unique = [...new Set(imageIds)];
   if (unique.length === 0) return new Set<string>();
@@ -124,7 +148,6 @@ async function viewerLikedIdSet(userId: string, imageIds: string[]) {
 
 export default async function GalleryPage() {
   const session = await getCurrentUser();
-  const isLoggedIn = !!session;
   const isAdmin = session?.role === "admin";
 
   let userLibraryBookIds: string[] = [];
@@ -152,11 +175,18 @@ export default async function GalleryPage() {
 
   if (!session) {
     const [latest, blur] = await Promise.all([guestLatestFeatured, guestLibraryBlur]);
+    const countMap = await commentCountsForGallery([...latest, ...blur], {
+      viewer: null,
+      globalSpoilerProtection: true,
+      spoilerByBookId: new Map(),
+      progressByBookId: new Map(),
+    });
+    const countFor = (id: string) => countMap.get(id) ?? 0;
     return (
       <GalleryClient
         layout="guest"
-        latestFeatured={latest.map(toGuestFeaturedCard)}
-        libraryBlur={blur.map(toGuestBlurCard)}
+        latestFeatured={latest.map((img) => toGuestFeaturedCard(img, countFor(img.id)))}
+        libraryBlur={blur.map((img) => toGuestBlurCard(img, countFor(img.id)))}
         viewerUserId={null}
       />
     );
@@ -205,8 +235,15 @@ export default async function GalleryPage() {
       session.id,
       featured.map((i) => i.id),
     );
+    const viewer: CommentVisibilityViewer = { id: session.id, role: session.role };
+    const countMap = await commentCountsForGallery(featured, {
+      viewer,
+      globalSpoilerProtection,
+      spoilerByBookId,
+      progressByBookId,
+    });
     const featuredCards = featured.map((img) => ({
-      ...baseFields(img, likedIds.has(img.id)),
+      ...baseFields(img, likedIds.has(img.id), countMap.get(img.id) ?? 0),
       currentChapterNumber: progressByBookId.get(img.bookId),
       spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
       ...memberLock(img, lockCtx),
@@ -222,6 +259,7 @@ export default async function GalleryPage() {
         library={{ kind: "no_books" }}
         featured={featuredCards}
         spoilerSettingsByBookId={spoilerSettingsByBookId}
+        viewerDisplayName={session.username ?? session.name ?? null}
       />
     );
   }
@@ -240,16 +278,23 @@ export default async function GalleryPage() {
     ...libraryRows.map((i) => i.id),
     ...featured.map((i) => i.id),
   ]);
+  const viewer: CommentVisibilityViewer = { id: session.id, role: session.role };
+  const countMap = await commentCountsForGallery([...libraryRows, ...featured], {
+    viewer,
+    globalSpoilerProtection,
+    spoilerByBookId,
+    progressByBookId,
+  });
 
   const libraryCards = libraryRows.map((img) => ({
-    ...baseFields(img, likedIds.has(img.id)),
+    ...baseFields(img, likedIds.has(img.id), countMap.get(img.id) ?? 0),
     currentChapterNumber: progressByBookId.get(img.bookId),
     spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
     ...memberLock(img, lockCtx),
   }));
 
   const featuredCards = featured.map((img) => ({
-    ...baseFields(img, likedIds.has(img.id)),
+    ...baseFields(img, likedIds.has(img.id), countMap.get(img.id) ?? 0),
     currentChapterNumber: progressByBookId.get(img.bookId),
     spoilerSetting: spoilerByBookId.get(img.bookId) ?? "INHERIT",
     ...memberLock(img, lockCtx),
@@ -265,6 +310,7 @@ export default async function GalleryPage() {
       library={libraryRows.length === 0 ? { kind: "no_images" } : { kind: "images", images: libraryCards }}
       featured={featuredCards}
       spoilerSettingsByBookId={spoilerSettingsByBookId}
+      viewerDisplayName={session.username ?? session.name ?? null}
     />
   );
 }

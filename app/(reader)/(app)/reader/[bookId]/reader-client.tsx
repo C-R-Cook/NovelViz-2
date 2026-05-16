@@ -8,8 +8,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
-import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal";
-import { UserRole } from "@db";
+import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal-models";
+import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
 
 export type ReaderBook = {
   id: string;
@@ -92,7 +92,7 @@ type Props = {
   book: ReaderBook;
   chapters: ReaderChapter[];
   initialProgress: ReaderProgress | null;
-  viewerRole: UserRole;
+  viewerRole: "reader" | "partner" | "admin";
 };
 
 export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Props) {
@@ -328,7 +328,7 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
         body: JSON.stringify({
           bookId: book.id,
           userPrompt: trimmed,
-          ...(viewerRole === UserRole.admin ? { falImagineModel: adminImagineFalModel } : {}),
+          ...(viewerRole === "admin" ? { falImagineModel: adminImagineFalModel } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -465,6 +465,7 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
       }
       if (imageHistory.length <= 1) return;
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (isTextEntryFocused()) return;
       event.preventDefault();
       if (historySwipeBusy) return;
       const delta = event.key === "ArrowRight" ? 1 : -1;
@@ -637,7 +638,7 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
 
               {activeAiTab === "imagine" ? (
                 <div className="space-y-3 pt-1" role="tabpanel">
-                    {viewerRole === UserRole.admin ? (
+                    {viewerRole === "admin" ? (
                       <label className="block">
                         <span className="mb-1 block text-xs font-medium text-text-primary">Image model (admin)</span>
                         <select

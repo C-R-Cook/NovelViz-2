@@ -1,9 +1,11 @@
 import { UserRole } from "@db";
+import {
+  IMAGINE_FAL_DEFAULT_ADMIN_KEY,
+  type ImagineFalModelKey,
+} from "@/lib/imagine-fal-models";
 
-/** POST body key for admins only — ignored for reader/partner. */
-export type ImagineFalModelKey = "flux-schnell" | "grok" | "seedream-v45";
-
-export const IMAGINE_FAL_DEFAULT_ADMIN_KEY: ImagineFalModelKey = "flux-schnell";
+export type { ImagineFalModelKey } from "@/lib/imagine-fal-models";
+export { IMAGINE_FAL_DEFAULT_ADMIN_KEY } from "@/lib/imagine-fal-models";
 
 const GROK_ENDPOINT = "xai/grok-imagine-image" as const;
 const FLUX_SCHNELL_ENDPOINT = "fal-ai/flux/schnell" as const;

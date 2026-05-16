@@ -40,6 +40,7 @@ export type AdminBookPublicImageRow = {
   isFeatured: boolean;
   username: string;
   featureRequest: { id: string; status: FeatureRequestStatus } | null;
+  hiddenSpoilerCommentCount: number;
 };
 
 type AdminBookTabKey = "details" | "images";
@@ -139,6 +140,11 @@ export function AdminBookDetailClient({
 
   const [publicImages, setPublicImages] = useState(initialPublicImages);
   const [imageBusyId, setImageBusyId] = useState<string | null>(null);
+  const [reviewExpanded, setReviewExpanded] = useState<Record<string, boolean>>({});
+  const [reviewRows, setReviewRows] = useState<
+    Record<string, { id: string; username: string; content: string; status: string }[]>
+  >({});
+  const [reviewLoadingId, setReviewLoadingId] = useState<string | null>(null);
   const [adminTab, setAdminTab] = useState<AdminBookTabKey>("details");
 
   useEffect(() => {
@@ -267,6 +273,49 @@ export function AdminBookDetailClient({
     } finally {
       setImageBusyId(null);
     }
+  }
+
+  async function loadHiddenCommentsForImage(imageId: string) {
+    setReviewLoadingId(imageId);
+    try {
+      const res = await fetch(`/api/comments?imageId=${encodeURIComponent(imageId)}`);
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        comments?: { id: string; username: string; content: string; status: string }[];
+      };
+      const hidden = (data.comments ?? []).filter((c) => c.status === "HIDDEN_SPOILER");
+      setReviewRows((prev) => ({ ...prev, [imageId]: hidden }));
+    } finally {
+      setReviewLoadingId(null);
+    }
+  }
+
+  async function adminModerateComment(
+    commentId: string,
+    imageId: string,
+    action: "reinstate" | "confirm_spoiler",
+    disposition?: "keep" | "delete",
+  ) {
+    const res = await fetch(`/api/comments/${encodeURIComponent(commentId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action,
+        ...(action === "confirm_spoiler" ? { disposition: disposition ?? "keep" } : {}),
+      }),
+    });
+    if (!res.ok) return;
+    setReviewRows((prev) => ({
+      ...prev,
+      [imageId]: (prev[imageId] ?? []).filter((c) => c.id !== commentId),
+    }));
+    setPublicImages((rows) =>
+      rows.map((row) =>
+        row.id === imageId
+          ? { ...row, hiddenSpoilerCommentCount: Math.max(0, (row.hiddenSpoilerCommentCount ?? 0) - 1) }
+          : row,
+      ),
+    );
   }
 
   useEffect(() => {
@@ -839,6 +888,11 @@ export function AdminBookDetailClient({
                       </p>
                       <p className="line-clamp-2 text-xs text-text-secondary">{img.userPrompt}</p>
                       <div className="flex flex-wrap gap-2">
+                        {img.hiddenSpoilerCommentCount > 0 ? (
+                          <span className="rounded-md bg-warning/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-warning ring-1 ring-warning/35">
+                            {img.hiddenSpoilerCommentCount} under review
+                          </span>
+                        ) : null}
                         {img.isFeatured ? (
                           <span className="rounded-md bg-accent-muted px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/35">
                             ★ Featured
@@ -914,6 +968,60 @@ export function AdminBookDetailClient({
                           </button>
                         ) : null}
                       </div>
+                      {img.hiddenSpoilerCommentCount > 0 ? (
+                        <div className="mt-2 space-y-2 border-t border-border-subtle pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !reviewExpanded[img.id];
+                              setReviewExpanded((p) => ({ ...p, [img.id]: next }));
+                              if (next && !reviewRows[img.id]) void loadHiddenCommentsForImage(img.id);
+                            }}
+                            className="text-left text-[10px] font-semibold uppercase tracking-wide text-warning underline-offset-2 hover:underline"
+                          >
+                            {reviewExpanded[img.id] ? "Hide" : "Show"} hidden comments ({img.hiddenSpoilerCommentCount})
+                          </button>
+                          {reviewExpanded[img.id] ? (
+                            <div className="rounded-md border border-border/80 bg-bg-base/80 p-2">
+                              {reviewLoadingId === img.id ? (
+                                <p className="text-xs text-text-muted">Loading…</p>
+                              ) : (
+                                <ul className="max-h-48 space-y-2 overflow-y-auto">
+                                  {(reviewRows[img.id] ?? []).map((c) => (
+                                    <li key={c.id} className="rounded border border-border-subtle bg-bg-surface/80 p-2 text-xs">
+                                      <p className="font-medium text-text-primary">@{c.username}</p>
+                                      <p className="mt-1 text-text-secondary">{c.content}</p>
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => void adminModerateComment(c.id, img.id, "reinstate")}
+                                          className="rounded bg-success/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-text-primary ring-1 ring-success/40"
+                                        >
+                                          Release
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void adminModerateComment(c.id, img.id, "confirm_spoiler", "keep")}
+                                          className="rounded bg-warning/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-warning ring-1 ring-warning/35"
+                                        >
+                                          Keep gated
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void adminModerateComment(c.id, img.id, "confirm_spoiler", "delete")}
+                                          className="rounded bg-error/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-error ring-1 ring-error/35"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   </li>
                 );

@@ -13,11 +13,18 @@ export type DashboardTabSlug =
   | "feature-requests"
   | "for-review"
   | "feature-approvals"
+  | "spoiler-comments"
+  | "flagged-comments"
   | "all-books"
   | "all-users"
   | "admin-stats";
 
-export type DashboardNavBadge = "forReview" | "featureApprovals" | "partnerFeatReq";
+export type DashboardNavBadge =
+  | "forReview"
+  | "featureApprovals"
+  | "spoilerComments"
+  | "flaggedComments"
+  | "partnerFeatReq";
 
 export type DashboardNavEntry =
   | { kind: "divider"; id: string }
@@ -38,6 +45,8 @@ const PARTNER_EXTRA: DashboardTabSlug[] = ["my-books", "stats", "feature-request
 const ADMIN_EXTRA: DashboardTabSlug[] = [
   "for-review",
   "feature-approvals",
+  "spoiler-comments",
+  "flagged-comments",
   "all-books",
   "all-users",
   "admin-stats",
@@ -82,6 +91,8 @@ export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[
     { kind: "divider", id: "d2" },
     { kind: "tab", tab: "for-review", icon: "✓", badge: "forReview" },
     { kind: "tab", tab: "feature-approvals", icon: "☆", badge: "featureApprovals" },
+    { kind: "tab", tab: "spoiler-comments", icon: "⚠", badge: "spoilerComments" },
+    { kind: "tab", tab: "flagged-comments", icon: "!", badge: "flaggedComments" },
     { kind: "tab", tab: "all-books", icon: "▤" },
     { kind: "tab", tab: "all-users", icon: "◎" },
     { kind: "tab", tab: "admin-stats", icon: "∑" },
@@ -137,6 +148,10 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
       return "For Review";
     case "feature-approvals":
       return "Feature Approvals";
+    case "spoiler-comments":
+      return "Spoiler Comments";
+    case "flagged-comments":
+      return "Flagged comments";
     case "all-books":
       return "All Books";
     case "all-users":

@@ -56,6 +56,7 @@ export default async function GalleryBookPage({ params }: { params: Promise<{ bo
       isLoggedIn={isLoggedIn}
       isAdmin={!!isAdmin}
       viewerUserId={session?.id ?? null}
+      viewerDisplayName={session?.username ?? session?.name ?? null}
     />
   );
 }

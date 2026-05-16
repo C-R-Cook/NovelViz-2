@@ -85,8 +85,9 @@ type ContextProps = {
 export function LibraryContextPanel({ book, visible }: ContextProps) {
   const router = useRouter();
   const [question, setQuestion] = useState("");
-  const neverRead = book.queryCount === 0 && book.imageCount === 0;
   const currentChapter = book.progress?.currentChapterNumber ?? 1;
+  /** Use saved reading progress, not Q&A/image counts — readers can be deep in a book without either. */
+  const neverRead = book.progress == null;
 
   const ask = () => {
     const trimmed = question.trim();

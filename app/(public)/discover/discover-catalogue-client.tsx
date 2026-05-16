@@ -8,6 +8,7 @@ import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
 import { discoverGenrePalette } from "@/lib/discover-genre-palette";
 import { GENRE_OPTIONS, formatGenre } from "@/lib/genre";
 import type { BookGenre } from "@db";
+import { MessageCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { BookLibraryActions } from "./book-library-actions";
@@ -32,6 +33,7 @@ type FeaturedImage = {
   userPrompt: string;
   chapterNumberAtTime: number;
   username: string;
+  commentCount?: number;
 };
 
 type VisionImage = FeaturedImage & {
@@ -984,7 +986,13 @@ export function DiscoverCatalogueClient({
                           <div className="mt-1 font-serif text-xs leading-snug text-white/85 line-clamp-2">
                             {img.userPrompt}
                           </div>
-                          <div className="mt-2 font-mono text-[10px] text-white/40">@{img.username}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-white/40">
+                            <span>@{img.username}</span>
+                            <span className="inline-flex items-center gap-1 text-white/45" title="Comments">
+                              <MessageCircle className="h-3 w-3 shrink-0 opacity-80" strokeWidth={2} aria-hidden />
+                              <span>{img.commentCount ?? 0}</span>
+                            </span>
+                          </div>
                         </div>
                       </Link>
                     </div>

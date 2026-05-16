@@ -1,18 +1,26 @@
 "use client";
 
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
+import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
 import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
 import { effectiveChapterGateMode } from "@/lib/gallery-spoiler";
+import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
 import Image from "next/image";
 import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SpoilerProtection } from "@db";
 
 const SESSION_UNLOCK_KEY = "novelviz_session_unlocks";
+
+/** Match main gallery modal — same height as share controls */
+const modalViewGalleryButtonClass =
+  "inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-blue-600/50 bg-blue-600/15 px-3 text-sm font-medium text-blue-200 shadow-sm transition hover:border-blue-500/60 hover:bg-blue-600/25";
 
 type ApiImage = {
   id: string;
@@ -23,6 +31,7 @@ type ApiImage = {
   userId: string;
   username: string;
   likeCount: number;
+  commentCount: number;
   isPublic: boolean;
   likedByViewer: boolean;
   isLocked: boolean;
@@ -47,6 +56,7 @@ type Props = {
   isLoggedIn: boolean;
   isAdmin: boolean;
   viewerUserId: string | null;
+  viewerDisplayName: string | null;
 };
 
 function LockIcon({ className }: { className?: string }) {
@@ -119,6 +129,7 @@ export function GalleryBookClient({
   isLoggedIn,
   isAdmin,
   viewerUserId,
+  viewerDisplayName,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -168,8 +179,12 @@ export function GalleryBookClient({
         const data = (await res.json()) as BookGalleryResponse;
         setImages(
           (data.images ?? []).map((raw) => {
-            const img = raw as ApiImage & { likedByViewer?: boolean };
-            return { ...img, likedByViewer: img.likedByViewer ?? false };
+            const img = raw as ApiImage & { likedByViewer?: boolean; commentCount?: number };
+            return {
+              ...img,
+              likedByViewer: img.likedByViewer ?? false,
+              commentCount: typeof img.commentCount === "number" ? img.commentCount : 0,
+            };
           }),
         );
         setCurrentChapterNumber(data.currentChapterNumber ?? null);
@@ -319,7 +334,7 @@ export function GalleryBookClient({
     setModalCtaError(null);
     setModalUnlockPending(true);
     try {
-      let res = await fetch(`/api/user-books/${bookId}/spoiler-protection`, {
+      const res = await fetch(`/api/user-books/${bookId}/spoiler-protection`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ setting: "UNLOCKED" }),
@@ -424,6 +439,7 @@ export function GalleryBookClient({
         return;
       }
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (isTextEntryFocused()) return;
       e.preventDefault();
       if (modalSwipeBusy) return;
       const delta = e.key === "ArrowRight" ? 1 : -1;
@@ -604,9 +620,72 @@ export function GalleryBookClient({
                   {!locked && padlockVariant ? (
                     <GalleryCardCornerBadge kind="library-padlock" variant={padlockVariant} />
                   ) : null}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-bg-overlay/90 to-transparent p-3 pt-8 pr-16">
-                    <p className="text-xs font-medium text-text-muted">Chapter {image.chapterNumberAtTime}</p>
-                    <p className="mt-0.5 text-[11px] text-text-secondary line-clamp-1">{username}</p>
+                  <div
+                    className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[28%] bg-gradient-to-b from-black/42 to-transparent"
+                    aria-hidden
+                  />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 w-full">
+                    <div
+                      className="absolute inset-x-0 bottom-0 h-[48%] min-h-[5rem] bg-gradient-to-t from-black/75 via-black/40 to-transparent"
+                      aria-hidden
+                    />
+                    <div className="relative p-3 pt-8">
+                    <div className="flex items-end justify-between gap-2">
+                      <div className="min-w-0 flex-1 pr-1">
+                        <p className="text-xs font-medium text-text-muted">Chapter {image.chapterNumberAtTime}</p>
+                        <p className="mt-0.5 text-[11px] text-text-secondary line-clamp-1">{username}</p>
+                      </div>
+                      <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+                        <span
+                          className="pointer-events-none inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-primary shadow-sm"
+                          title={`${image.commentCount} comment${image.commentCount === 1 ? "" : "s"}`}
+                        >
+                          <MessageCircle className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
+                          <span>{image.commentCount}</span>
+                        </span>
+                        {isOwnImage ? (
+                          <span
+                            title="You created this"
+                            className="inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
+                          >
+                            <HeartIcon className="h-3.5 w-3.5" />
+                            <span>{image.likeCount}</span>
+                          </span>
+                        ) : locked ? (
+                          <span
+                            title={alreadyLiked ? "You liked this — unlock the image to interact" : "Unlock to like"}
+                            className="inline-flex cursor-default items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
+                          >
+                            <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500/80" : ""}`} />
+                            <span>{image.likeCount}</span>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={likeDisabled}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void likeImage(image.id);
+                            }}
+                            className={`inline-flex items-center gap-1 rounded-md border bg-bg-surface/90 px-2 py-1 text-xs font-medium shadow-sm transition hover:bg-bg-raised disabled:cursor-not-allowed ${
+                              alreadyLiked
+                                ? "opacity-100 disabled:opacity-100"
+                                : "disabled:opacity-50"
+                            } ${alreadyLiked ? "border-red-500/55 text-red-500" : "border-border/80 text-text-primary"}`}
+                            aria-label={
+                              alreadyLiked
+                                ? `You liked this (${image.likeCount})`
+                                : `Like — ${image.likeCount} likes so far`
+                            }
+                          >
+                            <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500" : ""}`} />
+                            <span>{image.likeCount}</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    </div>
                   </div>
                   {locked ? (
                     <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-2 text-center">
@@ -615,42 +694,6 @@ export function GalleryBookClient({
                     </div>
                   ) : null}
                 </div>
-                {isOwnImage ? (
-                  <span
-                    title="You created this"
-                    className="absolute bottom-2 right-2 z-30 inline-flex items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
-                  >
-                    <HeartIcon className="h-3.5 w-3.5" />
-                    <span>{image.likeCount}</span>
-                  </span>
-                ) : locked ? (
-                  <span
-                    title={alreadyLiked ? "You liked this — unlock the image to interact" : "Unlock to like"}
-                    className="absolute bottom-2 right-2 z-30 inline-flex cursor-default items-center gap-1 rounded-md border border-border/80 bg-bg-surface/90 px-2 py-1 text-xs font-medium text-text-muted shadow-sm"
-                  >
-                    <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500/80" : ""}`} />
-                    <span>{image.likeCount}</span>
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={likeDisabled}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      void likeImage(image.id);
-                    }}
-                    className={`absolute bottom-2 right-2 z-30 inline-flex items-center gap-1 rounded-md border bg-bg-surface/90 px-2 py-1 text-xs font-medium shadow-sm transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-50 ${alreadyLiked ? "border-red-500/55 text-red-500" : "border-border/80 text-text-primary"}`}
-                    aria-label={
-                      alreadyLiked
-                        ? `You liked this (${image.likeCount})`
-                        : `Like — ${image.likeCount} likes so far`
-                    }
-                  >
-                    <HeartIcon filled={alreadyLiked} className={`h-3.5 w-3.5 shrink-0 ${alreadyLiked ? "text-red-500" : ""}`} />
-                    <span>{image.likeCount}</span>
-                  </button>
-                )}
               </div>
             </article>
           );
@@ -668,7 +711,7 @@ export function GalleryBookClient({
           <div
             role="dialog"
             aria-modal="true"
-            className="relative flex max-h-[90vh] w-full max-w-[800px] flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
+            className="relative flex h-[90dvh] max-h-[90dvh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button
@@ -683,8 +726,11 @@ export function GalleryBookClient({
               </svg>
             </button>
 
-            <div className="flex min-h-0 max-h-[90vh] w-full flex-1 flex-col overflow-hidden sm:pt-1">
-              <div className="relative flex h-[min(55vh,calc(90vh-12rem))] max-h-[55vh] w-full flex-shrink-0 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
+            <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden sm:pt-1">
+              <div
+                className={`flex min-h-0 min-w-0 flex-col ${modalLocked ? "w-full" : "flex-[2] border-r border-border"}`}
+              >
+              <div className="relative flex min-h-[200px] flex-1 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
                 <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
                   <ModalImageSwipeView
                     slide={{
@@ -696,7 +742,7 @@ export function GalleryBookClient({
                     direction={modalSlideDir}
                     onDirectionConsumed={() => setModalSlideDir(0)}
                     onAnimatingChange={setModalSwipeBusy}
-                    sizes="(max-width: 800px) 100vw, 800px"
+                    sizes="(max-width: 1024px) 66vw, 640px"
                   />
                   {modalIndex !== null && images.length > 1 ? (
                     <ModalImageNavArrows
@@ -710,59 +756,87 @@ export function GalleryBookClient({
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 sm:px-6 sm:pb-6">
-                <div className="space-y-3">
+                <div className="min-h-0 max-h-[42vh] shrink-0 overflow-y-auto px-4 pb-4 pt-3 sm:px-6 sm:pb-5">
+                  <div className="space-y-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                     <h2 className="min-w-0 flex-1 text-lg font-semibold text-text-primary">{modalImage.bookTitle}</h2>
                     <p className="shrink-0 text-sm text-text-muted">Generated at Chapter {modalImage.chapterNumberAtTime}</p>
                   </div>
                   {!modalLocked ? (
-                    <div className="rounded-lg border border-border/90 bg-bg-base/60 p-3">
-                      <p className="text-sm font-medium text-text-muted">Your prompt</p>
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">{modalImage.userPrompt}</p>
-                    </div>
+                    <GalleryImagePromptDisclosure prompt={modalImage.userPrompt} />
                   ) : null}
-                  <div className="flex flex-wrap items-center justify-between gap-4">
-                    {viewerUserId !== null && modalImage.userId === viewerUserId ? (
-                      <span
-                        title="You created this"
-                        className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                      {viewerUserId !== null && modalImage.userId === viewerUserId ? (
+                        <span
+                          title="You created this"
+                          className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
+                        >
+                          <HeartIcon className="h-4 w-4 shrink-0" />
+                          <span>{modalImage.likeCount}</span>
+                        </span>
+                      ) : modalLocked ? (
+                        <span
+                          title={
+                            modalImage.likedByViewer
+                              ? "You liked this — unlock the image to interact"
+                              : "Unlock to like"
+                          }
+                          className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
+                        >
+                          <HeartIcon
+                            filled={modalImage.likedByViewer}
+                            className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500/80" : ""}`}
+                          />
+                          <span>{modalImage.likeCount}</span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void likeImage(modalImage.id)}
+                          disabled={!canLike || !!likingIds[modalImage.id] || modalImage.likedByViewer}
+                          className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:cursor-not-allowed ${
+                            modalImage.likedByViewer
+                              ? "opacity-100 disabled:opacity-100"
+                              : "disabled:opacity-60"
+                          } ${modalImage.likedByViewer ? "border-red-500/55 text-red-500" : "border-border text-text-primary"}`}
+                          aria-label={
+                            modalImage.likedByViewer
+                              ? `You liked this (${modalImage.likeCount})`
+                              : "Like this image"
+                          }
+                        >
+                          <HeartIcon filled={modalImage.likedByViewer} className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500" : ""}`} />
+                          <span>{modalImage.likeCount}</span>
+                        </button>
+                      )}
+                      {viewerUserId !== null && modalImage.userId === viewerUserId ? (
+                        <button
+                          type="button"
+                          onClick={() => void setImagePublicState(modalImage.id, !modalImage.isPublic)}
+                          disabled={!!shareUpdatingIds[modalImage.id]}
+                          className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            modalImage.isPublic
+                              ? "border-error/35 bg-error/10 text-error"
+                              : "border-success/35 bg-success/10 text-success"
+                          }`}
+                        >
+                          {shareUpdatingIds[modalImage.id]
+                            ? "Saving…"
+                            : modalImage.isPublic
+                              ? "Make private"
+                              : "Make public"}
+                        </button>
+                      ) : null}
+                      <Link
+                        href={`/gallery/${modalImage.bookId}?from=gallery`}
+                        onClick={() => dismissModalImage()}
+                        className={modalViewGalleryButtonClass}
                       >
-                        <HeartIcon className="h-4 w-4 shrink-0" />
-                        <span>{modalImage.likeCount}</span>
-                      </span>
-                    ) : modalLocked ? (
-                      <span
-                        title={
-                          modalImage.likedByViewer
-                            ? "You liked this — unlock the image to interact"
-                            : "Unlock to like"
-                        }
-                        className="inline-flex cursor-default items-center gap-2 rounded-md border border-border bg-bg-surface px-3 py-2 text-sm font-medium text-text-muted"
-                      >
-                        <HeartIcon
-                          filled={modalImage.likedByViewer}
-                          className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500/80" : ""}`}
-                        />
-                        <span>{modalImage.likeCount}</span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void likeImage(modalImage.id)}
-                        disabled={!canLike || !!likingIds[modalImage.id] || modalImage.likedByViewer}
-                        className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60 ${modalImage.likedByViewer ? "border-red-500/55 text-red-500" : "border-border text-text-primary"}`}
-                        aria-label={
-                          modalImage.likedByViewer
-                            ? `You liked this (${modalImage.likeCount})`
-                            : "Like this image"
-                        }
-                      >
-                        <HeartIcon filled={modalImage.likedByViewer} className={`h-4 w-4 shrink-0 ${modalImage.likedByViewer ? "text-red-500" : ""}`} />
-                        <span>{modalImage.likeCount}</span>
-                      </button>
-                    )}
-                    <div className="text-sm text-text-muted">
+                        View Gallery
+                      </Link>
+                    </div>
+                    <div className="text-sm text-text-muted shrink-0">
                       <span>{modalImage.username?.trim() || "Anonymous reader"}</span>
                       {viewerUserId !== null && modalImage.userId === viewerUserId ? (
                         <span className="ml-2 inline-flex rounded-full border border-border bg-bg-base px-2 py-0.5 text-[10px] font-medium text-text-secondary">
@@ -834,47 +908,31 @@ export function GalleryBookClient({
                       ) : null}
                     </div>
                   ) : null}
-                  {(viewerUserId !== null && modalImage.userId === viewerUserId) ||
-                  (isLoggedIn && userBookSpoiler !== null && !modalLocked) ? (
-                    <div className="flex w-full flex-wrap items-center gap-3">
-                      <div className="flex min-w-0 flex-wrap items-center gap-3">
-                        {viewerUserId !== null && modalImage.userId === viewerUserId ? (
-                          <button
-                            type="button"
-                            onClick={() => void setImagePublicState(modalImage.id, !modalImage.isPublic)}
-                            disabled={!!shareUpdatingIds[modalImage.id]}
-                            className={`inline-flex h-9 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-semibold transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
-                              modalImage.isPublic
-                                ? "border-error/35 bg-error/10 text-error"
-                                : "border-success/35 bg-success/10 text-success"
-                            }`}
-                          >
-                            {shareUpdatingIds[modalImage.id]
-                              ? "Saving…"
-                              : modalImage.isPublic
-                                ? "Make private"
-                                : "Make public"}
-                          </button>
-                        ) : null}
-                      </div>
-                      {isLoggedIn && userBookSpoiler !== null && !modalLocked ? (
-                        <div className="ml-auto flex shrink-0">
-                          <SpoilerToggle
-                            size="modal"
-                            bookId={bookId}
-                            currentSetting={spoilerSetting}
-                            globalSetting={globalSpoilerProtection}
-                            onUpdate={(next) => {
-                              setSpoilerSetting(next);
-                              router.refresh();
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               </div>
+              </div>
+
+              {!modalLocked ? (
+                <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-surface/40">
+                  <GalleryImageComments
+                      layout="sidebar"
+                      className="h-full min-h-0"
+                      imageId={modalImage.id}
+                      sessionCommentsUnlocked={sessionUnlock}
+                      isLoggedIn={isLoggedIn}
+                      canInteract={!modalLocked}
+                      viewerDisplayName={viewerDisplayName}
+                      onPostedVisibleComment={() => {
+                        const mid = modalImage.id;
+                        setImages((prev) =>
+                          prev.map((img) =>
+                            img.id === mid ? { ...img, commentCount: (img.commentCount ?? 0) + 1 } : img,
+                          ),
+                        );
+                      }}
+                    />
+                </aside>
+              ) : null}
             </div>
           </div>
         </div>

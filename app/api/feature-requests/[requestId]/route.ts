@@ -1,13 +1,22 @@
 import { getCurrentUser } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { FeatureRequestStatus } from "@db";
+import { FeatureRequestStatus, NotificationType, UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ requestId: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
   const user = await getCurrentUser();
-  if (!user || user.role !== "admin") {
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { clerkId: user.clerkId },
+    select: { id: true, role: true },
+  });
+  if (!dbUser || dbUser.role !== UserRole.admin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -31,6 +40,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const reqRow = await prisma.featureRequest.findUnique({
     where: { id: requestId },
+    include: {
+      image: {
+        select: {
+          id: true,
+          bookId: true,
+          book: { select: { title: true } },
+        },
+      },
+    },
   });
   if (!reqRow) {
     return NextResponse.json({ error: "Request not found" }, { status: 404 });
@@ -49,7 +67,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       where: { id: requestId },
       data: {
         status: nextStatus,
-        reviewedBy: user.id,
+        reviewedBy: dbUser.id,
       },
       select: {
         id: true,
@@ -60,6 +78,24 @@ export async function PATCH(request: Request, context: RouteContext) {
       },
     });
   });
+
+  const bookTitle = reqRow.image.book.title;
+  const link = `/gallery/${reqRow.image.bookId}?image=${encodeURIComponent(reqRow.image.id)}`;
+  if (action === "approve") {
+    await createNotification(
+      reqRow.requestedBy,
+      NotificationType.FEATURE_REQUEST_APPROVED,
+      `Your feature request for "${bookTitle}" was approved.`,
+      link,
+    );
+  } else {
+    await createNotification(
+      reqRow.requestedBy,
+      NotificationType.FEATURE_REQUEST_REJECTED,
+      `Your feature request for "${bookTitle}" was not approved.`,
+      link,
+    );
+  }
 
   return NextResponse.json(updated);
 }

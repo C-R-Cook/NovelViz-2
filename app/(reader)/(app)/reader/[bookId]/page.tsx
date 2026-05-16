@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { ReaderClient } from "./reader-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserUsageSummary } from "@/lib/subscription";
 import { notFound, redirect } from "next/navigation";
 
 type PageProps = {
@@ -93,7 +94,13 @@ export default async function ReaderBookPage({ params }: PageProps) {
 
   return (
     <Suspense fallback={null}>
-      <ReaderClient book={book} chapters={chapters} initialProgress={initialProgress} viewerRole={dbUser.role} />
+      <ReaderClient
+        book={book}
+        chapters={chapters}
+        initialProgress={initialProgress}
+        viewerRole={dbUser.role}
+        usageSummary={await getUserUsageSummary(dbUser.id)}
+      />
     </Suspense>
   );
 }

@@ -7,6 +7,8 @@ import { COUNTRY_CODES, COUNTRY_OPTIONS } from "@/lib/countries";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
 import { GENDER_OPTIONS, type Gender } from "@/lib/gender";
 import { isValidUsernameFormat } from "@/lib/username";
+import { UsagePeriodPanel } from "@/components/subscription/usage-period-panel";
+import type { UserUsageSummary } from "@/lib/subscription";
 import { userInitials } from "@/lib/user-initials";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -39,6 +41,7 @@ export type AccountPageClientProps = {
   };
   memberSinceLabel: string;
   isProduction: boolean;
+  usageSummary: UserUsageSummary | null;
 };
 
 export function AccountPageClient({
@@ -47,6 +50,7 @@ export function AccountPageClient({
   stats,
   memberSinceLabel,
   isProduction,
+  usageSummary,
 }: AccountPageClientProps) {
   const router = useRouter();
   const { signOut } = useClerk();
@@ -269,6 +273,12 @@ export function AccountPageClient({
       <p className="mt-2 text-sm text-text-secondary">
         Manage your profile and reading preferences.
       </p>
+
+      {usageSummary ? (
+        <div className="mt-8">
+          <UsagePeriodPanel initialUsage={usageSummary} variant="full" />
+        </div>
+      ) : null}
 
       <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-col gap-6 lg:gap-8">

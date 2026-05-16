@@ -111,6 +111,31 @@ enum PartnerApplicationStatus {
   rejected
 }
 
+enum SubscriptionTier {
+  free
+  standard
+  premium
+}
+
+enum SubscriptionStatus {
+  active
+  cancelled
+  past_due
+  trialing
+}
+
+enum GrantType {
+  TIER_UPGRADE
+  QUERY_BONUS
+  IMAGE_BONUS
+}
+
+enum GrantSource {
+  ADMIN
+  SYSTEM
+  PURCHASE
+}
+
 model Book {
   id                           String     @id @default(cuid())
   title                        String
@@ -198,7 +223,11 @@ model User {
   ageRange                AgeRange?
   genrePreferences        String[]  @default([])
   /// When true (default), spoiler-style images are hidden until reading progress catches up unless overridden per book.
-  globalSpoilerProtection Boolean   @default(true)
+  globalSpoilerProtection Boolean            @default(true)
+  subscriptionTier        SubscriptionTier   @default(standard)
+  subscriptionStatus      SubscriptionStatus @default(active)
+  stripeCustomerId        String?
+  usagePeriodAnchor       Int                @default(1)
 
   userBooks       UserBook[]
   ownedBooks      Book[]    @relation("OwnedBooks")
@@ -213,9 +242,42 @@ model User {
   partnerRequests     PartnerRequest[]
   comments            Comment[]
   notifications       Notification[]
+  grants              UserGrant[]
+  badges              UserBadge[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserGrant {
+  id                    String            @id @default(uuid())
+  userId                String
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantType             GrantType
+  source                GrantSource       @default(ADMIN)
+  tierValue             SubscriptionTier?
+  bonusAmount           Int?
+  usedAmount            Int               @default(0)
+  startsAt              DateTime          @default(now())
+  expiresAt             DateTime?
+  reason                String?
+  grantedBy             String
+  stripePaymentIntentId String?
+  createdAt             DateTime          @default(now())
+
+  @@index([userId])
+}
+
+model UserBadge {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeKey  String
+  awardedAt DateTime @default(now())
+  awardedBy String?
+  note      String?
+
+  @@unique([userId, badgeKey])
 }
 
 model PartnerRequest {

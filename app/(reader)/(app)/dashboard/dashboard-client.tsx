@@ -10,6 +10,7 @@ import type { AdminFlaggedCommentRow } from "@/lib/admin-flagged-comments-queue"
 import type { AdminSpoilerCommentRow } from "@/lib/admin-spoiler-comments-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
+import { UsersAdminClient } from "@/app/admin/users/users-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
@@ -713,41 +714,14 @@ export function DashboardClient({
   }
 
   function allUsersSection() {
-    if (!admin?.recentUsers) return null;
-    if (admin.recentUsers.length === 0) {
-      return <p className="text-sm text-text-secondary">No users found.</p>;
-    }
     return (
-      <div>
-        <SectionLabel label="All users" right={`${admin.recentUsers.length} shown`} />
-        <div className="overflow-x-auto rounded-lg border border-border-subtle">
-          <table className="w-full min-w-[520px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-border-subtle font-mono text-[8px] uppercase tracking-widest text-text-muted">
-                <th className="px-3 py-2 font-medium">Email</th>
-                <th className="px-3 py-2 font-medium">Username</th>
-                <th className="px-3 py-2 font-medium">Role</th>
-                <th className="px-3 py-2 font-medium">Joined (UTC)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {admin.recentUsers.map((u, i) => (
-                <tr
-                  key={u.id}
-                  className="dashboard-stagger-item border-b border-border-subtle/80 last:border-0"
-                  style={reducedMotion ? undefined : { animationDelay: `${i * 45}ms` }}
-                >
-                  <td className="px-3 py-2 text-text-secondary">{u.email}</td>
-                  <td className="px-3 py-2 text-text-primary">{u.username ?? "—"}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-accent/90">{u.role}</td>
-                  <td className="px-3 py-2 text-xs text-text-muted">
-                    <ActivityTimestamp ms={u.createdAtMs} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className="dashboard-all-users-wrap space-y-3">
+        <p className="text-sm text-text-secondary">
+          <Link href="/admin/users" className="font-medium text-accent-text underline-offset-2 hover:underline">
+            Open full user management →
+          </Link>
+        </p>
+        <UsersAdminClient variant="embedded" />
       </div>
     );
   }

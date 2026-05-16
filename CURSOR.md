@@ -235,6 +235,10 @@ Dashboard and `/partner/books/[id]/stats` load aggregated metrics from **`lib/pa
 ## Environment Variables
 See `.env.example` for required keys. Never commit `.env.local` to Git.
 
+### Subscription / beta
+- **`BETA_MODE=true`** — usage limits are computed and returned but **not enforced** (`lib/subscription.ts`). Set on Vercel during beta; **must be `false` (or unset) before production launch** when limits should apply.
+- **`STRIPE_SECRET_KEY`** / **`STRIPE_WEBHOOK_SECRET`** — not yet active; stub webhook at `POST /api/webhooks/stripe`.
+
 ## Known Decisions
 
 - Prisma client: `provider = "prisma-client"` with **`output`** to **`app/generated/prisma`**, imported via **`@db`** alias.

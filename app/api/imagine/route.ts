@@ -5,6 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { resolveImagineFal } from "@/lib/imagine-fal";
 import { prisma } from "@/lib/prisma";
+import { checkUsageLimit, consumeTopUp, getEffectiveLimits } from "@/lib/subscription";
+import { UserRole } from "@db";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
@@ -103,6 +105,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const limitCheck = await checkUsageLimit(dbUser.id, "image");
+  if (!limitCheck.allowed) {
+    return NextResponse.json(
+      {
+        error: "LIMIT_REACHED",
+        limitType: "image",
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+        resetDate: limitCheck.resetDate,
+        topUpAvailable: limitCheck.topUpAvailable,
+      },
+      { status: 429 },
+    );
+  }
+
   let body: { bookId?: unknown; userPrompt?: unknown; falImagineModel?: unknown };
   try {
     body = (await request.json()) as { bookId?: unknown; userPrompt?: unknown; falImagineModel?: unknown };
@@ -118,6 +135,14 @@ export async function POST(request: Request) {
   }
   if (!userPrompt) {
     return NextResponse.json({ error: "userPrompt is required" }, { status: 400 });
+  }
+
+  const effectiveLimits = await getEffectiveLimits(dbUser.id);
+  if (dbUser.role !== UserRole.admin) {
+    const { endpoint } = resolveImagineFal(dbUser.role, body.falImagineModel, "");
+    if (!effectiveLimits.models.includes(endpoint)) {
+      return NextResponse.json({ error: "MODEL_NOT_ALLOWED" }, { status: 403 });
+    }
   }
 
   const progress = await prisma.readingProgress.findUnique({
@@ -405,6 +430,12 @@ Reader's request: ${userPrompt}`;
       createdAt: true,
     },
   });
+
+  try {
+    await consumeTopUp(dbUser.id, "image");
+  } catch (err) {
+    console.error("[api/imagine POST] consumeTopUp error", err);
+  }
 
   return NextResponse.json({
     imageUrl: finalImageUrl,

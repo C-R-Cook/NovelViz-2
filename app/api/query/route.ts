@@ -2,6 +2,7 @@ import anthropic from "@/lib/anthropic";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
+import { checkUsageLimit, consumeTopUp } from "@/lib/subscription";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -70,6 +71,21 @@ export async function POST(request: Request) {
   });
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limitCheck = await checkUsageLimit(dbUser.id, "query");
+  if (!limitCheck.allowed) {
+    return NextResponse.json(
+      {
+        error: "LIMIT_REACHED",
+        limitType: "query",
+        used: limitCheck.used,
+        limit: limitCheck.limit,
+        resetDate: limitCheck.resetDate,
+        topUpAvailable: limitCheck.topUpAvailable,
+      },
+      { status: 429 },
+    );
   }
 
   let body: { bookId?: unknown; questionText?: unknown };
@@ -245,6 +261,12 @@ My question: ${questionText}`;
       embeddingTokens,
     },
   });
+
+  try {
+    await consumeTopUp(dbUser.id, "query");
+  } catch (err) {
+    console.error("[api/query POST] consumeTopUp error", err);
+  }
 
   return NextResponse.json({ questionText, responseText });
 }

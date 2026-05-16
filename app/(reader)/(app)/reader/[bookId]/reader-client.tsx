@@ -8,8 +8,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import {
+  UsagePeriodPanel,
+  bumpUsageMeter,
+  formatLimitReachedMessage,
+} from "@/components/subscription/usage-period-panel";
 import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal-models";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
+import type { UserUsageSummary } from "@/lib/subscription";
 
 export type ReaderBook = {
   id: string;
@@ -93,9 +99,16 @@ type Props = {
   chapters: ReaderChapter[];
   initialProgress: ReaderProgress | null;
   viewerRole: "reader" | "partner" | "admin";
+  usageSummary: UserUsageSummary | null;
 };
 
-export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Props) {
+export function ReaderClient({
+  book,
+  chapters,
+  initialProgress,
+  viewerRole,
+  usageSummary,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const deepLinkConsumed = useRef(false);
@@ -108,6 +121,12 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
   });
 
   const [savedProgress, setSavedProgress] = useState<ReaderProgress | null>(initialProgress);
+  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
+  const [localUsage, setLocalUsage] = useState<UserUsageSummary | null>(usageSummary);
+
+  useEffect(() => {
+    setLocalUsage(usageSummary);
+  }, [usageSummary]);
 
   useEffect(() => {
     setSavedProgress(initialProgress);
@@ -262,14 +281,24 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         responseText?: string;
+        limitType?: string;
+        used?: number;
+        limit?: number | null;
+        resetDate?: string;
       };
       if (!res.ok) {
-        setQaError(data.error || "Something went wrong");
+        setQaError(
+          data.error === "LIMIT_REACHED"
+            ? formatLimitReachedMessage(data)
+            : data.error || "Something went wrong",
+        );
         return;
       }
       if (typeof data.responseText === "string") {
         setLastAnswer(data.responseText);
         setQuestion("");
+        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "query") : prev));
+        setUsageRefreshKey((k) => k + 1);
         void loadQueryHistory();
       } else {
         setQaError("Invalid response from server");
@@ -336,15 +365,25 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
         imageUrl?: string;
         fullPrompt?: string;
         image?: ImageHistoryItem;
+        limitType?: string;
+        used?: number;
+        limit?: number | null;
+        resetDate?: string;
       };
       if (!res.ok) {
-        setImgError(data.error || "Something went wrong");
+        setImgError(
+          data.error === "LIMIT_REACHED"
+            ? formatLimitReachedMessage(data)
+            : data.error || "Something went wrong",
+        );
         return;
       }
       if (data.image && typeof data.image.id === "string") {
         const item = data.image as ImageHistoryItem;
         openHistoryImageModal(item);
         setImgPrompt("");
+        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "image") : prev));
+        setUsageRefreshKey((k) => k + 1);
         setImageHistory((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
         void loadImageHistory();
       } else if (typeof data.imageUrl === "string") {
@@ -359,6 +398,8 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
           createdAt: new Date().toISOString(),
         });
         setImgPrompt("");
+        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "image") : prev));
+        setUsageRefreshKey((k) => k + 1);
         void loadImageHistory();
       } else {
         setImgError("Invalid response from server");
@@ -564,6 +605,14 @@ export function ReaderClient({ book, chapters, initialProgress, viewerRole }: Pr
               <p className="text-xs leading-relaxed text-text-muted">
                 We use only information and descriptions up to your current chapter to avoid spoilers.
               </p>
+
+              {localUsage ? (
+                <UsagePeriodPanel
+                  initialUsage={localUsage}
+                  refreshKey={usageRefreshKey}
+                  variant="compact"
+                />
+              ) : null}
 
               <section className="rounded-lg border border-border/80 bg-bg-base/70 px-3 py-3 sm:px-4">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

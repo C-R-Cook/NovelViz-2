@@ -39,6 +39,74 @@ export type UsageLimitResult = {
   topUpAvailable: number;
 };
 
+export type UsageMeterSnapshot = {
+  used: number;
+  limit: number | null;
+  topUpAvailable: number;
+  percentUsed: number | null;
+  unlimited: boolean;
+};
+
+/** Serializable usage summary for account / reader UI. */
+export type UserUsageSummary = {
+  tier: SubscriptionTier;
+  subscriptionStatus: string;
+  billingAnchorDay: number;
+  periodStart: string;
+  resetDate: string;
+  daysUntilRenewal: number;
+  betaMode: boolean;
+  queries: UsageMeterSnapshot;
+  images: UsageMeterSnapshot;
+};
+
+function meterSnapshot(used: number, limit: number | null, topUpAvailable: number): UsageMeterSnapshot {
+  const unlimited = limit === null;
+  const percentUsed =
+    unlimited || limit <= 0 ? null : Math.min(100, Math.round((used / limit) * 100));
+  return { used, limit, topUpAvailable, percentUsed, unlimited };
+}
+
+function daysUntil(date: Date): number {
+  const ms = date.getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 86_400_000));
+}
+
+/** Current billing period usage for display (progress bars, renewal countdown). */
+export async function getUserUsageSummary(userId: string): Promise<UserUsageSummary | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      subscriptionTier: true,
+      subscriptionStatus: true,
+      usagePeriodAnchor: true,
+    },
+  });
+  if (!user) return null;
+
+  const anchor = user.usagePeriodAnchor;
+  const periodStart = getUsagePeriodStart(anchor);
+  const resetDate = getResetDate(periodStart, anchor);
+
+  const [queryCheck, imageCheck, limits] = await Promise.all([
+    checkUsageLimit(userId, "query"),
+    checkUsageLimit(userId, "image"),
+    getEffectiveLimits(userId),
+  ]);
+
+  return {
+    tier: limits.tier,
+    subscriptionStatus: user.subscriptionStatus,
+    billingAnchorDay: anchor,
+    periodStart: periodStart.toISOString(),
+    resetDate: resetDate.toISOString(),
+    daysUntilRenewal: daysUntil(resetDate),
+    betaMode: BETA_MODE,
+    queries: meterSnapshot(queryCheck.used, queryCheck.limit, queryCheck.topUpAvailable),
+    images: meterSnapshot(imageCheck.used, imageCheck.limit, imageCheck.topUpAvailable),
+  };
+}
+
 const TIER_ORDER: Record<SubscriptionTier, number> = {
   [SubscriptionTier.free]: 0,
   [SubscriptionTier.standard]: 1,

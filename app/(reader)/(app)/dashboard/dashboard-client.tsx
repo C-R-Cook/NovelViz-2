@@ -13,6 +13,7 @@ import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { UsersAdminClient } from "@/app/admin/users/users-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
+import { UsagePeriodPanel } from "@/components/subscription/usage-period-panel";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
 import type { AdminBookRow } from "@/lib/admin-books-list";
@@ -140,7 +141,10 @@ export type DashboardClientProps = {
     pageSize: number;
   } | null;
   adminStats: AdminStatsPayload | null;
-  account: Pick<AccountPageClientProps, "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction">;
+  account: Pick<
+    AccountPageClientProps,
+    "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction" | "usageSummary"
+  >;
 };
 
 function subscribeReducedMotion(onStoreChange: () => void) {
@@ -467,6 +471,12 @@ export function DashboardClient({
             />
           ) : null}
         </div>
+
+        {account.usageSummary ? (
+          <div className="mt-4">
+            <UsagePeriodPanel initialUsage={account.usageSummary} variant="compact" />
+          </div>
+        ) : null}
 
         {role === "admin" && admin ? (
           <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
@@ -806,6 +816,7 @@ export function DashboardClient({
               stats={account.stats}
               memberSinceLabel={account.memberSinceLabel}
               isProduction={account.isProduction}
+              usageSummary={account.usageSummary}
             />
           </div>
         );

@@ -22,6 +22,7 @@ import {
   queryPartnerBooksPage,
 } from "@/lib/partner-books-list";
 import { prisma } from "@/lib/prisma";
+import { getUserUsageSummary } from "@/lib/subscription";
 import { FeatureRequestStatus, UserRole } from "@db";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -475,6 +476,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         stats: { libraryBookCount, queryCount, generatedImageCount },
         memberSinceLabel,
         isProduction: process.env.NODE_ENV === "production",
+        usageSummary: await getUserUsageSummary(session.id),
       }}
     />
   );

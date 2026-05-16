@@ -104,12 +104,16 @@ export async function POST(req: Request) {
     console.log(`${LOG_PREFIX} starting prisma.user.upsert`, {
       where: { clerkId: id },
     });
+    const signupDay = new Date().getDate();
+    const anchorDay = Math.min(signupDay, 28);
+
     const user = await prisma.user.upsert({
       where: { clerkId: id },
       create: {
         clerkId: id,
         email,
         name,
+        usagePeriodAnchor: anchorDay,
       },
       update: {
         email,
@@ -120,6 +124,21 @@ export async function POST(req: Request) {
       dbUserId: user.id,
       clerkId: user.clerkId,
     });
+
+    if (process.env.BETA_MODE === "true") {
+      try {
+        await prisma.userBadge.create({
+          data: {
+            userId: user.id,
+            badgeKey: "OG_BETA",
+            awardedBy: null,
+            note: "Awarded automatically during beta signup",
+          },
+        });
+      } catch (badgeErr) {
+        console.error(`${LOG_PREFIX} OG_BETA badge award failed`, badgeErr);
+      }
+    }
   } catch (err) {
     logUnknownError("prisma.user.upsert failed", err);
     console.error(`${LOG_PREFIX} Failed to sync user from Clerk webhook (raw):`, err);

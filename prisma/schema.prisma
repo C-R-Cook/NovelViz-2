@@ -82,6 +82,29 @@ enum FeatureRequestStatus {
   REJECTED
 }
 
+enum CommentStatus {
+  VISIBLE
+  HIDDEN_SPOILER
+  PENDING_CONTENT_REVIEW
+  DELETED
+}
+
+enum NotificationType {
+  COMMENT_HIDDEN_PENDING
+  COMMENT_REINSTATED
+  COMMENT_FLAGGED_FOR_MODERATION
+  COMMENT_REPORTED_TO_AUTHOR
+  COMMENT_FLAGGED_RESTORED
+  COMMENT_FLAGGED_REMOVED
+  COMMENT_RELEASED
+  COMMENT_SPOILER_REMOVED
+  COMMENT_SPOILER_CONFIRMED_GATED
+  BOOK_APPROVED
+  BOOK_REJECTED
+  FEATURE_REQUEST_APPROVED
+  FEATURE_REQUEST_REJECTED
+}
+
 enum PartnerApplicationStatus {
   pending
   approved
@@ -188,6 +211,8 @@ model User {
   featureReviews  FeatureRequest[] @relation("FeatureReviews")
   partnerApplications PartnerApplication[]
   partnerRequests     PartnerRequest[]
+  comments            Comment[]
+  notifications       Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -315,11 +340,48 @@ model GeneratedImage {
   book           Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
   likes          Like[]
   featureRequest FeatureRequest?
+  comments       Comment[]
 
   createdAt DateTime @default(now())
 
   @@index([userId, bookId])
   @@index([isPublic])
+}
+
+model Comment {
+  id        String        @id @default(uuid())
+  imageId   String
+  userId    String
+  content   String        @db.VarChar(500)
+  status           CommentStatus @default(VISIBLE)
+  /** Dev/testing: raw spoiler-scan outcome from comment-scan (see lib/comment-spoiler-scan-debug.ts). */
+  spoilerScanDebug     Json?
+  /** Chapter used for spoiler gating (from scan or image chapter). */
+  spoilerGateChapter     Int?
+  /** Set when an admin confirms moderation (keep gated or acknowledge). */
+  spoilerModerationAt    DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  image GeneratedImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([imageId])
+  @@index([imageId, status])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  type      NotificationType
+  message   String           @db.Text
+  link      String           @db.VarChar(2048)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read, createdAt])
 }
 
 model FeatureRequest {

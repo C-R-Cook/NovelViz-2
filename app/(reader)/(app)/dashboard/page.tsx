@@ -1,6 +1,14 @@
 import { DashboardClient } from "./dashboard-client";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  countPendingFlaggedComments,
+  queryAdminFlaggedCommentsQueue,
+} from "@/lib/admin-flagged-comments-queue";
+import {
+  countPendingSpoilerComments,
+  queryAdminSpoilerCommentsQueue,
+} from "@/lib/admin-spoiler-comments-queue";
+import {
   DASHBOARD_ADMIN_BOOKS_LIMIT,
   queryAdminBooksPage,
 } from "@/lib/admin-books-list";
@@ -74,6 +82,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       gender: true,
       genrePreferences: true,
       subscribedToMailingList: true,
+      globalSpoilerProtection: true,
       createdAt: true,
     },
   });
@@ -251,6 +260,10 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       username: string;
     }[];
     featureRequestsPendingCount: number;
+    spoilerCommentsQueue: import("@/lib/admin-spoiler-comments-queue").AdminSpoilerCommentRow[];
+    spoilerCommentsPendingCount: number;
+    flaggedCommentsQueue: import("@/lib/admin-flagged-comments-queue").AdminFlaggedCommentRow[];
+    flaggedCommentsPendingCount: number;
     recentUsers: {
       id: string;
       username: string | null;
@@ -279,6 +292,10 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       statsPayload,
       featureRequestsPendingRows,
       featureRequestsPendingCount,
+      spoilerCommentsPendingCount,
+      spoilerCommentsQueue,
+      flaggedCommentsPendingCount,
+      flaggedCommentsQueue,
       recentUsersRows,
     ] = await Promise.all([
       prisma.book.findMany({
@@ -323,6 +340,10 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
         },
       }),
       prisma.featureRequest.count({ where: { status: FeatureRequestStatus.PENDING } }),
+      countPendingSpoilerComments(),
+      queryAdminSpoilerCommentsQueue(80),
+      countPendingFlaggedComments(),
+      queryAdminFlaggedCommentsQueue(80),
       prisma.user.findMany({
         take: 80,
         orderBy: { createdAt: "desc" },
@@ -367,6 +388,10 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
       bookRequests: { totalCount: bookRequestTitleRows.length, topBooks },
       featureRequestsQueue,
       featureRequestsPendingCount,
+      spoilerCommentsQueue,
+      spoilerCommentsPendingCount,
+      flaggedCommentsQueue,
+      flaggedCommentsPendingCount,
       recentUsers: recentUsersRows.map((u) => ({
         id: u.id,
         username: u.username,
@@ -445,6 +470,7 @@ async function DashboardContent({ searchParams }: DashboardPageProps) {
           gender: dbUser.gender,
           genrePreferences: dbUser.genrePreferences,
           subscribedToMailingList: dbUser.subscribedToMailingList,
+          globalSpoilerProtection: dbUser.globalSpoilerProtection,
         },
         stats: { libraryBookCount, queryCount, generatedImageCount },
         memberSinceLabel,

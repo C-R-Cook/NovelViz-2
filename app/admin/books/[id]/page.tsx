@@ -2,6 +2,7 @@
 import { AdminBookDetailClient } from "./admin-book-detail-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { CommentStatus } from "@db";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -41,6 +42,21 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     },
   });
 
+  const imageIds = publicImagesRows.map((r) => r.id);
+  const hiddenCommentGroups =
+    imageIds.length > 0
+      ? await prisma.comment.groupBy({
+          by: ["imageId"],
+          where: {
+            imageId: { in: imageIds },
+            status: CommentStatus.HIDDEN_SPOILER,
+            spoilerModerationAt: null,
+          },
+          _count: { _all: true },
+        })
+      : [];
+  const hiddenByImage = new Map(hiddenCommentGroups.map((g) => [g.imageId, g._count._all]));
+
   const publicImages = publicImagesRows.map((img) => ({
     id: img.id,
     imageUrl: img.imageUrl,
@@ -49,6 +65,7 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
     isFeatured: img.isFeatured,
     username: img.user.username ?? img.user.name ?? "",
     featureRequest: img.featureRequest,
+    hiddenSpoilerCommentCount: hiddenByImage.get(img.id) ?? 0,
   }));
 
   const book = {

@@ -1,6 +1,6 @@
-import anthropic from "@/lib/anthropic";
 import cloudinary from "@/lib/cloudinary";
 import fal from "@/lib/fal";
+import { getAnthropicTextResponse } from "@/lib/anthropic-text";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { resolveImagineFal } from "@/lib/imagine-fal";
@@ -11,7 +11,6 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 
 export const maxDuration = 300;
-const DEFAULT_ANTHROPIC_MODELS = ["claude-sonnet-4-5", "claude-sonnet-4-20250514"] as const;
 const IMAGINE_DEBUG_FLAG = "IMAGINE_DEBUG";
 
 type ChunkRow = {
@@ -19,16 +18,6 @@ type ChunkRow = {
   content: string;
   sequenceNumber: number;
 };
-
-function getAnthropicModelCandidates(): string[] {
-  const raw = process.env.ANTHROPIC_MODEL;
-  if (!raw) return [...DEFAULT_ANTHROPIC_MODELS];
-  const parsed = raw
-    .split(",")
-    .map((v) => v.trim())
-    .filter((v) => v.length > 0);
-  return parsed.length > 0 ? parsed : [...DEFAULT_ANTHROPIC_MODELS];
-}
 
 function isImagineDebugEnabled(): boolean {
   const raw = process.env[IMAGINE_DEBUG_FLAG];
@@ -60,50 +49,6 @@ function extractFalImageUrl(data: unknown): string | null {
     if (typeof img.url === "string") return img.url;
   }
   return null;
-}
-
-async function getAnthropicTextResponse(
-  systemPrompt: string,
-  userMessage: string,
-  maxTokens: number,
-): Promise<{ text: string; promptTokens: number; completionTokens: number }> {
-  const candidates = getAnthropicModelCandidates();
-  let lastErr: unknown = null;
-
-  for (const model of candidates) {
-    try {
-      const message = await anthropic.messages.create({
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userMessage }],
-      });
-      const first = message.content[0];
-      const text = first && first.type === "text" ? first.text.trim() : "";
-      if (text) {
-        return {
-          text,
-          promptTokens: message.usage?.input_tokens ?? 0,
-          completionTokens: message.usage?.output_tokens ?? 0,
-        };
-      }
-      lastErr = new Error("Anthropic returned empty text content");
-    } catch (err) {
-      const maybeType = (err as { type?: string } | undefined)?.type;
-      const maybeStatus = (err as { status?: number } | undefined)?.status;
-      lastErr = err;
-      if (maybeType === "not_found_error" || maybeStatus === 404) {
-        continue;
-      }
-      throw err;
-    }
-  }
-
-  if (lastErr) {
-    throw lastErr;
-  }
-
-  throw new Error("No Anthropic model candidates available");
 }
 
 export async function GET(request: Request) {

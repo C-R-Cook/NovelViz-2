@@ -4,6 +4,10 @@ import { AccountPageClient, type AccountPageClientProps } from "@/app/(reader)/(
 import { DashboardPartnerSection } from "@/app/(reader)/(app)/dashboard/dashboard-partner-section";
 import { FeatureRequestsQueue } from "@/app/(reader)/(app)/dashboard/feature-requests-queue";
 import { ForReviewQueue } from "@/app/(reader)/(app)/dashboard/for-review-queue";
+import { FlaggedCommentsQueue } from "@/app/(reader)/(app)/dashboard/flagged-comments-queue";
+import { SpoilerCommentsQueue } from "@/app/(reader)/(app)/dashboard/spoiler-comments-queue";
+import type { AdminFlaggedCommentRow } from "@/lib/admin-flagged-comments-queue";
+import type { AdminSpoilerCommentRow } from "@/lib/admin-spoiler-comments-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
@@ -117,6 +121,10 @@ export type DashboardClientProps = {
       username: string;
     }[];
     featureRequestsPendingCount: number;
+    spoilerCommentsQueue: AdminSpoilerCommentRow[];
+    spoilerCommentsPendingCount: number;
+    flaggedCommentsQueue: AdminFlaggedCommentRow[];
+    flaggedCommentsPendingCount: number;
     recentUsers: {
       id: string;
       username: string | null;
@@ -170,6 +178,8 @@ function navBadgeValue(
   if (!badge) return 0;
   if (badge === "forReview") return admin?.pendingReviewCount ?? 0;
   if (badge === "featureApprovals") return admin?.featureRequestsPendingCount ?? 0;
+  if (badge === "spoilerComments") return admin?.spoilerCommentsPendingCount ?? 0;
+  if (badge === "flaggedComments") return admin?.flaggedCommentsPendingCount ?? 0;
   if (badge === "partnerFeatReq") return partner?.ownFeatureRequestsPendingCount ?? 0;
   return 0;
 }
@@ -847,6 +857,20 @@ export function DashboardClient({
             actionRequestId={featureActionId}
             onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
             className="dashboard-feature-queue-wrap"
+          />
+        ) : null;
+      case "spoiler-comments":
+        return admin ? (
+          <SpoilerCommentsQueue
+            items={admin.spoilerCommentsQueue}
+            className="dashboard-spoiler-comments-wrap"
+          />
+        ) : null;
+      case "flagged-comments":
+        return admin ? (
+          <FlaggedCommentsQueue
+            items={admin.flaggedCommentsQueue}
+            className="dashboard-flagged-comments-wrap"
           />
         ) : null;
       case "all-books":

@@ -1,6 +1,8 @@
 import { getCurrentUser } from "@/lib/auth";
+import { commentCountsForGalleryBook } from "@/lib/gallery-comment-counts";
 import { prisma } from "@/lib/prisma";
 import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
+import type { SpoilerProtection } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ bookId: string }> };
@@ -23,6 +25,8 @@ export async function GET(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
 
+  const user = await getCurrentUser();
+
   const featured = url.searchParams.get("featured") === "true";
   const limitRaw = parseInt(url.searchParams.get("limit") ?? "8", 10);
   const limit = Math.min(Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 8, 20);
@@ -37,6 +41,45 @@ export async function GET(request: Request, context: RouteContext) {
       },
     });
 
+    const countRefs = featuredImages.map((img) => ({
+      id: img.id,
+      bookId: img.bookId,
+      chapterNumberAtTime: img.chapterNumberAtTime,
+    }));
+
+    let globalSpoilerProtection = true;
+    let userBookSpoiler: SpoilerProtection | null = null;
+    let currentChapterNumber: number | undefined;
+
+    if (user && user.role !== "admin" && !sessionOverride) {
+      const [dbUser, userBook, progress] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: user.id },
+          select: { globalSpoilerProtection: true },
+        }),
+        prisma.userBook.findFirst({
+          where: { userId: user.id, bookId, isActive: true },
+          select: { spoilerProtection: true },
+        }),
+        prisma.readingProgress.findUnique({
+          where: { userId_bookId: { userId: user.id, bookId } },
+          select: { currentChapterNumber: true },
+        }),
+      ]);
+      globalSpoilerProtection = dbUser?.globalSpoilerProtection ?? true;
+      userBookSpoiler = userBook?.spoilerProtection ?? null;
+      currentChapterNumber = progress?.currentChapterNumber;
+    }
+
+    const commentCountByImage = await commentCountsForGalleryBook(countRefs, {
+      bookId,
+      user,
+      sessionOverride,
+      globalSpoilerProtection,
+      userBookSpoiler,
+      currentChapterNumber,
+    });
+
     return NextResponse.json({
       images: featuredImages.map((img) => ({
         id: img.id,
@@ -47,6 +90,7 @@ export async function GET(request: Request, context: RouteContext) {
         likeCount: 0,
         isLocked: false,
         bookId: img.bookId,
+        commentCount: commentCountByImage.get(img.id) ?? 0,
       })),
     });
   }
@@ -67,9 +111,13 @@ export async function GET(request: Request, context: RouteContext) {
     },
   });
 
-  const user = await getCurrentUser();
-
   const imageIds = images.map((i) => i.id);
+  const countRefs = images.map((img) => ({
+    id: img.id,
+    bookId,
+    chapterNumberAtTime: img.chapterNumberAtTime,
+  }));
+
   const viewerLikedIds = new Set<string>();
   if (user !== null && imageIds.length > 0) {
     const likedRows = await prisma.like.findMany({
@@ -80,6 +128,11 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   if (!user) {
+    const commentCountByImage = await commentCountsForGalleryBook(countRefs, {
+      bookId,
+      user: null,
+      sessionOverride: false,
+    });
     return NextResponse.json({
       bookId: book.id,
       bookTitle: book.title,
@@ -100,39 +153,23 @@ export async function GET(request: Request, context: RouteContext) {
         bookId: book.id,
         bookTitle: book.title,
         author: book.author,
+        commentCount: commentCountByImage.get(img.id) ?? 0,
       })),
     });
   }
 
-  if (user.role === "admin") {
-    return NextResponse.json({
-      bookId: book.id,
-      bookTitle: book.title,
-      author: book.author,
-      currentChapterNumber: null,
-      images: images.map((img) => ({
-        id: img.id,
-        imageUrl: img.imageUrl,
-        userPrompt: img.userPrompt,
-        chapterNumberAtTime: img.chapterNumberAtTime,
-        createdAt: img.createdAt.toISOString(),
-        userId: img.userId,
-        username: img.user.username ?? img.user.name ?? "",
-        likeCount: img.likeCount,
-        isPublic: img.isPublic,
-        likedByViewer: viewerLikedIds.has(img.id),
-        isLocked: false,
-        bookId: book.id,
-        bookTitle: book.title,
-        author: book.author,
-      })),
-    });
-  }
-
-  if (sessionOverride) {
-    const progress = await prisma.readingProgress.findUnique({
-      where: { userId_bookId: { userId: user.id, bookId } },
-      select: { currentChapterNumber: true },
+  if (user.role === "admin" || sessionOverride) {
+    const progress =
+      sessionOverride && user
+        ? await prisma.readingProgress.findUnique({
+            where: { userId_bookId: { userId: user.id, bookId } },
+            select: { currentChapterNumber: true },
+          })
+        : null;
+    const commentCountByImage = await commentCountsForGalleryBook(countRefs, {
+      bookId,
+      user,
+      sessionOverride,
     });
     return NextResponse.json({
       bookId: book.id,
@@ -154,6 +191,7 @@ export async function GET(request: Request, context: RouteContext) {
         bookId: book.id,
         bookTitle: book.title,
         author: book.author,
+        commentCount: commentCountByImage.get(img.id) ?? 0,
       })),
     });
   }
@@ -177,6 +215,15 @@ export async function GET(request: Request, context: RouteContext) {
   const mode = effectiveChapterGateMode(userBook?.spoilerProtection, globalSpoilerProtection);
   const currentChapter = progress?.currentChapterNumber;
 
+  const commentCountByImage = await commentCountsForGalleryBook(countRefs, {
+    bookId,
+    user,
+    sessionOverride: false,
+    globalSpoilerProtection,
+    userBookSpoiler: userBook?.spoilerProtection ?? null,
+    currentChapterNumber: currentChapter,
+  });
+
   return NextResponse.json({
     bookId: book.id,
     bookTitle: book.title,
@@ -197,6 +244,7 @@ export async function GET(request: Request, context: RouteContext) {
       bookId: book.id,
       bookTitle: book.title,
       author: book.author,
+      commentCount: commentCountByImage.get(img.id) ?? 0,
     })),
   });
 }

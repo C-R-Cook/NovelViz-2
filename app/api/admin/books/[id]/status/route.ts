@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
-import { BookStatus } from "@db";
-import { UserRole } from "@db";
+import { BookStatus, NotificationType, UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -25,15 +25,23 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const dbUser = await prisma.user.findUnique({
+    where: { clerkId: user.clerkId },
+    select: { id: true, role: true },
+  });
+  if (!dbUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id: bookId } = await context.params;
   const book = await prisma.book.findFirst({
     where: { id: bookId, deletedAt: null },
-    select: { id: true, ownerId: true, status: true },
+    select: { id: true, ownerId: true, status: true, title: true },
   });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
   }
-  if (user.role !== UserRole.admin && book.ownerId !== user.id) {
+  if (dbUser.role !== UserRole.admin && book.ownerId !== dbUser.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -87,10 +95,39 @@ export async function PATCH(request: Request, context: RouteContext) {
     data.rejectionReason = null;
   }
 
+  const previousStatus = book.status;
+
   const updated = await prisma.book.update({
     where: { id: bookId },
     data,
   });
+
+  if (
+    dbUser.role === UserRole.admin &&
+    book.ownerId &&
+    previousStatus === "pending_review" &&
+    (updated.status === "published" || updated.status === "rejected")
+  ) {
+    const link = `/partner/books/${bookId}`;
+    if (updated.status === "published") {
+      await createNotification(
+        book.ownerId,
+        NotificationType.BOOK_APPROVED,
+        `Your book "${book.title}" was approved and is now published.`,
+        link,
+      );
+    } else {
+      const reason = updated.rejectionReason?.trim();
+      const reasonSuffix = reason && reason.length > 0 ? ` Reason: ${reason.slice(0, 200)}` : "";
+      await createNotification(
+        book.ownerId,
+        NotificationType.BOOK_REJECTED,
+        `Your book "${book.title}" was not approved.${reasonSuffix}`,
+        link,
+      );
+    }
+  }
+
   return NextResponse.json({
     book: updated,
     status: updated.status,

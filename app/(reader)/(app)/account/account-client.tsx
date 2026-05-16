@@ -30,6 +30,7 @@ export type AccountPageClientProps = {
     gender: Gender | null;
     genrePreferences: string[];
     subscribedToMailingList: boolean;
+    globalSpoilerProtection: boolean;
   };
   stats: {
     libraryBookCount: number;
@@ -58,6 +59,9 @@ export function AccountPageClient({
   const [gender, setGender] = useState<string>(initialUser.gender ?? "");
   const [subscribedToMailingList, setSubscribedToMailingList] = useState(
     initialUser.subscribedToMailingList,
+  );
+  const [globalSpoilerProtection, setGlobalSpoilerProtection] = useState(
+    initialUser.globalSpoilerProtection,
   );
   const [genrePreferences, setGenrePreferences] = useState<string[]>(initialUser.genrePreferences);
 
@@ -212,6 +216,7 @@ export function AccountPageClient({
         ageRange: ageRange || null,
         gender: gender || null,
         subscribedToMailingList,
+        globalSpoilerProtection,
         genrePreferences,
       };
       const res = await fetch("/api/account", {
@@ -450,6 +455,26 @@ export function AccountPageClient({
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="rounded-lg border border-border/80 bg-bg-base/50 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={globalSpoilerProtection}
+                  onChange={(e) => {
+                    setGlobalSpoilerProtection(e.target.checked);
+                    setPrefsOk(false);
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
+                />
+                <span className="text-sm text-text-primary">
+                  <span className="font-medium">Gallery spoiler protection</span>
+                  <span className="mt-1 block text-text-secondary">
+                    When enabled, hide gallery images and comments from chapters you have not reached yet.
+                    Books in your library can still override this per book from the gallery.
+                  </span>
+                </span>
+              </label>
             </div>
             <label className="flex cursor-pointer items-start gap-3">
               <input

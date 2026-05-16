@@ -27,3 +27,12 @@ export function isChapterBehindLock(
   if (currentChapter === undefined) return true;
   return currentChapter < imageChapter;
 }
+
+/** Spoiler-flagged comments always gate on this chapter (ignores per-book UNLOCKED). */
+export function isBehindSpoilerCommentGate(
+  currentChapter: number | undefined,
+  spoilerGateChapter: number,
+): boolean {
+  if (currentChapter === undefined) return true;
+  return currentChapter < spoilerGateChapter;
+}

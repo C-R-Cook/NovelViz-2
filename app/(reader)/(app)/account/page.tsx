@@ -20,6 +20,7 @@ export default async function AccountPage() {
       gender: true,
       genrePreferences: true,
       subscribedToMailingList: true,
+      globalSpoilerProtection: true,
       createdAt: true,
     },
   });

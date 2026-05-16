@@ -58,6 +58,7 @@ export async function PATCH(request: Request) {
     gender?: Gender | null;
     genrePreferences?: string[];
     subscribedToMailingList?: boolean;
+    globalSpoilerProtection?: boolean;
   } = {};
 
   if ("name" in b) {
@@ -153,6 +154,7 @@ export async function PATCH(request: Request) {
         gender: true,
         genrePreferences: true,
         subscribedToMailingList: true,
+        globalSpoilerProtection: true,
         createdAt: true,
       },
     });

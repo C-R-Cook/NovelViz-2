@@ -1,5 +1,6 @@
 "use client";
 
+import { NotificationsBell } from "@/components/notifications-bell";
 import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -131,7 +132,7 @@ function NavUserMenu({
 }
 
 export function NavChrome({
-  initialUserId: _initialUserId,
+  initialUserId,
   isLoggedIn,
   userInitials,
   userName,
@@ -140,11 +141,12 @@ export function NavChrome({
   userRole,
   isProduction,
 }: NavChromeProps) {
+  void initialUserId;
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    setMenuOpen(false);
+    queueMicrotask(() => setMenuOpen(false));
   }, [pathname]);
 
   const menuPrimaryLabel =
@@ -226,13 +228,16 @@ export function NavChrome({
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {isLoggedIn && userRole ? (
-            <NavUserMenu
-              initials={userInitials}
-              menuPrimaryLabel={menuPrimaryLabel}
-              menuSecondaryLabel={menuSecondaryLabel}
-              isProduction={isProduction}
-              onNavigate={() => setMenuOpen(false)}
-            />
+            <>
+              <NotificationsBell />
+              <NavUserMenu
+                initials={userInitials}
+                menuPrimaryLabel={menuPrimaryLabel}
+                menuSecondaryLabel={menuSecondaryLabel}
+                isProduction={isProduction}
+                onNavigate={() => setMenuOpen(false)}
+              />
+            </>
           ) : (
             <Link href="/sign-in" className={signInClass} onClick={() => setMenuOpen(false)}>
               Sign In

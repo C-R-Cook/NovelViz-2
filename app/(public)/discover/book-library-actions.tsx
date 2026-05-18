@@ -12,7 +12,7 @@ type Props = {
   variant?: "default" | "discoverGold";
 };
 
-const discoverGoldBtn =
+const discoverCtaBtn =
   "rounded border px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)] disabled:cursor-not-allowed disabled:opacity-60";
 
 export function BookLibraryActions({
@@ -65,7 +65,7 @@ export function BookLibraryActions({
         disabled={pending}
         className={
           variant === "discoverGold"
-            ? `${discoverGoldBtn} border-[color-mix(in_srgb,var(--discover-accent, #b8860b)_55%,transparent)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--discover-accent,#b8860b)_14%,transparent),color-mix(in_srgb,var(--discover-accent,#b8860b)_28%,transparent))] text-[color-mix(in_srgb,var(--discover-accent,#b8860b)_95%,#fff)] hover:brightness-110`
+            ? `${discoverCtaBtn} ${inLibrary ? "discover-cta-in-library" : "discover-cta-add-library"}`
             : "rounded-md border border-border bg-bg-raised px-3 py-2 text-xs font-medium text-text-primary transition hover:border-accent/60 hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-60 sm:px-4 sm:text-sm"
         }
       >

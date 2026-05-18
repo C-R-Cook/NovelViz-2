@@ -2,38 +2,20 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
-import {
-  UsagePeriodPanel,
-  bumpUsageMeter,
-  formatLimitReachedMessage,
-} from "@/components/subscription/usage-period-panel";
+import { formatLimitReachedMessage } from "@/components/subscription/usage-period-panel";
 import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal-models";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
-import type { UserUsageSummary } from "@/lib/subscription";
 
-export type ReaderBook = {
-  id: string;
-  title: string;
-  author: string;
-  coverImageUrl: string | null;
-};
+import { LibrarySectionHead } from "./library-section-head";
+import type { LibraryBookRow, LibraryChapter, LibraryProgress } from "./library-types";
 
-export type ReaderChapter = {
-  id: string;
-  sequenceNumber: number;
-  title: string | null;
-};
-
-export type ReaderProgress = {
-  currentChapterId: string;
-  currentChapterNumber: number;
-};
+export type { LibraryChapter, LibraryProgress };
 
 export type QueryHistoryItem = {
   id: string;
@@ -94,51 +76,38 @@ function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-type Props = {
-  book: ReaderBook;
-  chapters: ReaderChapter[];
-  initialProgress: ReaderProgress | null;
-  viewerRole: "reader" | "partner" | "admin";
-  usageSummary: UserUsageSummary | null;
+export type LibraryBookImagesSection = {
+  title: string;
+  headExtra: ReactNode;
+  content: ReactNode;
 };
 
-export function ReaderClient({
+export type LibraryBookPanelSections = {
+  ai: ReactNode;
+  images: LibraryBookImagesSection | null;
+};
+
+type Props = {
+  book: LibraryBookRow;
+  chapterNumber: number;
+  viewerRole: "reader" | "partner" | "admin";
+  initialTab?: "ask" | "imagine";
+  initialQuestion?: string;
+  children?: (sections: LibraryBookPanelSections) => ReactNode;
+};
+
+export function LibraryBookPanel({
   book,
-  chapters,
-  initialProgress,
+  chapterNumber,
   viewerRole,
-  usageSummary,
+  initialTab,
+  initialQuestion,
+  children,
 }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const chapters = book.chapters;
   const deepLinkConsumed = useRef(false);
   const total = chapters.length;
-
-  const [selectedChapterId, setSelectedChapterId] = useState<string>(() => {
-    if (initialProgress) return initialProgress.currentChapterId;
-    if (chapters[0]) return chapters[0].id;
-    return "";
-  });
-
-  const [savedProgress, setSavedProgress] = useState<ReaderProgress | null>(initialProgress);
-  const [usageRefreshKey, setUsageRefreshKey] = useState(0);
-  const [localUsage, setLocalUsage] = useState<UserUsageSummary | null>(usageSummary);
-
-  useEffect(() => {
-    setLocalUsage(usageSummary);
-  }, [usageSummary]);
-
-  useEffect(() => {
-    setSavedProgress(initialProgress);
-    if (initialProgress) {
-      setSelectedChapterId(initialProgress.currentChapterId);
-    } else if (chapters[0]) {
-      setSelectedChapterId(chapters[0].id);
-    }
-  }, [initialProgress, chapters]);
-
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
 
   const [question, setQuestion] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
@@ -154,20 +123,18 @@ export function ReaderClient({
 
   useEffect(() => {
     if (deepLinkConsumed.current) return;
-    const tab = searchParams.get("tab");
-    const qRaw = searchParams.get("q");
-    if (!tab && !qRaw) return;
+    if (!initialTab && !initialQuestion) return;
     deepLinkConsumed.current = true;
-    if (qRaw) {
-      setQuestion(qRaw);
+    if (initialQuestion) {
+      setQuestion(initialQuestion);
       setActiveAiTab("ask");
-    } else if (tab === "ask") {
+    } else if (initialTab === "ask") {
       setActiveAiTab("ask");
-    } else if (tab === "imagine") {
+    } else if (initialTab === "imagine") {
       setActiveAiTab("imagine");
     }
-    router.replace(`/reader/${book.id}`, { scroll: false });
-  }, [searchParams, router, book.id]);
+    router.replace(`/library?book=${encodeURIComponent(book.bookId)}`, { scroll: false });
+  }, [initialTab, initialQuestion, router, book.bookId]);
 
   const [imgPrompt, setImgPrompt] = useState("");
   const [adminImagineFalModel, setAdminImagineFalModel] = useState<ImagineFalModelKey>(IMAGINE_FAL_DEFAULT_ADMIN_KEY);
@@ -185,8 +152,6 @@ export function ReaderClient({
   const [promptCopied, setPromptCopied] = useState<PromptCopyKind | null>(null);
   const promptCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const selectedChapter = chapters.find((c) => c.id === selectedChapterId);
-
   const copyPromptText = useCallback(async (kind: PromptCopyKind, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -203,50 +168,11 @@ export function ReaderClient({
     }
   }, []);
 
-  const saveProgress = useCallback(async () => {
-    if (!selectedChapterId || !selectedChapter) {
-      setMessage({ type: "err", text: "Select a chapter first." });
-      return;
-    }
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch(`/api/progress/${book.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chapterId: selectedChapterId,
-          chapterNumber: selectedChapter.sequenceNumber,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        progress?: ReaderProgress;
-      };
-      if (!res.ok) {
-        setMessage({ type: "err", text: data.error || "Could not save progress" });
-        return;
-      }
-      if (data.progress) {
-        setSavedProgress({
-          currentChapterId: data.progress.currentChapterId,
-          currentChapterNumber: data.progress.currentChapterNumber,
-        });
-      }
-      setMessage({ type: "ok", text: "Progress saved." });
-      router.refresh();
-    } catch {
-      setMessage({ type: "err", text: "Network error. Try again." });
-    } finally {
-      setSaving(false);
-    }
-  }, [book.id, selectedChapter, selectedChapterId, router]);
-
   const loadQueryHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError(null);
     try {
-      const res = await fetch(`/api/query?bookId=${encodeURIComponent(book.id)}`);
+      const res = await fetch(`/api/query?bookId=${encodeURIComponent(book.bookId)}`);
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         queries?: QueryHistoryItem[];
@@ -264,7 +190,7 @@ export function ReaderClient({
       setHistoryLoading(false);
       setHistoryInitialized(true);
     }
-  }, [book.id]);
+  }, [book.bookId]);
 
   const submitQuestion = useCallback(async () => {
     const trimmed = question.trim();
@@ -276,7 +202,7 @@ export function ReaderClient({
       const res = await fetch("/api/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookId: book.id, questionText: trimmed }),
+        body: JSON.stringify({ bookId: book.bookId, questionText: trimmed }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -297,8 +223,6 @@ export function ReaderClient({
       if (typeof data.responseText === "string") {
         setLastAnswer(data.responseText);
         setQuestion("");
-        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "query") : prev));
-        setUsageRefreshKey((k) => k + 1);
         void loadQueryHistory();
       } else {
         setQaError("Invalid response from server");
@@ -308,13 +232,13 @@ export function ReaderClient({
     } finally {
       setQaLoading(false);
     }
-  }, [book.id, question, loadQueryHistory]);
+  }, [book.bookId, question, loadQueryHistory]);
 
   const loadImageHistory = useCallback(async () => {
     setImageHistoryLoading(true);
     setImageHistoryError(null);
     try {
-      const res = await fetch(`/api/imagine?bookId=${encodeURIComponent(book.id)}`);
+      const res = await fetch(`/api/imagine?bookId=${encodeURIComponent(book.bookId)}`);
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         images?: ImageHistoryItem[];
@@ -332,12 +256,12 @@ export function ReaderClient({
       setImageHistoryLoading(false);
       setImageHistoryInitialized(true);
     }
-  }, [book.id]);
+  }, [book.bookId]);
 
   useEffect(() => {
     setHistoryInitialized(false);
     setImageHistoryInitialized(false);
-  }, [book.id]);
+  }, [book.bookId]);
 
   const openHistoryImageModal = useCallback((item: ImageHistoryItem) => {
     setHistorySwipeDir(0);
@@ -355,7 +279,7 @@ export function ReaderClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          bookId: book.id,
+          bookId: book.bookId,
           userPrompt: trimmed,
           ...(viewerRole === "admin" ? { falImagineModel: adminImagineFalModel } : {}),
         }),
@@ -382,8 +306,6 @@ export function ReaderClient({
         const item = data.image as ImageHistoryItem;
         openHistoryImageModal(item);
         setImgPrompt("");
-        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "image") : prev));
-        setUsageRefreshKey((k) => k + 1);
         setImageHistory((prev) => [item, ...prev.filter((i) => i.id !== item.id)]);
         void loadImageHistory();
       } else if (typeof data.imageUrl === "string") {
@@ -394,12 +316,10 @@ export function ReaderClient({
           fullPrompt,
           imageUrl: data.imageUrl,
           isPublic: false,
-          chapterNumberAtTime: savedProgress?.currentChapterNumber ?? 1,
+          chapterNumberAtTime: chapterNumber,
           createdAt: new Date().toISOString(),
         });
         setImgPrompt("");
-        setLocalUsage((prev) => (prev ? bumpUsageMeter(prev, "image") : prev));
-        setUsageRefreshKey((k) => k + 1);
         void loadImageHistory();
       } else {
         setImgError("Invalid response from server");
@@ -409,7 +329,7 @@ export function ReaderClient({
     } finally {
       setImgLoading(false);
     }
-  }, [book.id, imgPrompt, loadImageHistory, savedProgress?.currentChapterNumber, openHistoryImageModal, viewerRole, adminImagineFalModel]);
+  }, [book.bookId, imgPrompt, loadImageHistory, chapterNumber, openHistoryImageModal, viewerRole, adminImagineFalModel]);
 
   const setImagePublicState = useCallback(
     async (imageId: string, isPublic: boolean) => {
@@ -532,128 +452,30 @@ export function ReaderClient({
   }, [selectedHistoryImage?.id]);
 
   useEffect(() => {
-    if (activeAiTab === "imagine") {
-      if (!imageHistoryInitialized && !imageHistoryLoading) {
-        void loadImageHistory();
-      }
-      return;
+    if (!imageHistoryInitialized && !imageHistoryLoading) {
+      void loadImageHistory();
     }
+  }, [imageHistoryInitialized, imageHistoryLoading, loadImageHistory]);
 
-    if (!historyInitialized && !historyLoading) {
+  useEffect(() => {
+    if (activeAiTab === "ask" && !historyInitialized && !historyLoading) {
       void loadQueryHistory();
     }
-  }, [
-    activeAiTab,
-    historyInitialized,
-    historyLoading,
-    imageHistoryInitialized,
-    imageHistoryLoading,
-    loadImageHistory,
-    loadQueryHistory,
-  ]);
+  }, [activeAiTab, historyInitialized, historyLoading, loadQueryHistory]);
 
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-6">
-      <header className="space-y-3 sm:space-y-4">
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 sm:gap-x-3">
-          <h1 className="font-serif text-xl font-semibold tracking-tight text-text-primary sm:text-2xl">
-            {book.title}
-          </h1>
-          <span className="hidden text-text-secondary sm:inline" aria-hidden>
-            ·
-          </span>
-          <p className="min-w-0 text-sm text-text-secondary">{book.author}</p>
-        </div>
-        <Link
-          href={`/gallery/${book.id}?from=reader`}
-          className="inline-flex text-xs font-medium text-accent-text/90 underline-offset-2 transition hover:text-accent-text hover:underline sm:text-sm"
-        >
-          See all {book.title} images →
-        </Link>
+  const emptyNotice = (
+    <p className="rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
+      This book hasn&apos;t been ingested yet, check back soon
+    </p>
+  );
 
-      </header>
-
-      {total === 0 ? (
-        <p className="mt-6 rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">
-          This book hasn&apos;t been ingested yet, check back soon
-        </p>
-      ) : (
-        <>
-          <section className="mt-4 grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,11rem)_1fr]">
-            <div className="mx-auto w-full max-w-[11rem] shrink-0 justify-self-center self-start overflow-hidden rounded-xl border border-border bg-bg-surface md:mx-0 md:max-w-none md:justify-self-stretch">
-              <div className="relative aspect-[2/3] w-full">
-                {book.coverImageUrl ? (
-                  <Image
-                    src={book.coverImageUrl}
-                    alt={`Cover: ${book.title}`}
-                    fill
-                    className="object-cover"
-                    sizes="(min-width: 768px) 176px, (min-width: 640px) 40vw, 75vw"
-                  />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-4 text-center text-sm leading-tight text-text-muted">
-                    No cover available
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="min-w-0 space-y-3 rounded-xl border border-border bg-bg-surface/60 p-4 sm:p-5">
-              <h2 className="font-serif text-lg font-semibold text-text-primary">
-                Ask &amp; imagine
-              </h2>
-              <p className="text-xs leading-relaxed text-text-muted">
-                We use only information and descriptions up to your current chapter to avoid spoilers.
-              </p>
-
-              {localUsage ? (
-                <UsagePeriodPanel
-                  initialUsage={localUsage}
-                  refreshKey={usageRefreshKey}
-                  variant="compact"
-                />
-              ) : null}
-
-              <section className="rounded-lg border border-border/80 bg-bg-base/70 px-3 py-3 sm:px-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <label className="min-w-0 sm:min-w-72">
-                    <span className="sr-only">Current chapter</span>
-                    <select
-                      value={selectedChapterId}
-                      onChange={(e) => setSelectedChapterId(e.target.value)}
-                      className="w-full rounded-md border border-border bg-bg-surface px-2.5 py-1.5 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-                    >
-                      {chapters.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    onClick={saveProgress}
-                    disabled={saving || !selectedChapterId}
-                    className="shrink-0 rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-surface disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {saving ? "Saving…" : "Save chapter"}
-                  </button>
-                </div>
-                {message ? (
-                  <p
-                    className={
-                      message.type === "ok"
-                        ? "mt-2 text-xs text-success"
-                        : "mt-2 text-xs text-error"
-                    }
-                  >
-                    {message.text}
-                  </p>
-                ) : null}
-              </section>
-
+  const aiSection =
+    total === 0 ? (
+      emptyNotice
+    ) : (
+      <section className="library-book-tabs library-book-tabs--split">
               <div
-                className="flex gap-1 border-b border-border"
+                className="library-book-tabs-list flex gap-1 border-b border-border"
                 role="tablist"
                 aria-label="Reader AI tools"
               >
@@ -767,15 +589,23 @@ export function ReaderClient({
                     ) : null}
                   </div>
                 )}
-            </div>
-          </section>
+      </section>
+    );
 
-          <section className="mt-4 space-y-2 rounded-xl border border-border bg-bg-surface/50 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-              {activeAiTab === "imagine" ? "Previous image generations" : "Previous questions"}
-            </p>
-            {activeAiTab === "imagine" ? (
-              imageHistoryLoading ? (
+  const imagesSection: LibraryBookImagesSection | null =
+    total === 0 ? null : {
+      title: `My ${book.title} images`,
+      headExtra: (
+        <Link href={`/gallery/${book.bookId}?from=library`} className="library-section-head-link">
+          See all →
+        </Link>
+      ),
+      content: (
+          <section
+            className="library-book-images space-y-2 rounded-xl border border-border bg-bg-surface/50 p-4"
+            aria-label={`My ${book.title} images gallery`}
+          >
+            {imageHistoryLoading ? (
                 <p className="text-xs text-text-muted">Loading…</p>
               ) : imageHistoryError ? (
                 <p className="text-xs text-error">{imageHistoryError}</p>
@@ -832,40 +662,12 @@ export function ReaderClient({
                     </li>
                   ))}
                 </ul>
-              )
-            ) : historyLoading ? (
-              <p className="text-xs text-text-muted">Loading…</p>
-            ) : historyError ? (
-              <p className="text-xs text-error">{historyError}</p>
-            ) : historyQueries.length === 0 ? (
-              <p className="text-xs text-text-muted">No questions yet.</p>
-            ) : (
-              <ul className="max-h-80 space-y-0 divide-y divide-border/80 overflow-y-auto">
-                {historyQueries.map((q) => (
-                  <li key={q.id} className="py-3 first:pt-0">
-                    <p className="text-sm font-semibold text-text-primary">
-                      {q.questionText}
-                    </p>
-                    <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
-                      {q.responseText}
-                    </p>
-                    <p className="mt-2 text-[11px] text-text-secondary">
-                      Chapter {q.chapterNumberAtTime} ·{" "}
-                      {new Date(q.createdAt).toLocaleString(undefined, {
-                        dateStyle: "short",
-                        timeStyle: "short",
-                      })}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
+              )}
           </section>
+      ),
+    };
 
-        </>
-      )}
-
-      {selectedHistoryImage ? (
+  const imageModal = selectedHistoryImage ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay/70 p-4"
           role="dialog"
@@ -1030,7 +832,27 @@ export function ReaderClient({
             </div>
           </div>
         </div>
+      ) : null;
+
+  if (children) {
+    return (
+      <>
+        {children({ ai: aiSection, images: imagesSection })}
+        {imageModal}
+      </>
+    );
+  }
+
+  return (
+    <div className="library-book-panel">
+      {aiSection}
+      {imagesSection ? (
+        <section className="library-book-images-fallback" aria-label={imagesSection.title}>
+          <LibrarySectionHead title={imagesSection.title}>{imagesSection.headExtra}</LibrarySectionHead>
+          {imagesSection.content}
+        </section>
       ) : null}
+      {imageModal}
     </div>
   );
 }

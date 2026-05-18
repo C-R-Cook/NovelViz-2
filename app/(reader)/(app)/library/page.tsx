@@ -1,8 +1,9 @@
 import { LibraryClient } from "./library-client";
-import type { LibraryBookRow } from "./library-types";
+import type { LibraryBookRow, LibraryChapter } from "./library-types";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 export const metadata = {
   title: "My Library | NovelViz",
@@ -26,11 +27,43 @@ function formatRelativeLastRead(iso: string | null): string {
   return rtf.format(-diffMonth, "month");
 }
 
-export default async function LibraryPage() {
+type LibraryPageProps = {
+  searchParams?: Promise<{
+    book?: string | string[];
+    tab?: string | string[];
+    q?: string | string[];
+  }>;
+};
+
+function firstParam(v: string | string[] | undefined): string | undefined {
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v[0];
+  return undefined;
+}
+
+async function LibraryContent({ searchParams }: LibraryPageProps) {
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
   }
+
+  const sp = searchParams ? await searchParams : {};
+  const requestedBookId = firstParam(sp.book);
+  const initialTabRaw = firstParam(sp.tab);
+  const initialTab =
+    initialTabRaw === "ask" || initialTabRaw === "imagine" ? initialTabRaw : undefined;
+  const initialQuestion = firstParam(sp.q);
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { role: true },
+  });
+  if (!dbUser) {
+    redirect("/sign-in");
+  }
+
+  const viewerRole =
+    dbUser.role === "partner" ? "partner" : dbUser.role === "admin" ? "admin" : "reader";
 
   const userBooks = await prisma.userBook.findMany({
     where: {
@@ -50,6 +83,13 @@ export default async function LibraryPage() {
 
   const bookIds = userBooks.map((ub) => ub.bookId);
 
+  if (bookIds.length > 0) {
+    await prisma.userBook.updateMany({
+      where: { userId: session.id, bookId: { in: bookIds }, isActive: false },
+      data: { isActive: true },
+    });
+  }
+
   const progressRows =
     bookIds.length === 0
       ? []
@@ -61,11 +101,32 @@ export default async function LibraryPage() {
     progressRows.map((p) => [
       p.bookId,
       {
+        currentChapterId: p.currentChapterId,
         currentChapterNumber: p.currentChapterNumber,
         updatedAt: p.updatedAt.toISOString(),
       },
     ]),
   );
+
+  const chapterRows =
+    bookIds.length === 0
+      ? []
+      : await prisma.chapter.findMany({
+          where: { bookId: { in: bookIds } },
+          orderBy: { sequenceNumber: "asc" },
+          select: { id: true, bookId: true, sequenceNumber: true, title: true },
+        });
+
+  const chaptersByBookId = new Map<string, LibraryChapter[]>();
+  for (const ch of chapterRows) {
+    const list = chaptersByBookId.get(ch.bookId) ?? [];
+    list.push({
+      id: ch.id,
+      sequenceNumber: ch.sequenceNumber,
+      title: ch.title,
+    });
+    chaptersByBookId.set(ch.bookId, list);
+  }
 
   const [queryGroup, imageGroup, queryRowsForLast, totalQueries, totalImages] =
     bookIds.length === 0
@@ -118,6 +179,7 @@ export default async function LibraryPage() {
           genre: book.genre as string | null,
           coverImageUrl: book.coverImageUrl,
           chapterTotal: book._count.chapters,
+          chapters: chaptersByBookId.get(book.id) ?? [],
           progress: prog,
           removedFromCatalogue: book.status === "unlisted",
           queryCount: queryCountByBook.get(book.id) ?? 0,
@@ -137,7 +199,9 @@ export default async function LibraryPage() {
       return new Date(tb).getTime() - new Date(ta).getTime();
     });
 
-  const withoutProgress = userBooks.filter((ub) => !progressByBookId.has(ub.bookId));
+  const withoutProgress = [...userBooks.filter((ub) => !progressByBookId.has(ub.bookId))].sort(
+    (a, b) => a.addedAt.getTime() - b.addedAt.getTime(),
+  );
 
   const orderedUserBooks = [...withProgress, ...withoutProgress];
 
@@ -145,14 +209,43 @@ export default async function LibraryPage() {
     .map((ub) => rowByBookId.get(ub.book.id))
     .filter((row): row is LibraryBookRow => row != null);
 
-  const defaultActiveBookId = books[0]?.bookId ?? "";
-  const totalCount = userBooks.length;
+  const bookIdSet = new Set(books.map((b) => b.bookId));
+
+  let defaultActiveBookId = "";
+  if (requestedBookId && bookIdSet.has(requestedBookId)) {
+    defaultActiveBookId = requestedBookId;
+  } else if (withProgress[0]) {
+    defaultActiveBookId = withProgress[0].bookId;
+  } else if (withoutProgress[0]) {
+    defaultActiveBookId = withoutProgress[0].bookId;
+  } else {
+    defaultActiveBookId = books[0]?.bookId ?? "";
+  }
 
   return (
     <LibraryClient
       books={books}
-      totals={{ books: totalCount, queries: totalQueries, images: totalImages }}
+      totals={{ books: userBooks.length, queries: totalQueries, images: totalImages }}
       defaultActiveBookId={defaultActiveBookId}
+      viewerRole={viewerRole}
+      initialTab={initialTab}
+      initialQuestion={initialQuestion}
     />
+  );
+}
+
+function LibraryLoadingFallback() {
+  return (
+    <div className="mx-auto max-w-6xl px-4 py-12 text-center text-sm text-text-muted">
+      Loading library…
+    </div>
+  );
+}
+
+export default function LibraryPage(props: LibraryPageProps) {
+  return (
+    <Suspense fallback={<LibraryLoadingFallback />}>
+      <LibraryContent {...props} />
+    </Suspense>
   );
 }

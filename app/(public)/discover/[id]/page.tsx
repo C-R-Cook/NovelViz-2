@@ -162,7 +162,7 @@ export default async function DiscoverBookDetailPage({ params }: PageProps) {
             />
             {session && readerCta ? (
               <Link
-                href={`/reader/${book.id}`}
+                href={`/library?book=${book.id}`}
                 className="inline-flex w-fit rounded-md border border-accent/35 bg-accent-muted px-3 py-2 text-xs font-medium text-text-primary transition hover:border-accent/70 hover:bg-accent-hover/90 sm:px-4 sm:text-sm"
               >
                 {readerCta === "continue" ? "Continue Reading" : "Start Reading"}

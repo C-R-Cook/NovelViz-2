@@ -15,7 +15,7 @@ export default async function ReaderLayout({
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-bg-base text-text-primary antialiased">
       <Nav />
-      <main className="flex-1 pt-14">{children}</main>
+      <main className="flex-1 pt-[calc(3.5rem+0.25rem)]">{children}</main>
     </div>
   );
 }

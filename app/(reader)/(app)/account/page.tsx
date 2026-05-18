@@ -1,7 +1,6 @@
 import { AccountPageClient } from "./account-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getUserUsageSummary } from "@/lib/subscription";
 import { redirect } from "next/navigation";
 
 export default async function AccountPage() {
@@ -35,11 +34,10 @@ export default async function AccountPage() {
     year: "numeric",
   }).format(user.createdAt);
 
-  const [libraryBookCount, queryCount, generatedImageCount, usageSummary] = await Promise.all([
+  const [libraryBookCount, queryCount, generatedImageCount] = await Promise.all([
     prisma.userBook.count({ where: { userId: session.id, isActive: true } }),
     prisma.query.count({ where: { userId: session.id } }),
     prisma.generatedImage.count({ where: { userId: session.id } }),
-    getUserUsageSummary(session.id),
   ]);
 
   return (
@@ -49,7 +47,6 @@ export default async function AccountPage() {
       stats={{ libraryBookCount, queryCount, generatedImageCount }}
       memberSinceLabel={memberSinceLabel}
       isProduction={process.env.NODE_ENV === "production"}
-      usageSummary={usageSummary}
     />
   );
 }

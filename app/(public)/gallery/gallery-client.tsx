@@ -970,7 +970,7 @@ export function GalleryClient(props: GalleryClientProps) {
         return;
       }
       closeModal();
-      if (then === "reader") router.push(`/reader/${bookId}`);
+      if (then === "reader") router.push(`/library?book=${bookId}`);
       else router.refresh();
     } finally {
       setAddLibraryPending(false);
@@ -1481,7 +1481,7 @@ export function GalleryClient(props: GalleryClientProps) {
                               Unlock all {modalActiveImage.bookTitle} images
                             </button>
                             <Link
-                              href={`/reader/${modalActiveImage.bookId}`}
+                              href={`/library?book=${modalActiveImage.bookId}`}
                               onClick={() => closeModal()}
                               className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
                             >

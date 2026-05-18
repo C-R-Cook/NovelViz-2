@@ -1,7 +1,6 @@
 /* Dashboard shell — scoped under .dashboard-root; tokens + Discover-aligned motion */
 
 .dashboard-root {
-  --dashboard-top-h: 54px;
   position: relative;
   isolation: isolate;
   /* Lock shell to the viewport so only `.dashboard-main` scrolls; sidebar stays put. */
@@ -39,52 +38,6 @@
 .dashboard-root .dashboard-sidebar::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--accent) 22%, transparent);
   border-radius: 3px;
-}
-
-/* Top bar */
-.dashboard-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  flex-shrink: 0;
-  height: var(--dashboard-top-h);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0 1.25rem;
-  border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--bg-base) 92%, transparent);
-  backdrop-filter: blur(20px);
-}
-
-.dashboard-brand {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.8125rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--accent) 85%, var(--text-muted));
-}
-
-.dashboard-topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-}
-
-.dashboard-avatar {
-  width: 30px;
-  height: 30px;
-  border-radius: 9999px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: ui-monospace, monospace;
-  font-size: 10px;
-  font-weight: 600;
-  color: color-mix(in srgb, var(--accent) 90%, var(--text-primary));
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
 }
 
 /* Body row */

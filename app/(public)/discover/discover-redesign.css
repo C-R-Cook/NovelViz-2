@@ -481,6 +481,8 @@
 /* ── Concept page (tmp/discover-page.jsx alignment) ───────────────── */
 
 .discover-root--concept {
+  --discover-glow: #8b1a1a;
+  --discover-accent: #c41e3a;
   background: #0a0806;
   color: #f5f0e8;
 }
@@ -759,6 +761,34 @@
   letter-spacing: 0.2em;
   font-size: 10px;
   text-transform: uppercase;
+}
+
+.discover-cta-add-library {
+  border-color: color-mix(in srgb, #22c55e 55%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #22c55e 16%, transparent),
+    color-mix(in srgb, #16a34a 34%, transparent)
+  );
+  color: color-mix(in srgb, #dcfce7 95%, #fff);
+}
+
+.discover-cta-add-library:hover {
+  filter: brightness(1.1);
+}
+
+.discover-cta-in-library {
+  border-color: color-mix(in srgb, #eab308 58%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, #eab308 18%, transparent),
+    color-mix(in srgb, #ca8a04 36%, transparent)
+  );
+  color: color-mix(in srgb, #fef9c3 95%, #fff);
+}
+
+.discover-cta-in-library:hover {
+  filter: brightness(1.1);
 }
 
 .discover-concept-masonry {

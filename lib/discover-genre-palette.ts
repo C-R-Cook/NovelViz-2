@@ -1,5 +1,11 @@
 import type { BookGenre } from "@db";
 
+/** Fixed discover hero / shelf accent (gothic red). */
+export const DISCOVER_DEFAULT_PALETTE = {
+  glow: "#8B1A1A",
+  accent: "#C41E3A",
+} as const;
+
 /** Deep shelf tone + brighter accent for glows / UI (aligned with tmp/discover-page.jsx). */
 export function discoverGenrePalette(genre: BookGenre | null): { glow: string; accent: string } {
   switch (genre) {

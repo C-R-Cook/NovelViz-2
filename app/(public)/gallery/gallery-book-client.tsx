@@ -323,7 +323,7 @@ export function GalleryBookClient({
 
   const bookInLibrary = isLoggedIn && userBookSpoiler !== null;
   const from = searchParams.get("from");
-  const backHref = from === "reader" ? `/reader/${bookId}` : "/gallery";
+  const backHref = from === "reader" || from === "library" ? `/library?book=${bookId}` : "/gallery";
   const backLabel = from === "reader" ? "Back to your book" : "Back to gallery";
 
   useEffect(() => {
@@ -393,7 +393,7 @@ export function GalleryBookClient({
         return;
       }
       dismissModalImage();
-      if (then === "reader") router.push(`/reader/${bookId}`);
+      if (then === "reader") router.push(`/library?book=${bookId}`);
       else router.refresh();
     } finally {
       setAddLibraryPending(false);
@@ -897,7 +897,7 @@ export function GalleryBookClient({
                               Unlock all {modalImage.bookTitle} images
                             </button>
                             <Link
-                              href={`/reader/${modalImage.bookId}`}
+                              href={`/library?book=${modalImage.bookId}`}
                               onClick={() => dismissModalImage()}
                               className="text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
                             >

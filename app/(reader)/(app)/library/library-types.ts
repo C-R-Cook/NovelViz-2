@@ -1,3 +1,15 @@
+export type LibraryChapter = {
+  id: string;
+  sequenceNumber: number;
+  title: string | null;
+};
+
+export type LibraryProgress = {
+  currentChapterId: string;
+  currentChapterNumber: number;
+  updatedAt: string;
+};
+
 export type LibraryBookRow = {
   userBookId: string;
   bookId: string;
@@ -6,7 +18,8 @@ export type LibraryBookRow = {
   genre: string | null;
   coverImageUrl: string | null;
   chapterTotal: number;
-  progress: { currentChapterNumber: number; updatedAt: string } | null;
+  chapters: LibraryChapter[];
+  progress: LibraryProgress | null;
   removedFromCatalogue: boolean;
   queryCount: number;
   imageCount: number;

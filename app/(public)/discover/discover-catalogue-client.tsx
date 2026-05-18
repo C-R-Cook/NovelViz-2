@@ -5,7 +5,7 @@ import "./discover-redesign.css";
 import { BookRequestModal } from "@/components/book-request-modal";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
-import { discoverGenrePalette } from "@/lib/discover-genre-palette";
+import { DISCOVER_DEFAULT_PALETTE } from "@/lib/discover-genre-palette";
 import { GENRE_OPTIONS, formatGenre } from "@/lib/genre";
 import type { BookGenre } from "@db";
 import { MessageCircle } from "lucide-react";
@@ -216,8 +216,6 @@ function ShelfFeaturedCard({
   onSelect: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-  const pal = discoverGenrePalette(book.genre);
-
   const transform = shelfFeaturedCardTransform({
     index,
     isSelected,
@@ -247,7 +245,6 @@ function ShelfFeaturedCard({
       } ${hovered && !isSelected && finePointer ? "discover-shelf-card--hover" : ""} ${reducedMotion ? "discover-shelf-card--reduced-motion" : ""} ${!reducedMotion ? "discover-shelf-card-enter" : ""}`}
       style={{
         ...(!reducedMotion ? { animationDelay: `${index * 50}ms` } : {}),
-        ...({ "--disc-shelf-accent": pal.accent } as CSSProperties),
         transform,
         zIndex,
       }}
@@ -267,7 +264,7 @@ function ShelfFeaturedCard({
         ) : (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center"
-            style={{ background: pal.glow }}
+            style={{ background: DISCOVER_DEFAULT_PALETTE.glow }}
           >
             <div className="mb-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
               {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
@@ -287,7 +284,7 @@ function ShelfFeaturedCard({
         >
           <div
             className="mb-1 font-mono text-[10px] uppercase tracking-[0.15em]"
-            style={{ color: pal.accent }}
+            style={{ color: DISCOVER_DEFAULT_PALETTE.accent }}
           >
             {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
           </div>
@@ -298,8 +295,8 @@ function ShelfFeaturedCard({
         <span
           className="discover-shelf-gem"
           style={{
-            background: pal.accent,
-            boxShadow: `0 0 12px ${pal.accent}`,
+            background: DISCOVER_DEFAULT_PALETTE.accent,
+            boxShadow: `0 0 12px ${DISCOVER_DEFAULT_PALETTE.accent}`,
           }}
           aria-hidden
         >
@@ -660,7 +657,6 @@ export function DiscoverCatalogueClient({
   }, []);
 
   const selectedBook = featured[selectedFeaturedIndex] ?? null;
-  const heroPalette = discoverGenrePalette(selectedBook?.genre ?? null);
 
   const filteredVisionImages = useMemo(() => {
     if (visionsGenre === "all") return visionImages;
@@ -785,14 +781,6 @@ export function DiscoverCatalogueClient({
   return (
     <div
       className={`discover-root min-h-screen pb-20 pt-6 text-text-primary sm:pt-10 ${!searchActive && showFeatured ? "discover-root--concept" : ""}`}
-      style={
-        !searchActive && showFeatured
-          ? ({
-              "--discover-glow": heroPalette.glow,
-              "--discover-accent": heroPalette.accent,
-            } as CSSProperties)
-          : undefined
-      }
     >
       <div className="discover-root-inner mx-auto max-w-7xl px-4 sm:px-6">
         {!searchActive && showFeatured ? (
@@ -894,11 +882,6 @@ export function DiscoverCatalogueClient({
               <div
                 key={selectedBook.id}
                 className="discover-concept-detail mt-2 flex flex-col gap-6 px-2 sm:flex-row sm:items-center sm:px-4"
-                style={
-                  {
-                    "--discover-accent": discoverGenrePalette(selectedBook.genre).accent,
-                  } as CSSProperties
-                }
               >
                 <div className="min-w-0 flex-1">
                   <div className="discover-concept-detail-genre font-mono text-[11px] uppercase tracking-[0.2em]">

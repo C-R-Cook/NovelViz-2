@@ -13,7 +13,6 @@ import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { UsersAdminClient } from "@/app/admin/users/users-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
-import { UsagePeriodPanel } from "@/components/subscription/usage-period-panel";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
 import type { AdminBookRow } from "@/lib/admin-books-list";
@@ -31,7 +30,6 @@ import {
 import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import type { PartnerDashboardBookRow } from "@/lib/partner-books-list";
-import { userInitials } from "@/lib/user-initials";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -143,7 +141,7 @@ export type DashboardClientProps = {
   adminStats: AdminStatsPayload | null;
   account: Pick<
     AccountPageClientProps,
-    "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction" | "usageSummary"
+    "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction"
   >;
 };
 
@@ -354,9 +352,6 @@ export function DashboardClient({
     [router],
   );
 
-  const initials = userInitials(account.user.name ?? reader.displayName, reader.email);
-  const handleLabel = reader.username?.trim() ? `@${reader.username.trim()}` : reader.email;
-
   function renderNavRow(entry: DashboardNavEntry) {
     if (entry.kind === "divider") {
       return <div key={entry.id} className="dashboard-nav-divider" />;
@@ -403,7 +398,7 @@ export function DashboardClient({
     return (
       <Link
         key={b.bookId}
-        href={`/reader/${b.bookId}`}
+        href={`/library?book=${b.bookId}`}
         className={`dashboard-book-row ${opts?.staggerClass ?? "dashboard-stagger-item"} block no-underline`}
         style={delay ? { animationDelay: `${delay}ms` } : undefined}
       >
@@ -472,12 +467,6 @@ export function DashboardClient({
           ) : null}
         </div>
 
-        {account.usageSummary ? (
-          <div className="mt-4">
-            <UsagePeriodPanel initialUsage={account.usageSummary} variant="compact" />
-          </div>
-        ) : null}
-
         {role === "admin" && admin ? (
           <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
             <KpiCard label="Total users" value={admin.totalUsers} sub="Registered" delayMs={reducedMotion ? 0 : 80} />
@@ -511,13 +500,13 @@ export function DashboardClient({
             </div>
             <div className="dashboard-cta-actions">
               <Link
-                href={`/reader/${first.bookId}`}
+                href={`/library?book=${first.bookId}`}
                 className="rounded border border-accent bg-accent px-5 py-2 font-mono text-[8px] font-bold uppercase tracking-widest text-text-primary transition hover:opacity-95"
               >
                 Open reader →
               </Link>
               <Link
-                href={`/reader/${first.bookId}`}
+                href={`/library?book=${first.bookId}`}
                 className="rounded border border-border-subtle px-4 py-2 font-mono text-[8px] uppercase tracking-widest text-text-muted transition hover:border-accent/40 hover:text-text-secondary"
               >
                 Ask question
@@ -816,7 +805,6 @@ export function DashboardClient({
               stats={account.stats}
               memberSinceLabel={account.memberSinceLabel}
               isProduction={account.isProduction}
-              usageSummary={account.usageSummary}
             />
           </div>
         );
@@ -882,19 +870,6 @@ export function DashboardClient({
   return (
     <div className="dashboard-root">
       <div className="dashboard-root-inner">
-        <header className="dashboard-topbar">
-          <span className="dashboard-brand">NovelViz</span>
-          <div className="dashboard-topbar-user">
-            <span className="hidden max-w-[14rem] truncate font-mono text-[8px] tracking-wide text-text-muted sm:inline">
-              {handleLabel}
-            </span>
-            <span className="max-w-[10rem] truncate font-mono text-[8px] tracking-wide text-text-muted sm:hidden">{handleLabel}</span>
-            <div className="dashboard-avatar" aria-hidden>
-              {initials}
-            </div>
-          </div>
-        </header>
-
         <div className="dashboard-body">
           <aside className="dashboard-sidebar">
             <div className="dashboard-sidebar-user">

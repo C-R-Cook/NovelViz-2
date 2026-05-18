@@ -9,7 +9,7 @@ export type CatalogueBook = {
   description: string | null;
   genre: string | null;
   coverImageUrl: string | null;
-  /** When set (e.g. My Library), the card links to `/reader/[id]` instead of the catalogue detail page. */
+  /** When set (e.g. My Library), the card links to `/library?book=[id]` instead of the catalogue detail page. */
   readerAction?: "continue" | "start";
   /**
    * My Library: book status is no longer publicly listed (`unlisted`).
@@ -36,7 +36,7 @@ export function BookCardGrid({ books, layout = "grid" }: Props) {
       }
     >
       {books.map((book) => {
-        const primaryHref = book.readerAction ? `/reader/${book.id}` : `/discover/${book.id}`;
+        const primaryHref = book.readerAction ? `/library?book=${book.id}` : `/discover/${book.id}`;
         const shelvedUnavailable = Boolean(book.removedFromCatalogue);
         const hoverCardClass =
           shelvedUnavailable

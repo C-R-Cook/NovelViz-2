@@ -1,6 +1,7 @@
 "use client";
 
 import { NotificationsBell } from "@/components/notifications-bell";
+import { DEV_USER_COOKIE } from "@/lib/dev-users";
 import { useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -36,17 +37,25 @@ function NavUserMenu({
   menuPrimaryLabel,
   menuSecondaryLabel,
   isProduction,
-  onNavigate,
 }: {
   initials: string;
   menuPrimaryLabel: string;
   menuSecondaryLabel: string | null;
   isProduction: boolean;
-  onNavigate: () => void;
 }) {
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  async function handleSignOut() {
+    setOpen(false);
+    if (isProduction) {
+      await signOut({ redirectUrl: "/" });
+      return;
+    }
+    document.cookie = `${DEV_USER_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+    window.location.href = "/";
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -82,49 +91,14 @@ function NavUserMenu({
               <p className="truncate text-xs text-text-muted">{menuSecondaryLabel}</p>
             ) : null}
           </div>
-          <Link
-            href="/account"
-            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
+          <button
+            type="button"
+            className="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-raised"
             role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onNavigate();
-            }}
+            onClick={() => void handleSignOut()}
           >
-            My Account
-          </Link>
-          <Link
-            href="/dashboard"
-            className="block px-3 py-2 text-sm text-text-primary hover:bg-bg-raised"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onNavigate();
-            }}
-          >
-            Dashboard
-          </Link>
-          <div className="my-1 border-t border-border-subtle" role="separator" />
-          {isProduction ? (
-            <button
-              type="button"
-              className="block w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-raised"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                void signOut({ redirectUrl: "/" });
-              }}
-            >
-              Sign Out
-            </button>
-          ) : (
-            <p className="px-3 py-2 text-xs leading-relaxed text-text-muted">
-              Dev user: <span className="text-text-secondary">{menuPrimaryLabel}</span>
-              <span className="mt-1 block text-[11px] text-text-muted">
-                Use the role switcher to change identity. Production builds show Sign out here.
-              </span>
-            </p>
-          )}
+            Sign out
+          </button>
         </div>
       ) : null}
     </div>
@@ -235,7 +209,6 @@ export function NavChrome({
                 menuPrimaryLabel={menuPrimaryLabel}
                 menuSecondaryLabel={menuSecondaryLabel}
                 isProduction={isProduction}
-                onNavigate={() => setMenuOpen(false)}
               />
             </>
           ) : (

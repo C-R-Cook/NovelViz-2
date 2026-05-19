@@ -1,0 +1,488 @@
+"use client";
+
+import { DiscoverParticleField } from "@/components/discover-particle-field";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+const MARQUEE_TITLES = [
+  "Dracula",
+  "Jane Eyre",
+  "Frankenstein",
+  "Alice in Wonderland",
+  "Moby Dick",
+  "Pride & Prejudice",
+  "The Picture of Dorian Gray",
+  "Wuthering Heights",
+  "The Wizard of Oz",
+  "Treasure Island",
+];
+
+const GALLERY = [
+  {
+    src: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&h=650&fit=crop",
+    book: "Dracula",
+    chapter: 7,
+    prompt: "Count Dracula descending the moonlit staircase",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=380&fit=crop",
+    book: "Jane Eyre",
+    chapter: 14,
+    prompt: "Thornfield Hall shrouded in winter mist",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=500&h=600&fit=crop",
+    book: "Alice in Wonderland",
+    chapter: 4,
+    prompt: "Alice tumbling through the endless rabbit hole",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=500&h=420&fit=crop",
+    book: "Frankenstein",
+    chapter: 12,
+    prompt: "The creature silhouetted in a storm",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1566127992631-137a642a90f4?w=500&h=560&fit=crop",
+    book: "Pride & Prejudice",
+    chapter: 5,
+    prompt: "Pemberley estate at golden hour",
+  },
+  {
+    src: "https://images.unsplash.com/photo-1519638399535-1b036603ac77?w=500&h=340&fit=crop",
+    book: "Dracula",
+    chapter: 3,
+    prompt: "Mina writing in her journal by candlelight",
+  },
+];
+
+const PRIMARY_FEATURES = [
+  {
+    icon: "🔒",
+    title: "Spoiler-Free Q&A",
+    body: "Ask anything about plot, themes, characters, or writing style. Your AI companion answers only from chapters you've already read.",
+  },
+  {
+    icon: "◻",
+    title: "Chapter-Gated Images",
+    body: "Generate illustrations from scenes you've encountered. Each image is locked to your current chapter — you'll never see a character before they appear.",
+  },
+  {
+    icon: "◈",
+    title: "Community Gallery",
+    body: "Browse images created by other readers — gated to protect you from seeing scenes beyond your progress. Your spoiler settings travel with you.",
+  },
+];
+
+const SECONDARY_FEATURES = [
+  [
+    "Public Domain Library",
+    "Every book in our catalogue is from Project Gutenberg — no licensing, no fees, no gatekeeping. Just great literature.",
+  ],
+  [
+    "Progress Tracking",
+    "Your AI knows exactly where you are. Declare your chapter and everything adapts — Q&A, images, gallery visibility.",
+  ],
+  [
+    "Spoiler Protection Controls",
+    "Global protection, per-book overrides, and session unlocks. You decide exactly what you're willing to see.",
+  ],
+] as const;
+
+const STEPS = [
+  {
+    number: "01",
+    title: "Add a book to your library",
+    body: "Browse our public domain catalogue — Dracula, Jane Eyre, Frankenstein, and dozens more. Declare which books you own. No in-app reading required.",
+  },
+  {
+    number: "02",
+    title: "Track your reading progress",
+    body: "Tell NovelViz which chapter you're on. This is the only number that matters — it gates everything your AI companion is allowed to know.",
+  },
+  {
+    number: "03",
+    title: "Ask anything. Generate anything.",
+    body: "Chat with your AI companion about plot, themes, characters. Generate images of scenes you've encountered. Every interaction is sealed to your current chapter.",
+  },
+] as const;
+
+function useReveal(threshold = 0.15) {
+  const ref = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      setVisible(true);
+      return;
+    }
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+
+  return { ref, visible };
+}
+
+function useReducedMotion() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  return reducedMotion;
+}
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div className="landing-section-label">
+      <div className="landing-section-label-line" aria-hidden />
+      <span className="landing-section-label-text">{label}</span>
+      <div className="landing-section-label-line landing-section-label-line--grow" aria-hidden />
+    </div>
+  );
+}
+
+function GemDivider() {
+  return (
+    <div className="landing-gem" aria-hidden>
+      <div className="landing-gem-line" />
+      <span className="landing-gem-icon">✦</span>
+      <div className="landing-gem-line" />
+    </div>
+  );
+}
+
+type LandingClientProps = {
+  isLoggedIn: boolean;
+};
+
+export function LandingClient({ isLoggedIn }: LandingClientProps) {
+  const reducedMotion = useReducedMotion();
+  const [heroIn, setHeroIn] = useState(reducedMotion);
+  const [email, setEmail] = useState("");
+  const [joined, setJoined] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
+
+  const problem = useReveal();
+  const how = useReveal();
+  const features = useReveal();
+  const gallery = useReveal();
+  const cta = useReveal();
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setHeroIn(true);
+      return;
+    }
+    const t = window.setTimeout(() => setHeroIn(true), 100);
+    return () => window.clearTimeout(t);
+  }, [reducedMotion]);
+
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 40);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToSection = useCallback(
+    (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+    },
+    [reducedMotion],
+  );
+
+  const handleJoin = () => {
+    if (!email.trim()) return;
+    setJoined(true);
+  };
+
+  const startHref = isLoggedIn ? "/library" : "/register";
+  const marqueeItems = [...MARQUEE_TITLES, ...MARQUEE_TITLES];
+
+  return (
+    <div className="landing-root">
+      <div className="landing-glow" aria-hidden />
+
+      <nav
+        className={`landing-nav${navScrolled ? " landing-nav--scrolled" : ""}`}
+        aria-label="Landing"
+      >
+        <Link href="/" className="landing-nav-brand">
+          <div className="landing-nav-logo" aria-hidden>
+            📖
+          </div>
+          <span className="landing-nav-wordmark">NOVELVIZ</span>
+        </Link>
+
+        <div className="landing-nav-links">
+          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("how-it-works")}>
+            How it works
+          </button>
+          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("features")}>
+            Features
+          </button>
+          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("gallery")}>
+            Gallery
+          </button>
+        </div>
+
+        <button type="button" className="landing-nav-cta" onClick={() => scrollToSection("beta")}>
+          Join Beta →
+        </button>
+      </nav>
+
+      <section className={`landing-hero${heroIn ? " landing-hero-in" : ""}`}>
+        {!reducedMotion ? (
+          <DiscoverParticleField count={65} opacity={0.4} linkDistance={90} />
+        ) : null}
+
+        <p className="landing-eyebrow">Public Domain · AI Companion · Spoiler-Free</p>
+
+        <h1 className="landing-hero-title">
+          Every Chapter,
+          <br />
+          Alive.
+        </h1>
+
+        <p className="landing-hero-sub">
+          An AI reading companion that knows only what you&apos;ve read. Ask questions, generate images —
+          completely spoiler-free.
+        </p>
+
+        <div className="landing-hero-ctas">
+          <Link href={startHref} className="landing-btn-primary">
+            {isLoggedIn ? "Go to My Library →" : "Start Reading Free →"}
+          </Link>
+          <Link href="/books" className="landing-btn-secondary">
+            Browse Books
+          </Link>
+        </div>
+
+        <div className="landing-scroll-cue" aria-hidden>
+          <span className="landing-scroll-label">Scroll</span>
+          <div className="landing-scroll-line" />
+        </div>
+      </section>
+
+      <div className="landing-marquee-wrap" aria-hidden>
+        <div className="landing-marquee-track">
+          {marqueeItems.map((title, i) => (
+            <span key={`${title}-${i}`} className="landing-marquee-item">
+              {title}
+              <span className="landing-marquee-gem">✦</span>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <section
+        ref={problem.ref}
+        className={`landing-section landing-section--narrow landing-reveal${problem.visible ? " landing-reveal--visible" : ""}`}
+      >
+        <p className="landing-problem-kicker">The Problem</p>
+        <blockquote className="landing-blockquote">
+          &ldquo;AI assistants are useful for reading — until they casually mention how the story ends.&rdquo;
+        </blockquote>
+        <p className="landing-body-italic">
+          Every other reading AI uses its full knowledge of a book to answer your questions. NovelViz knows
+          only what you&apos;ve read so far. Nothing beyond your current chapter ever enters the conversation.
+        </p>
+      </section>
+
+      <GemDivider />
+
+      <section id="how-it-works" ref={how.ref} className="landing-section">
+        <SectionLabel label="How it works" />
+        <div className="landing-how-grid">
+          <div className="landing-steps">
+            {STEPS.map((step, i) => (
+              <div
+                key={step.number}
+                className={`landing-step${how.visible ? " landing-step--visible" : ""}`}
+                style={how.visible ? { transitionDelay: `${i * 100}ms` } : undefined}
+              >
+                <div className="landing-step-num">{step.number}</div>
+                <div>
+                  <h3 className="landing-step-title">{step.title}</h3>
+                  <p className="landing-body-italic">{step.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={`landing-mock-panel${how.visible ? " landing-mock-panel--visible" : ""}`}>
+            <div className="landing-mock-card">
+              <div className="landing-mock-header">
+                <div className="landing-mock-dot" aria-hidden />
+                <span className="landing-mock-header-label">Dracula · Chapter 7 of 27</span>
+              </div>
+              <div className="landing-mock-body">
+                <div className="landing-bubble-user">
+                  <div className="landing-bubble-user-inner">
+                    &ldquo;Why does the Count react so strongly to the crucifix?&rdquo;
+                  </div>
+                </div>
+                <div className="landing-bubble-ai">
+                  <div className="landing-bubble-avatar" aria-hidden>
+                    📖
+                  </div>
+                  <div className="landing-bubble-ai-inner">
+                    &ldquo;Stoker uses the crucifix as an emblem of sanctified power — a threshold the Count
+                    cannot cross. Harker first encounters this in Chapter 3 when he reflexively raises his
+                    rosary...&rdquo;
+                  </div>
+                </div>
+                <div className="landing-spoiler-guard">
+                  <span aria-hidden>🔒</span>
+                  <span className="landing-spoiler-guard-text">Response sealed to Chapter 7 — no spoilers</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <GemDivider />
+
+      <section id="features" ref={features.ref} className="landing-section">
+        <SectionLabel label="Features" />
+        <div className="landing-features-grid">
+          {PRIMARY_FEATURES.map((feat, i) => (
+            <article
+              key={feat.title}
+              className={`landing-feature-card${features.visible ? " landing-feature-card--visible" : ""}`}
+              style={features.visible ? { transitionDelay: `${i * 100}ms` } : undefined}
+            >
+              <div className="landing-feature-icon" aria-hidden>
+                {feat.icon}
+              </div>
+              <h3 className="landing-feature-title">{feat.title}</h3>
+              <p className="landing-feature-body">{feat.body}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className="landing-features-grid landing-features-grid--secondary">
+          {SECONDARY_FEATURES.map(([title, body], i) => (
+            <div
+              key={title}
+              className={`landing-feature-secondary${features.visible ? " landing-feature-secondary--visible" : ""}`}
+              style={features.visible ? { transitionDelay: `${300 + i * 80}ms` } : undefined}
+            >
+              <h4 className="landing-feature-secondary-title">{title}</h4>
+              <p className="landing-feature-secondary-body">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <GemDivider />
+
+      <section id="gallery" ref={gallery.ref} className="landing-section">
+        <SectionLabel label="Community Gallery" />
+        <div className="landing-gallery-intro">
+          <h2>Your story, illustrated.</h2>
+          <p className="landing-body-italic">
+            Readers generate images from the chapters they&apos;ve read. Browse the community gallery — your
+            spoiler settings mean you only see scenes you&apos;ve already encountered.
+          </p>
+        </div>
+
+        <div className="landing-gallery-masonry">
+          {GALLERY.map((item, i) => (
+            <div
+              key={`${item.book}-${item.chapter}`}
+              className={`landing-gallery-item${gallery.visible ? " landing-gallery-item--visible" : ""}`}
+              style={gallery.visible ? { transitionDelay: `${i * 70}ms` } : undefined}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={item.src} alt={item.prompt} loading="lazy" />
+              <div className="landing-gallery-overlay" aria-hidden />
+              <div className="landing-gallery-caption">
+                <div className="landing-gallery-meta">
+                  {item.book} · Ch. {item.chapter}
+                </div>
+                <div className="landing-gallery-prompt">{item.prompt}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="landing-gallery-cta-wrap">
+          <Link href="/gallery" className="landing-btn-secondary">
+            Explore All Images →
+          </Link>
+        </div>
+      </section>
+
+      <section id="beta" ref={cta.ref} className="landing-section landing-beta-section">
+        <div className={`landing-beta-card${cta.visible ? " landing-beta-card--visible" : ""}`}>
+          {!reducedMotion ? <DiscoverParticleField count={35} opacity={0.3} linkDistance={90} /> : null}
+          <div className="landing-beta-inner">
+            <p className="landing-beta-kicker">Now in Beta</p>
+            <h2 className="landing-beta-title">Read without fear.</h2>
+            <p className="landing-beta-sub">
+              Join a small group of readers helping shape NovelViz. Free during beta. No credit card.
+            </p>
+
+            {joined ? (
+              <p className="landing-beta-success">✦ You&apos;re on the list. We&apos;ll be in touch.</p>
+            ) : (
+              <div className="landing-beta-form">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
+                  placeholder="your@email.com"
+                  className="landing-beta-input"
+                  aria-label="Email for beta access"
+                />
+                <button type="button" className="landing-btn-primary" onClick={handleJoin}>
+                  Join →
+                </button>
+              </div>
+            )}
+
+            <p className="landing-beta-fine">Free to use · Public domain books · No credit card</p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
+        <div className="landing-footer-brand">
+          <span className="landing-footer-wordmark">NOVELVIZ</span>
+          <span className="landing-footer-copy">© 2026</span>
+        </div>
+        <nav className="landing-footer-links" aria-label="Footer">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/contact">Contact</Link>
+        </nav>
+        <p className="landing-footer-tagline">Built for readers, by a reader.</p>
+      </footer>
+    </div>
+  );
+}

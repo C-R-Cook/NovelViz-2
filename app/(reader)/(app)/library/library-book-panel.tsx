@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
+import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { formatLimitReachedMessage } from "@/components/subscription/usage-period-panel";
@@ -31,6 +32,7 @@ export type ImageHistoryItem = {
   fullPrompt: string;
   imageUrl: string;
   isPublic: boolean;
+  isFeatured: boolean;
   chapterNumberAtTime: number;
   createdAt: string;
 };
@@ -248,7 +250,14 @@ export function LibraryBookPanel({
         setImageHistory([]);
         return;
       }
-      setImageHistory(Array.isArray(data.images) ? data.images : []);
+      setImageHistory(
+        Array.isArray(data.images)
+          ? data.images.map((img) => ({
+              ...img,
+              isFeatured: img.isFeatured ?? false,
+            }))
+          : [],
+      );
     } catch {
       setImageHistoryError("Network error");
       setImageHistory([]);
@@ -316,6 +325,7 @@ export function LibraryBookPanel({
           fullPrompt,
           imageUrl: data.imageUrl,
           isPublic: false,
+          isFeatured: false,
           chapterNumberAtTime: chapterNumber,
           createdAt: new Date().toISOString(),
         });
@@ -755,6 +765,23 @@ export function LibraryBookPanel({
                       ? "This image is currently visible in the community gallery."
                       : "Share this image with the NovelViz community."}
                   </p>
+                  <AdminFeaturedImageToggle
+                    show={viewerRole === "admin"}
+                    imageId={selectedHistoryImage.id}
+                    isFeatured={selectedHistoryImage.isFeatured}
+                    disabled={selectedHistoryImage.id.startsWith("temp-")}
+                    className="mt-2"
+                    onFeaturedChange={(next) => {
+                      setImageHistory((rows) =>
+                        rows.map((row) =>
+                          row.id === selectedHistoryImage.id ? { ...row, isFeatured: next } : row,
+                        ),
+                      );
+                      setSelectedHistoryImage((cur) =>
+                        cur && cur.id === selectedHistoryImage.id ? { ...cur, isFeatured: next } : cur,
+                      );
+                    }}
+                  />
                 </div>
 
                 <div className="rounded-md border border-border bg-bg-base/60 px-3 py-2">

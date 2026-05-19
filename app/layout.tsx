@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
-import { PublicFooter } from "@/components/public-footer";
+import { ConditionalPublicFooter } from "@/components/conditional-public-footer";
 import { THEME_HYDRATION_SCRIPT } from "@/lib/theme-hydration-script";
 import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
@@ -33,7 +33,7 @@ export default async function RootLayout({
           <div className="app-atmosphere flex min-h-0 flex-1 flex-col">
             <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
             <div className="relative z-[1] shrink-0">
-              <PublicFooter />
+              <ConditionalPublicFooter />
             </div>
           </div>
           {isDev ? (

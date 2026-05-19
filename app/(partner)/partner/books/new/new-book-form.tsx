@@ -20,6 +20,11 @@ export function NewPartnerBookForm() {
   const [metadataErr, setMetadataErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    title: string;
+    author: string;
+    status: string;
+  } | null>(null);
 
   async function prefillFromEpub(file: File) {
     if (!file.name.toLowerCase().endsWith(".epub")) return;
@@ -74,8 +79,7 @@ export function NewPartnerBookForm() {
     void prefillFromEpub(ingestFile);
   }, [applyEpubMetadata, ingestFile]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submitBook(confirmDuplicate: boolean) {
     setError(null);
     setSubmitting(true);
     try {
@@ -100,15 +104,24 @@ export function NewPartnerBookForm() {
           genre: genre === "" ? null : genre,
           publishedYear: py,
           description: description.trim() === "" ? null : description.trim(),
+          ...(confirmDuplicate ? { confirmDuplicate: true } : {}),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         book?: { id: string };
+        duplicateWarning?: boolean;
+        existingBook?: { title: string; author: string; status: string };
+        message?: string;
       };
+      if (res.ok && data.duplicateWarning && data.existingBook) {
+        setDuplicateWarning(data.existingBook);
+        return;
+      }
       if (!res.ok || !data.book) {
         throw new Error(data.error || res.statusText);
       }
+      setDuplicateWarning(null);
 
       if (ingestFile) {
         const fd = new FormData();
@@ -145,6 +158,11 @@ export function NewPartnerBookForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    void submitBook(false);
   }
 
   return (
@@ -251,10 +269,43 @@ export function NewPartnerBookForm() {
           <p className="text-xs text-error">{metadataErr}</p>
         ) : null}
       </div>
+      {duplicateWarning ? (
+        <div
+          className="rounded-lg border border-[#C49A3C]/40 bg-[#C49A3C]/10 p-4 space-y-3"
+          role="alert"
+        >
+          <p className="text-sm text-[#C49A3C]">
+            A book with this title and author already exists in the catalogue. Are you sure you
+            want to add it?
+          </p>
+          <p className="text-xs text-text-secondary">
+            Existing: <span className="text-text-primary">{duplicateWarning.title}</span> by{" "}
+            <span className="text-text-primary">{duplicateWarning.author}</span> (status:{" "}
+            {duplicateWarning.status})
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setDuplicateWarning(null)}
+              className="rounded-lg border border-border bg-bg-surface px-3 py-1.5 text-sm text-text-primary transition hover:bg-bg-raised"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => void submitBook(true)}
+              disabled={submitting}
+              className="rounded-lg bg-[#C49A3C]/20 px-3 py-1.5 text-sm font-medium text-[#C49A3C] ring-1 ring-[#C49A3C]/40 transition hover:bg-[#C49A3C]/30 disabled:opacity-50"
+            >
+              Add anyway
+            </button>
+          </div>
+        </div>
+      ) : null}
       {error ? <p className="text-sm text-error">{error}</p> : null}
       <button
         type="submit"
-        disabled={submitting || extractingMetadata}
+        disabled={submitting || extractingMetadata || duplicateWarning !== null}
         className="rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
       >
         {submitting ? "Creating..." : "Create Book"}

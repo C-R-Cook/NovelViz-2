@@ -8,11 +8,12 @@ import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, us
 import "./gallery-redesign.css";
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
 import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
+import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
-import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
+import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
 import { HelpCircle, LockKeyholeOpen, MessageCircle, Star } from "lucide-react";
 import type { SpoilerProtection } from "@db";
@@ -31,6 +32,7 @@ export type GalleryImageCard = {
   likedByViewer: boolean;
   /** Count of VISIBLE comments (server aggregate). */
   commentCount: number;
+  isFeatured: boolean;
   bookId: string;
   bookTitle: string;
   bookAuthor: string;
@@ -733,13 +735,19 @@ export function GalleryClient(props: GalleryClientProps) {
       const bookSpoiler = spoilerSettingsByBookId[image.bookId] ?? "INHERIT";
       const globalForSession = gallerySessionRevealAll ? false : true;
       const mode = effectiveChapterGateMode(bookSpoiler, globalForSession);
-      const behind = isChapterBehindLock(mode, image.currentChapterNumber, image.chapterNumberAtTime);
+      const behind = isGalleryImageChapterLocked({
+        viewerUserId,
+        imageUserId: image.userId,
+        mode,
+        currentChapter: image.currentChapterNumber,
+        imageChapter: image.chapterNumberAtTime,
+      });
       if (!behind) return { locked: false, lockKind: "none" };
       const lockKind: GalleryLockKind =
         image.currentChapterNumber === undefined ? "unstarted" : "chapter";
       return { locked: true, lockKind };
     },
-    [spoilerSettingsByBookId, gallerySessionRevealAll],
+    [spoilerSettingsByBookId, gallerySessionRevealAll, viewerUserId],
   );
 
   const isImageLocked = useCallback(
@@ -1410,6 +1418,18 @@ export function GalleryClient(props: GalleryClientProps) {
                               : "Make public"}
                         </button>
                       ) : null}
+                      <AdminFeaturedImageToggle
+                        show={isAdmin}
+                        imageId={modalActiveImage.id}
+                        isFeatured={modalActiveImage.isFeatured}
+                        onFeaturedChange={(next) => {
+                          setImagesById((prev) => {
+                            const img = prev[modalActiveImage.id];
+                            if (!img) return prev;
+                            return { ...prev, [modalActiveImage.id]: { ...img, isFeatured: next } };
+                          });
+                        }}
+                      />
                       <Link
                         href={`/gallery/${modalActiveImage.bookId}?from=gallery`}
                         onClick={() => closeModal()}

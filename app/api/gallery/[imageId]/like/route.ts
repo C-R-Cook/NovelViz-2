@@ -38,6 +38,7 @@ export async function POST(request: Request, context: RouteContext) {
     isAdmin,
     bookId: existing.bookId,
     chapterNumberAtTime: existing.chapterNumberAtTime,
+    imageOwnerUserId: existing.userId,
     sessionBrowsingUnlockedBookIds,
   });
   if (locked) {

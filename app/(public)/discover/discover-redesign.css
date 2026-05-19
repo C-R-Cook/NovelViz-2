@@ -700,8 +700,8 @@
 
 .discover-shelf-gem {
   position: absolute;
-  top: -8px;
-  right: -8px;
+  top: 8px;
+  right: 8px;
   z-index: 5;
   display: flex;
   width: 20px;

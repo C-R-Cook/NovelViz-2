@@ -29,6 +29,7 @@ export async function queryAdminFlaggedCommentsQueue(take = 80): Promise<AdminFl
         select: {
           id: true,
           imageUrl: true,
+          isFeatured: true,
           userPrompt: true,
           chapterNumberAtTime: true,
           book: {
@@ -46,6 +47,7 @@ export async function queryAdminFlaggedCommentsQueue(take = 80): Promise<AdminFl
     username: row.user.username ?? row.user.name ?? "Reader",
     imageId: row.image.id,
     imageUrl: row.image.imageUrl,
+    imageIsFeatured: row.image.isFeatured,
     userPrompt: row.image.userPrompt,
     chapterNumberAtTime: row.image.chapterNumberAtTime,
     bookId: row.image.book.id,

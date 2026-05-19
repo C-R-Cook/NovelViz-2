@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  formatEpubSize,
+  ingestSkipReasonLabel,
+} from "@/scripts/lib/gutenberg-queue-flags";
 import type { GutenbergQueueFile, QueueEntry } from "@/scripts/lib/gutenberg-types";
 
 type QueueState =
@@ -42,11 +46,15 @@ function BookRow({
   checked,
   onChange,
   readOnly,
+  onClearManualUpload,
+  clearingManual,
 }: {
   entry: QueueEntry;
   checked: boolean;
   onChange?: (checked: boolean) => void;
   readOnly?: boolean;
+  onClearManualUpload?: () => void;
+  clearingManual?: boolean;
 }) {
   const tags = [...entry.subjects, ...entry.bookshelves].slice(0, 3);
   const extra = entry.subjects.length + entry.bookshelves.length - tags.length;
@@ -88,6 +96,32 @@ function BookRow({
         {entry.rejectReason ? (
           <span className="ml-2 text-xs text-text-muted">Rejected: {entry.rejectReason}</span>
         ) : null}
+        {entry.manualUploadRequired || entry.skipAutoIngest ? (
+          <span className="ml-2 inline-flex flex-wrap items-center gap-2">
+            <span className="rounded bg-[#8B4513]/20 px-1.5 py-0.5 text-[10px] uppercase text-[#E8A87C]">
+              Manual EPUB
+              {entry.epubSizeBytes ? ` · ${formatEpubSize(entry.epubSizeBytes)}` : ""}
+            </span>
+            {entry.ingestSkipReason ? (
+              <span className="text-[10px] text-text-muted">
+                {ingestSkipReasonLabel(entry.ingestSkipReason)}
+              </span>
+            ) : null}
+            {onClearManualUpload ? (
+              <button
+                type="button"
+                disabled={clearingManual}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onClearManualUpload();
+                }}
+                className="text-[10px] underline text-text-secondary hover:text-text-primary disabled:opacity-50"
+              >
+                {clearingManual ? "Clearing…" : "Clear flag (after manual ingest)"}
+              </button>
+            ) : null}
+          </span>
+        ) : null}
         <span className="mt-1 block text-xs text-text-muted">
           {tags.join(" · ")}
           {extra > 0 ? ` · +${extra} more` : ""}
@@ -103,6 +137,7 @@ export function GutenbergImportClient() {
   const [rejectedExpanded, setRejectedExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [clearingId, setClearingId] = useState<number | null>(null);
 
   const loadQueue = useCallback(async () => {
     setState({ status: "loading" });
@@ -142,25 +177,55 @@ export function GutenbergImportClient() {
 
   const byFilter = useMemo(() => {
     if (state.status !== "ready") {
-      return { accepted: [] as QueueEntry[], review: [] as QueueEntry[], rejected: [] as QueueEntry[] };
+      return {
+        accepted: [] as QueueEntry[],
+        review: [] as QueueEntry[],
+        rejected: [] as QueueEntry[],
+        manualUpload: [] as QueueEntry[],
+      };
     }
     const accepted: QueueEntry[] = [];
     const review: QueueEntry[] = [];
     const rejected: QueueEntry[] = [];
+    const manualUpload: QueueEntry[] = [];
     for (const e of state.entries) {
+      if (e.manualUploadRequired || e.skipAutoIngest) {
+        manualUpload.push(e);
+      }
       if (e.filterResult === "accepted") accepted.push(e);
       else if (e.filterResult === "review") review.push(e);
       else rejected.push(e);
     }
-    return { accepted, review, rejected };
+    return { accepted, review, rejected, manualUpload };
   }, [state]);
+
+  async function clearManualUploadFlag(gutenbergId: number) {
+    setClearingId(gutenbergId);
+    setSaveMessage(null);
+    try {
+      const res = await fetch("/api/admin/gutenberg-queue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ updates: [{ gutenbergId, clearManualUpload: true }] }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      await loadQueue();
+      setSaveMessage(`Cleared manual-upload flag for gutenbergId ${gutenbergId}.`);
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Clear flag failed");
+    } finally {
+      setClearingId(null);
+    }
+  }
 
   const queuedCount = useMemo(() => {
     if (state.status !== "ready") return 0;
     return state.entries.filter(
       (e) =>
         (e.filterResult === "accepted" || e.filterResult === "review") &&
-        checked[e.gutenbergId] === true,
+        checked[e.gutenbergId] === true &&
+        !e.skipAutoIngest,
     ).length;
   }, [state, checked]);
 
@@ -233,6 +298,34 @@ export function GutenbergImportClient() {
           before they appear on Discover (requires a cover image).
         </p>
       </div>
+
+      {byFilter.manualUpload.length > 0 ? (
+        <section className="rounded-lg border border-[#8B4513]/40 bg-[#8B4513]/10 p-4">
+          <SectionHeader title="Manual upload required" count={byFilter.manualUpload.length} expanded />
+          <p className="mt-2 text-xs text-text-secondary">
+            These EPUBs exceeded the 4.5 MB ingest cap. Upload the EPUB manually via{" "}
+            <a href="/admin/books" className="underline text-text-primary">
+              Books admin
+            </a>{" "}
+            (use the same title and set <code className="text-text-primary">gutenbergId</code> in the DB if
+            needed), then clear the flag here so bulk ingest will not retry them on{" "}
+            <code className="text-text-primary">--resume</code> / <code className="text-text-primary">--limit</code>
+            .
+          </p>
+          <div className="mt-1">
+            {byFilter.manualUpload.map((e) => (
+              <BookRow
+                key={`manual-${e.gutenbergId}`}
+                entry={e}
+                checked={false}
+                readOnly
+                onClearManualUpload={() => void clearManualUploadFlag(e.gutenbergId)}
+                clearingManual={clearingId === e.gutenbergId}
+              />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <SectionHeader title="Accepted" count={byFilter.accepted.length} expanded />

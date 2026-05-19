@@ -731,15 +731,41 @@ export function DashboardClient({
       <div className="dashboard-adminstats-shell space-y-8">
         <section aria-labelledby="dashboard-admin-tools">
           <SectionLabel label="Tools" />
-          <p className="text-sm text-text-secondary">
-            <Link href="/admin/t2i-tester" className="font-medium text-accent-text underline-offset-2 hover:underline">
-              T2I Tester
-            </Link>
-            <span className="text-text-muted">
-              {" "}
-              — fal.ai model comparison; saves JPEGs under server folder t2i-output/ (not the gallery).
-            </span>
-          </p>
+          <ul className="space-y-2 text-sm text-text-secondary">
+            <li>
+              <Link
+                href="/admin/data-flows"
+                className="font-medium text-accent-text underline-offset-2 hover:underline"
+              >
+                Data flows
+              </Link>
+              <span className="text-text-muted">
+                {" "}
+                — flowcharts for book ingest, Imagine, and Q&amp;A / comments.
+              </span>
+            </li>
+            <li>
+              <Link
+                href="/admin/gutenberg-import"
+                className="font-medium text-accent-text underline-offset-2 hover:underline"
+              >
+                Gutenberg import
+              </Link>
+              <span className="text-text-muted"> — discovery queue and approvals.</span>
+            </li>
+            <li>
+              <Link
+                href="/admin/t2i-tester"
+                className="font-medium text-accent-text underline-offset-2 hover:underline"
+              >
+                T2I Tester
+              </Link>
+              <span className="text-text-muted">
+                {" "}
+                — fal.ai model comparison; saves JPEGs under t2i-output/ (not the gallery).
+              </span>
+            </li>
+          </ul>
         </section>
 
         <section aria-labelledby="dashboard-admin-quick-stats">

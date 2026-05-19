@@ -857,6 +857,16 @@ export async function extractEpubCover(
   return buf && buf.length > 0 ? buf : null;
 }
 
+/** Cover bytes from a Gutenberg/partner EPUB buffer, or null if none in the package. */
+export async function extractEpubCoverFromBuffer(buffer: Buffer): Promise<Buffer | null> {
+  try {
+    const { zip, opfXml, opfDir } = await openEpubPackage(buffer);
+    return await extractEpubCover(zip, opfXml, opfDir);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Parse an EPUB buffer: spine order, HTML stripped to plain text, short sections dropped.
  */

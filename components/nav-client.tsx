@@ -163,13 +163,22 @@ export function NavChrome({
         </Link>
       ) : null}
       {isLoggedIn && userRole === "admin" ? (
-        <Link
-          href="/admin/t2i-tester"
-          className={navLinkClass(isActive(pathname, "/admin/t2i-tester"))}
-          onClick={() => setMenuOpen(false)}
-        >
-          T2I tester
-        </Link>
+        <>
+          <Link
+            href="/admin/data-flows"
+            className={navLinkClass(isActive(pathname, "/admin/data-flows"))}
+            onClick={() => setMenuOpen(false)}
+          >
+            Data flows
+          </Link>
+          <Link
+            href="/admin/t2i-tester"
+            className={navLinkClass(isActive(pathname, "/admin/t2i-tester"))}
+            onClick={() => setMenuOpen(false)}
+          >
+            T2I tester
+          </Link>
+        </>
       ) : null}
     </>
   );

@@ -4,22 +4,30 @@
  * GUTENBERG_ADMIN_USER_ID — DB id of admin user (ownerId for imported books).
  * Find with: SELECT id FROM "User" WHERE role = 'admin' LIMIT 1;
  */
-import "dotenv/config";
+import "./lib/load-env";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import cloudinary from "@/lib/cloudinary";
 import {
   OPENAI_EMBEDDING_USD_PER_M,
   OPENAI_GPT4O_MINI_USD_PER_M_INPUT,
   OPENAI_GPT4O_MINI_USD_PER_M_OUTPUT,
 } from "@/lib/costs";
-import { chunkText, embedChunks, processBook } from "@/lib/ingestion";
-import { fetchOpenLibraryMetadata } from "@/lib/open-library";
+import { chunkText, embedChunks, extractEpubCoverFromBuffer, processBook } from "@/lib/ingestion";
+import { resolveGutenbergBookEnrichment } from "@/lib/open-library-cover";
 import { prisma } from "@/lib/prisma";
 import { BookStatus, Prisma, UserRole } from "@db";
 import { QUEUE_PATH } from "./lib/gutenberg-filters";
-import type { GutenbergQueueFile, QueueEntry } from "./lib/gutenberg-types";
+import {
+  flagQueueEntryManualUpload,
+  formatEpubSize,
+} from "./lib/gutenberg-queue-flags";
+import {
+  INGEST_SKIP_EPUB_TOO_LARGE,
+  shouldSkipAutoIngest,
+  type GutenbergQueueFile,
+  type QueueEntry,
+} from "./lib/gutenberg-types";
 
 const LOG = "[gutenberg-ingest]";
 const MAX_EPUB_BYTES = 4.5 * 1024 * 1024;
@@ -36,22 +44,6 @@ type ChunkRow = {
   content: string;
   vector: string;
 };
-
-function sniffImageMimeType(buf: Buffer): string {
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    buf.length >= 8 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47
-  ) {
-    return "image/png";
-  }
-  return "image/jpeg";
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -84,67 +76,6 @@ async function warnTitleAuthorOverlap(entry: QueueEntry): Promise<void> {
         `(gutenbergId=${overlap.gutenbergId ?? "null"}, status=${overlap.status}) — continuing`,
     );
   }
-}
-
-async function uploadCoverBuffer(
-  bookId: string,
-  coverBuf: Buffer,
-  dryRun: boolean,
-): Promise<string | null> {
-  if (dryRun) {
-    console.log(`  → Would upload cover to Cloudinary (public_id: ${bookId})`);
-    return null;
-  }
-  const mime = sniffImageMimeType(coverBuf);
-  const dataUri = `data:${mime};base64,${coverBuf.toString("base64")}`;
-  const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "novelviz/covers",
-    public_id: bookId,
-    overwrite: true,
-    transformation: [{ width: 400, height: 600, crop: "fit" }],
-    resource_type: "image",
-  });
-  return result.secure_url;
-}
-
-async function resolveCoverUrl(
-  bookId: string,
-  entry: QueueEntry,
-  dryRun: boolean,
-): Promise<string | null> {
-  if (dryRun) {
-    console.log(`  → Would fetch cover from Open Library or Gutendex`);
-    return null;
-  }
-
-  const ol = await fetchOpenLibraryMetadata(entry.title, entry.authorDisplay);
-  if (ol.coverId) {
-    try {
-      const url = `https://covers.openlibrary.org/b/id/${ol.coverId}-L.jpg`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        const uploaded = await uploadCoverBuffer(bookId, buf, false);
-        if (uploaded) return uploaded;
-      }
-    } catch (e) {
-      console.warn(`${LOG} Open Library cover fetch failed:`, e);
-    }
-  }
-
-  if (entry.gutendexCoverUrl) {
-    try {
-      const res = await fetch(entry.gutendexCoverUrl, { signal: AbortSignal.timeout(15_000) });
-      if (res.ok) {
-        const buf = Buffer.from(await res.arrayBuffer());
-        return uploadCoverBuffer(bookId, buf, false);
-      }
-    } catch (e) {
-      console.warn(`${LOG} Gutendex cover fetch failed:`, e);
-    }
-  }
-
-  return null;
 }
 
 async function rollbackBook(bookId: string, dryRun: boolean): Promise<void> {
@@ -279,38 +210,13 @@ async function runIngestPipeline(
   };
 }
 
-async function enrichOpenLibrary(bookId: string, dryRun: boolean): Promise<void> {
-  if (dryRun) return;
-  const book = await prisma.book.findFirst({
-    where: { id: bookId, deletedAt: null },
-    select: { id: true, title: true, author: true, description: true, publishedYear: true },
-  });
-  if (!book) return;
-  try {
-    const ol = await fetchOpenLibraryMetadata(book.title, book.author);
-    const updateData: Prisma.BookUpdateInput = { openLibraryKey: ol.openLibraryKey };
-    if (ol.description && (!book.description || book.description.trim() === "")) {
-      updateData.description = ol.description;
-    }
-    if (ol.firstPublishYear && !book.publishedYear) {
-      updateData.publishedYear = ol.firstPublishYear;
-    }
-    await prisma.book.update({ where: { id: bookId }, data: updateData });
-    console.log(
-      `  → Open Library: enriched (publishedYear: ${ol.firstPublishYear ?? "n/a"})`,
-    );
-  } catch (e) {
-    console.warn(`${LOG} Open Library enrichment failed (non-fatal):`, e);
-  }
-}
-
 async function processEntry(
   entry: QueueEntry,
   index: number,
   total: number,
   adminUserId: string,
   dryRun: boolean,
-): Promise<"ok" | "skip" | "fail" | "skip-genre"> {
+): Promise<"ok" | "skip" | "fail" | "skip-genre" | "too-large"> {
   const label = `[${index}/${total}]`;
   const started = Date.now();
   console.log(`${LOG} ${label} Processing "${entry.title}" (gutenbergId: ${entry.gutenbergId})`);
@@ -344,16 +250,48 @@ async function processEntry(
     console.log(`  → EPUB downloaded (${Math.round(epubBuffer.length / 1024)} KB)`);
 
     if (epubBuffer.length > MAX_EPUB_BYTES) {
-      console.log(`  → EPUB exceeds 4.5MB — skipping`);
-      return "fail";
+      console.log(
+        `  → EPUB exceeds 4.5MB (${formatEpubSize(epubBuffer.length)}) — flagged for manual upload`,
+      );
+      if (!dryRun) {
+        flagQueueEntryManualUpload(entry, INGEST_SKIP_EPUB_TOO_LARGE, epubBuffer.length);
+      }
+      return "too-large";
     }
 
     bookId = randomUUID();
-    const coverImageUrl = await resolveCoverUrl(bookId, entry, dryRun);
-    if (coverImageUrl) {
-      console.log(`  → Cover uploaded to Cloudinary`);
-    } else if (!dryRun) {
-      console.log(`  → No cover available`);
+
+    const epubCoverBuffer = await extractEpubCoverFromBuffer(epubBuffer);
+    if (epubCoverBuffer) {
+      console.log(`  → EPUB cover found (${Math.round(epubCoverBuffer.length / 1024)} KB)`);
+    }
+
+    let enrichment: Awaited<ReturnType<typeof resolveGutenbergBookEnrichment>> | null = null;
+    if (dryRun) {
+      console.log(
+        `  → Would resolve Open Library metadata + cover (EPUB, then Gutendex, then Open Library)`,
+      );
+    } else {
+      enrichment = await resolveGutenbergBookEnrichment({
+        bookId,
+        title: entry.title,
+        author: entry.authorDisplay,
+        epubCoverBuffer,
+        gutendexCoverUrl: entry.gutendexCoverUrl,
+        log: (msg) => console.log(`  → ${msg}`),
+      });
+      if (enrichment.coverImageUrl) {
+        console.log(`  → Cover on Cloudinary`);
+      } else {
+        console.log(`  → No cover available`);
+      }
+      if (enrichment.openLibraryKey) {
+        console.log(
+          `  → Open Library: key=${enrichment.openLibraryKey}, year=${enrichment.publishedYear ?? "n/a"}`,
+        );
+      } else {
+        console.log(`  → No Open Library match for metadata`);
+      }
     }
 
     if (dryRun) {
@@ -368,10 +306,10 @@ async function processEntry(
           status: BookStatus.processing,
           isPublicDomain: true,
           gutenbergId: entry.gutenbergId,
-          coverImageUrl,
-          description: null,
-          publishedYear: null,
-          openLibraryKey: null,
+          coverImageUrl: enrichment?.coverImageUrl ?? null,
+          description: enrichment?.description ?? null,
+          publishedYear: enrichment?.publishedYear ?? null,
+          openLibraryKey: enrichment?.openLibraryKey ?? null,
         },
       });
       console.log(`  → Book record created: ${bookId}`);
@@ -381,7 +319,6 @@ async function processEntry(
     if (!dryRun) {
       console.log(`  → ${chapters} chapters parsed, ${chunks} chunks created`);
       console.log(`  → Genre: ${genre}`);
-      await enrichOpenLibrary(bookId, dryRun);
       console.log(`  → Status: pending_review`);
     }
 
@@ -417,13 +354,22 @@ async function main(): Promise<void> {
   const queuePath = path.resolve(process.cwd(), QUEUE_PATH);
   if (!fs.existsSync(queuePath)) {
     console.error(`${LOG} Queue file not found: ${QUEUE_PATH}`);
+    console.error(
+      `${LOG} Run discovery first: npm run gutenberg-fetch\n` +
+        `       Then approve titles at http://localhost:3000/admin/gutenberg-import`,
+    );
     process.exit(1);
   }
 
   const queue = JSON.parse(fs.readFileSync(queuePath, "utf8")) as GutenbergQueueFile;
   let approved = queue.entries.filter((e) => e.approved === true);
   if (approved.length === 0) {
-    console.error(`${LOG} No approved entries in queue. Review books in /admin/gutenberg-import first.`);
+    const acceptedCount = queue.entries.filter((e) => e.filterResult === "accepted").length;
+    console.error(`${LOG} No approved entries in queue (${acceptedCount} accepted but not approved yet).`);
+    console.error(
+      `${LOG} Open http://localhost:3000/admin/gutenberg-import, check the books you want, ` +
+        `click "Queue approved books", then re-run ingest.`,
+    );
     process.exit(1);
   }
 
@@ -435,6 +381,15 @@ async function main(): Promise<void> {
     const done = new Set(existing.map((r) => r.gutenbergId).filter((id): id is number => id !== null));
     approved = approved.filter((e) => !done.has(e.gutenbergId));
     console.log(`${LOG} Resume: ${done.size} already ingested, ${approved.length} remaining`);
+  }
+
+  const skippedManual = approved.filter((e) => shouldSkipAutoIngest(e));
+  if (skippedManual.length > 0) {
+    approved = approved.filter((e) => !shouldSkipAutoIngest(e));
+    console.log(
+      `${LOG} Skipping ${skippedManual.length} flagged for manual upload: ` +
+        `${skippedManual.map((e) => e.gutenbergId).join(", ")}`,
+    );
   }
 
   if (limit) {
@@ -459,7 +414,9 @@ async function main(): Promise<void> {
   let failed = 0;
   let skipped = 0;
   let skipGenre = 0;
+  let tooLarge = 0;
   const failedIds: number[] = [];
+  const tooLargeIds: number[] = [];
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
 
@@ -477,6 +434,9 @@ async function main(): Promise<void> {
       skipped += 1;
     } else if (result === "skip-genre") {
       skipGenre += 1;
+    } else if (result === "too-large") {
+      tooLarge += 1;
+      tooLargeIds.push(entry.gutenbergId);
     } else {
       failed += 1;
       failedIds.push(entry.gutenbergId);
@@ -487,7 +447,7 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!dryRun) {
+  if (!dryRun && (succeeded > 0 || tooLarge > 0)) {
     queue.fetchedAt = queue.fetchedAt;
     fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2), "utf8");
   }
@@ -502,6 +462,10 @@ async function main(): Promise<void> {
   console.log(`  Failed:     ${failed}`);
   console.log(`  Skipped:    ${skipped} (dedup)`);
   console.log(`  Skip genre: ${skipGenre}`);
+  console.log(`  Too large:  ${tooLarge} (flagged for manual upload)`);
+  if (tooLargeIds.length > 0) {
+    console.log(`  Manual upload gutenbergIds: ${tooLargeIds.join(", ")}`);
+  }
   if (failedIds.length > 0) {
     console.log(`  Failed gutenbergIds: ${failedIds.join(", ")}`);
   }

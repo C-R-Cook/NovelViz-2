@@ -3,7 +3,8 @@
 
 import type { BookStatus } from "@db";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export type ChapterListItem = {
   id: string;
@@ -34,7 +35,10 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   const [actionBusy, setActionBusy] = useState(false);
   const [staleMsg, setStaleMsg] = useState<string | null>(null);
   const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
+  const [chapterMenuMounted, setChapterMenuMounted] = useState(false);
+  const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
   const chapterPickerRef = useRef<HTMLDivElement>(null);
+  const chapterMenuRef = useRef<HTMLUListElement>(null);
 
   const loadChapters = useCallback(async () => {
     setLoadErr(null);
@@ -74,12 +78,36 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   }, [selected]);
 
   useEffect(() => {
+    setChapterMenuMounted(true);
+  }, []);
+
+  const updatePickerRect = useCallback(() => {
+    const el = chapterPickerRef.current;
+    if (!el) return;
+    setPickerRect(el.getBoundingClientRect());
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!chapterPickerOpen) {
+      setPickerRect(null);
+      return;
+    }
+    updatePickerRect();
+    window.addEventListener("resize", updatePickerRect);
+    window.addEventListener("scroll", updatePickerRect, true);
+    return () => {
+      window.removeEventListener("resize", updatePickerRect);
+      window.removeEventListener("scroll", updatePickerRect, true);
+    };
+  }, [chapterPickerOpen, updatePickerRect]);
+
+  useEffect(() => {
     if (!chapterPickerOpen) return;
     function onPointerDown(e: PointerEvent) {
-      const el = chapterPickerRef.current;
-      if (el && !el.contains(e.target as Node)) {
-        setChapterPickerOpen(false);
-      }
+      const target = e.target as Node;
+      if (chapterPickerRef.current?.contains(target)) return;
+      if (chapterMenuRef.current?.contains(target)) return;
+      setChapterPickerOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -243,6 +271,75 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   const canNext = idx >= 0 && idx < chapters.length - 1;
   const disabled = status === "processing" || actionBusy;
 
+  const chapterListMenu =
+    chapterPickerOpen && pickerRect && chapterMenuMounted ? (
+      <ul
+        ref={chapterMenuRef}
+        role="listbox"
+        aria-labelledby="chapter-manager-label"
+        style={(() => {
+          const gap = 4;
+          const maxMenuHeight = 320;
+          const spaceBelow = window.innerHeight - pickerRect.bottom - gap;
+          const spaceAbove = pickerRect.top - gap;
+          const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+          const maxHeight = Math.min(
+            maxMenuHeight,
+            openUp ? spaceAbove : spaceBelow,
+            window.innerHeight * 0.5,
+          );
+          return {
+            position: "fixed" as const,
+            left: pickerRect.left,
+            width: pickerRect.width,
+            top: openUp ? undefined : pickerRect.bottom + gap,
+            bottom: openUp ? window.innerHeight - pickerRect.top + gap : undefined,
+            maxHeight: Math.max(120, maxHeight),
+            zIndex: 250,
+          };
+        })()}
+        className="overflow-y-auto overscroll-contain rounded-lg border border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
+      >
+        <li role="none">
+          <button
+            type="button"
+            role="option"
+            aria-selected={selectedId === ""}
+            className="w-full px-3 py-2 text-left text-sm text-text-muted transition hover:bg-bg-surface hover:text-text-primary"
+            onClick={async () => {
+              setSelectedId("");
+              setStaleMsg(null);
+              setChapterPickerOpen(false);
+            }}
+          >
+            Select a chapter…
+          </button>
+        </li>
+        {chapters.map((c) => (
+          <li key={c.id} role="none">
+            <button
+              type="button"
+              role="option"
+              aria-selected={selectedId === c.id}
+              className={`w-full px-3 py-2 text-left text-sm transition hover:bg-bg-surface ${
+                selectedId === c.id
+                  ? "bg-accent-muted text-text-primary"
+                  : "text-text-primary"
+              }`}
+              onClick={async () => {
+                setSelectedId(c.id);
+                setStaleMsg(null);
+                setChapterPickerOpen(false);
+                await loadChapters();
+              }}
+            >
+              {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : null;
+
   return (
     <section className="rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
       <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">
@@ -267,7 +364,7 @@ export function ChapterManagerClient({ bookId, status }: Props) {
               >
                 Chapter
               </span>
-              <div ref={chapterPickerRef} className="relative z-20">
+              <div ref={chapterPickerRef} className="relative">
                 <button
                   type="button"
                   id="chapter-manager-trigger"
@@ -298,51 +395,6 @@ export function ChapterManagerClient({ bookId, status }: Props) {
                     />
                   </svg>
                 </button>
-                {chapterPickerOpen ? (
-                  <ul
-                    role="listbox"
-                    aria-labelledby="chapter-manager-label"
-                    className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-[min(50vh,20rem)] overflow-y-auto overscroll-contain rounded-lg border border-border bg-bg-surface py-1 shadow-lg shadow-bg-overlay/15 ring-1 ring-border"
-                  >
-                    <li role="none">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected={selectedId === ""}
-                        className="w-full px-3 py-2 text-left text-sm text-text-muted transition hover:bg-bg-surface hover:text-text-primary"
-                        onClick={async () => {
-                          setSelectedId("");
-                          setStaleMsg(null);
-                          setChapterPickerOpen(false);
-                        }}
-                      >
-                        Select a chapter…
-                      </button>
-                    </li>
-                    {chapters.map((c) => (
-                      <li key={c.id} role="none">
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected={selectedId === c.id}
-                          className={`w-full px-3 py-2 text-left text-sm transition hover:bg-bg-surface ${
-                            selectedId === c.id
-                              ? "bg-accent-muted text-text-primary"
-                              : "text-text-primary"
-                          }`}
-                          onClick={async () => {
-                            setSelectedId(c.id);
-                            setStaleMsg(null);
-                            setChapterPickerOpen(false);
-                            await loadChapters();
-                          }}
-                        >
-                          {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
               </div>
             </div>
           </div>
@@ -429,6 +481,9 @@ export function ChapterManagerClient({ bookId, status }: Props) {
           ) : null}
         </>
       )}
+      {chapterMenuMounted && chapterListMenu
+        ? createPortal(chapterListMenu, document.body)
+        : null}
     </section>
   );
 }

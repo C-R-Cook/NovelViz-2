@@ -1,5 +1,25 @@
 export type FilterResult = "accepted" | "review" | "rejected";
 
+/** Why auto-ingest was skipped (e.g. EPUB over size cap). */
+export const INGEST_SKIP_EPUB_TOO_LARGE = "epub_too_large" as const;
+export type IngestSkipReason = typeof INGEST_SKIP_EPUB_TOO_LARGE;
+
+export function shouldSkipAutoIngest(entry: QueueEntry): boolean {
+  return entry.skipAutoIngest === true;
+}
+
+export function defaultQueueIngestFlags(): Pick<
+  QueueEntry,
+  "skipAutoIngest" | "manualUploadRequired" | "ingestSkipReason" | "epubSizeBytes"
+> {
+  return {
+    skipAutoIngest: false,
+    manualUploadRequired: false,
+    ingestSkipReason: null,
+    epubSizeBytes: null,
+  };
+}
+
 export interface QueueEntry {
   gutenbergId: number;
   title: string;
@@ -15,6 +35,12 @@ export interface QueueEntry {
   reviewReasons: string[];
   approved: boolean | null;
   ingestedAt: string | null;
+  /** When true, ingest CLI skips this title (resume/limit). */
+  skipAutoIngest: boolean;
+  /** Shown in admin UI — upload EPUB via partner/admin ingest, then clear the flag. */
+  manualUploadRequired: boolean;
+  ingestSkipReason: IngestSkipReason | null;
+  epubSizeBytes: number | null;
 }
 
 export interface GutenbergQueueFile {

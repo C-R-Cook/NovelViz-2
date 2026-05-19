@@ -152,11 +152,32 @@ export function formatAuthorDisplay(raw: string): string {
   return `${given} ${surname}`;
 }
 
-export function pickEpubUrl(formats: Record<string, string>): string | null {
+/** Gutenberg text-only EPUB (no inline illustrations). */
+export function gutenbergNoImagesEpubUrl(gutenbergId: number): string {
+  return `https://www.gutenberg.org/ebooks/${gutenbergId}.epub.noimages`;
+}
+
+function isIllustratedEpubUrl(url: string): boolean {
+  return /\.epub3?\.images\b/i.test(url) || /\.epub\.images\b/i.test(url);
+}
+
+/**
+ * Prefer the small no-images EPUB for ingest. Gutendex often lists only the large
+ * illustrated EPUB3; derive the no-images URL from the Gutenberg id when needed.
+ */
+export function pickEpubUrl(formats: Record<string, string>, gutenbergId: number): string | null {
   const epubEntries = Object.entries(formats).filter(([mime]) => mime === "application/epub+zip");
   if (epubEntries.length === 0) return null;
-  const noimages = epubEntries.find(([, url]) => url.includes("noimages"));
-  return (noimages ?? epubEntries[0])![1];
+
+  const listedNoImages = epubEntries.find(([, url]) => url.includes("noimages"));
+  if (listedNoImages) return listedNoImages[1];
+
+  const first = epubEntries[0]![1];
+  if (isIllustratedEpubUrl(first)) {
+    return gutenbergNoImagesEpubUrl(gutenbergId);
+  }
+
+  return first;
 }
 
 export const QUEUE_PATH = "scripts/gutenberg-queue.json";

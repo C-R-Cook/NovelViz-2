@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./lib/load-env";
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaNeon } from "@prisma/adapter-neon";
@@ -9,11 +9,12 @@ import {
   pickEpubUrl,
   QUEUE_PATH,
 } from "./lib/gutenberg-filters";
-import type {
-  GutendexBook,
-  GutendexResponse,
-  GutenbergQueueFile,
-  QueueEntry,
+import {
+  defaultQueueIngestFlags,
+  type GutendexBook,
+  type GutendexResponse,
+  type GutenbergQueueFile,
+  type QueueEntry,
 } from "./lib/gutenberg-types";
 
 const LOG = "[gutenberg-fetch]";
@@ -49,13 +50,14 @@ function toQueueEntry(book: GutendexBook): QueueEntry {
     subjects: book.subjects,
     bookshelves: book.bookshelves,
     gutendexCoverUrl: book.formats["image/jpeg"] ?? null,
-    epubUrl: pickEpubUrl(book.formats),
+    epubUrl: pickEpubUrl(book.formats, book.id),
     downloadCount: book.download_count,
     filterResult,
     rejectReason,
     reviewReasons,
     approved: null,
     ingestedAt: null,
+    ...defaultQueueIngestFlags(),
   };
 }
 

@@ -30,7 +30,7 @@ export async function fetchOpenLibraryMetadata(
       `https://openlibrary.org/search.json?q=${query}&limit=5&fields=key,title,author_name,first_publish_year,cover_i`,
       {
         headers: { "User-Agent": "NovelViz/1.0 (contact@novelviz.com)" },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(25_000),
       },
     );
     if (!searchRes.ok) return empty;
@@ -57,7 +57,7 @@ export async function fetchOpenLibraryMetadata(
       try {
         const workRes = await fetch(`https://openlibrary.org${best.key}.json`, {
           headers: { "User-Agent": "NovelViz/1.0 (contact@novelviz.com)" },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(25_000),
         });
         if (workRes.ok) {
           const workData = (await workRes.json()) as {

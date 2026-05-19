@@ -1,4 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
+import { clearQueueEntryManualUpload } from "@/scripts/lib/gutenberg-queue-flags";
+import type { QueueEntry } from "@/scripts/lib/gutenberg-types";
 import { UserRole } from "@db";
 import fs from "node:fs";
 import path from "node:path";
@@ -55,33 +57,37 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "updates array required" }, { status: 400 });
   }
 
-  const queue = readQueueFile() as {
-    entries: Array<{ gutenbergId: number; approved: boolean | null }>;
-    totalAccepted?: number;
-    totalReview?: number;
-    totalRejected?: number;
-  } | null;
+  const queue = readQueueFile() as { entries: QueueEntry[] } | null;
 
   if (!queue || !Array.isArray(queue.entries)) {
     return NextResponse.json({ error: "Queue file not found" }, { status: 404 });
   }
 
-  const updateMap = new Map<number, boolean>();
+  const approvalMap = new Map<number, boolean>();
+  const clearManualIds = new Set<number>();
+
   for (const u of updates) {
-    if (
-      typeof u === "object" &&
-      u !== null &&
-      typeof (u as { gutenbergId?: unknown }).gutenbergId === "number" &&
-      typeof (u as { approved?: unknown }).approved === "boolean"
-    ) {
-      updateMap.set((u as { gutenbergId: number }).gutenbergId, (u as { approved: boolean }).approved);
+    if (typeof u !== "object" || u === null) continue;
+    const gutenbergId = (u as { gutenbergId?: unknown }).gutenbergId;
+    if (typeof gutenbergId !== "number") continue;
+
+    const approved = (u as { approved?: unknown }).approved;
+    if (typeof approved === "boolean") {
+      approvalMap.set(gutenbergId, approved);
+    }
+
+    if ((u as { clearManualUpload?: unknown }).clearManualUpload === true) {
+      clearManualIds.add(gutenbergId);
     }
   }
 
   for (const entry of queue.entries) {
-    const approved = updateMap.get(entry.gutenbergId);
+    const approved = approvalMap.get(entry.gutenbergId);
     if (approved !== undefined) {
       entry.approved = approved;
+    }
+    if (clearManualIds.has(entry.gutenbergId)) {
+      clearQueueEntryManualUpload(entry);
     }
   }
 

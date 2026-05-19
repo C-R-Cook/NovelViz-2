@@ -42,6 +42,8 @@ type VisionImage = FeaturedImage & {
   bookGenre: BookGenre | null;
 };
 
+type VisionFilter = "all" | "selected-genre" | "selected-book";
+
 const GENRE_PILLS = [{ value: "all", label: "All" }, ...GENRE_OPTIONS];
 
 function SectionDivider() {
@@ -290,19 +292,19 @@ function ShelfFeaturedCard({
           </div>
           <div className="line-clamp-2 font-serif text-[13px] font-bold leading-tight text-white">{book.title}</div>
         </div>
+        {isSelected ? (
+          <span
+            className="discover-shelf-gem"
+            style={{
+              background: DISCOVER_DEFAULT_PALETTE.accent,
+              boxShadow: `0 0 8px ${DISCOVER_DEFAULT_PALETTE.accent}`,
+            }}
+            aria-hidden
+          >
+            ✦
+          </span>
+        ) : null}
       </div>
-      {isSelected ? (
-        <span
-          className="discover-shelf-gem"
-          style={{
-            background: DISCOVER_DEFAULT_PALETTE.accent,
-            boxShadow: `0 0 12px ${DISCOVER_DEFAULT_PALETTE.accent}`,
-          }}
-          aria-hidden
-        >
-          ✦
-        </span>
-      ) : null}
     </button>
   );
 }
@@ -372,7 +374,7 @@ export function DiscoverCatalogueClient({
 
   const [visionImages, setVisionImages] = useState<VisionImage[]>([]);
   const [visionsLoading, setVisionsLoading] = useState(false);
-  const [visionsGenre, setVisionsGenre] = useState<"all" | BookGenre>("all");
+  const [visionFilter, setVisionFilter] = useState<VisionFilter>("all");
 
   useEffect(() => {
     setSelectedFeaturedIndex((idx) =>
@@ -658,18 +660,30 @@ export function DiscoverCatalogueClient({
 
   const selectedBook = featured[selectedFeaturedIndex] ?? null;
 
-  const filteredVisionImages = useMemo(() => {
-    if (visionsGenre === "all") return visionImages;
-    return visionImages.filter((v) => v.bookGenre === visionsGenre);
-  }, [visionImages, visionsGenre]);
-
-  const visionGenreOptions = useMemo((): ("all" | BookGenre)[] => {
-    const g = new Set<BookGenre>();
-    for (const b of featured) {
-      if (b.genre) g.add(b.genre);
+  const visionFilterPills = useMemo(() => {
+    if (!selectedBook) {
+      return [{ id: "all" as const, label: "All", disabled: false }];
     }
-    return ["all", ...g];
-  }, [featured]);
+    return [
+      { id: "all" as const, label: "All", disabled: false },
+      {
+        id: "selected-genre" as const,
+        label: selectedBook.genre ? formatGenre(selectedBook.genre) : "Genre",
+        disabled: !selectedBook.genre,
+      },
+      { id: "selected-book" as const, label: selectedBook.title, disabled: false },
+    ];
+  }, [selectedBook]);
+
+  const filteredVisionImages = useMemo(() => {
+    if (visionFilter === "all") return visionImages;
+    if (!selectedBook) return visionImages;
+    if (visionFilter === "selected-genre") {
+      if (!selectedBook.genre) return [];
+      return visionImages.filter((v) => v.bookGenre === selectedBook.genre);
+    }
+    return visionImages.filter((v) => v.bookId === selectedBook.id);
+  }, [visionImages, visionFilter, selectedBook]);
 
   const selectedLibraryEntry = useMemo(() => {
     if (!selectedBook) return undefined;
@@ -859,7 +873,7 @@ export function DiscoverCatalogueClient({
               onPointerLeave={(e) => {
                 if (featuredDragRef.current.pointerId === e.pointerId) endFeaturedDrag(e);
               }}
-              className={`discover-no-h-scrollbar discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 py-6 sm:mx-0 sm:px-8 ${
+              className={`discover-no-h-scrollbar discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 pb-6 pt-10 sm:mx-0 sm:px-8 ${
                 centerFeaturedRow ? "sm:justify-center" : ""
               } ${featuredScrollerDragging ? "discover-featured-scroller--dragging" : ""}`}
             >
@@ -917,21 +931,22 @@ export function DiscoverCatalogueClient({
               <h2 className="discover-concept-section-title m-0 shrink-0">Community visions</h2>
               <div className="discover-concept-section-line min-w-[4rem] flex-1" />
               <div className="flex max-w-full flex-wrap gap-2">
-                {visionGenreOptions.slice(0, 5).map((g) => {
-                  const active = visionsGenre === g;
-                  const label = g === "all" ? "All" : formatGenre(g);
+                {visionFilterPills.map((pill) => {
+                  const active = visionFilter === pill.id;
                   return (
                     <button
-                      key={g}
+                      key={pill.id}
                       type="button"
-                      onClick={() => setVisionsGenre(g)}
-                      className={`discover-concept-vision-pill rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition ${
+                      disabled={pill.disabled}
+                      onClick={() => setVisionFilter(pill.id)}
+                      title={pill.label}
+                      className={`discover-concept-vision-pill max-w-[11rem] truncate rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         active
                           ? "border border-[rgba(180,140,100,0.45)] bg-[rgba(180,140,100,0.15)] text-[rgba(230,200,160,0.95)]"
                           : "border border-white/[0.08] bg-transparent text-white/35 hover:border-white/15 hover:text-white/50"
                       }`}
                     >
-                      {label}
+                      {pill.label}
                     </button>
                   );
                 })}

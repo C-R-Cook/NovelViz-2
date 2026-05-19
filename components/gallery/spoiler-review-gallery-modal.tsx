@@ -2,6 +2,7 @@
 
 import "@/app/(public)/gallery/gallery-redesign.css";
 import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
+import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import type { AdminSpoilerCommentRow } from "@/lib/admin-spoiler-comments-queue";
@@ -96,6 +97,11 @@ export function SpoilerReviewGalleryModal({
                   <p className="shrink-0 text-sm text-text-muted">Chapter {row.chapterNumberAtTime}</p>
                 </div>
                 {row.userPrompt?.trim() ? <GalleryImagePromptDisclosure prompt={row.userPrompt} /> : null}
+                <AdminFeaturedImageToggle
+                  show
+                  imageId={row.imageId}
+                  isFeatured={row.imageIsFeatured}
+                />
                 <Link
                   href={galleryHref}
                   target="_blank"

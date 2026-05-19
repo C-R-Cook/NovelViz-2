@@ -7,7 +7,9 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "gutenberg-fetch": "tsx scripts/gutenberg-fetch.ts",
+    "gutenberg-ingest": "tsx scripts/gutenberg-ingest.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

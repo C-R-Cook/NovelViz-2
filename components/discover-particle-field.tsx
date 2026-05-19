@@ -2,8 +2,20 @@
 
 import { useEffect, useRef } from "react";
 
-/** Ambient particle + link lines (discover concept CTA). Respects reduced motion via parent hiding. */
-export function DiscoverParticleField() {
+type DiscoverParticleFieldProps = {
+  count?: number;
+  opacity?: number;
+  linkDistance?: number;
+  className?: string;
+};
+
+/** Ambient particle + link lines (discover / landing). Respects reduced motion via parent hiding. */
+export function DiscoverParticleField({
+  count = 60,
+  opacity = 0.4,
+  linkDistance = 100,
+  className,
+}: DiscoverParticleFieldProps = {}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -20,7 +32,7 @@ export function DiscoverParticleField() {
     resize();
     window.addEventListener("resize", resize);
 
-    const pts = Array.from({ length: 60 }, () => ({
+    const pts = Array.from({ length: count }, () => ({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
       vx: (Math.random() - 0.5) * 0.3,
@@ -40,7 +52,7 @@ export function DiscoverParticleField() {
         if (p.y > canvas.height) p.y = 0;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180,140,100,${p.a * 0.4})`;
+        ctx.fillStyle = `rgba(180,140,100,${p.a * opacity})`;
         ctx.fill();
       });
       for (let i = 0; i < pts.length; i++) {
@@ -48,11 +60,11 @@ export function DiscoverParticleField() {
           const dx = pts[i].x - pts[j].x;
           const dy = pts[i].y - pts[j].y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 100) {
+          if (dist < linkDistance) {
             ctx.beginPath();
             ctx.moveTo(pts[i].x, pts[i].y);
             ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.strokeStyle = `rgba(180,140,100,${(1 - dist / 100) * 0.08})`;
+            ctx.strokeStyle = `rgba(180,140,100,${(1 - dist / linkDistance) * 0.08 * opacity})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -66,12 +78,12 @@ export function DiscoverParticleField() {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [count, linkDistance, opacity]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      className={className ?? "pointer-events-none absolute inset-0 h-full w-full"}
       aria-hidden
     />
   );

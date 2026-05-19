@@ -4,6 +4,7 @@ import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner
 import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
 import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
@@ -33,6 +34,7 @@ type ApiImage = {
   likeCount: number;
   commentCount: number;
   isPublic: boolean;
+  isFeatured: boolean;
   likedByViewer: boolean;
   isLocked: boolean;
   bookId: string;
@@ -183,6 +185,7 @@ export function GalleryBookClient({
             return {
               ...img,
               likedByViewer: img.likedByViewer ?? false,
+              isFeatured: img.isFeatured ?? false,
               commentCount: typeof img.commentCount === "number" ? img.commentCount : 0,
             };
           }),
@@ -209,10 +212,11 @@ export function GalleryBookClient({
     setSessionUnlock(next);
   }
 
-  function displayLocked(apiLocked: boolean): boolean {
+  function displayLocked(image: ApiImage): boolean {
     if (isAdmin) return false;
     if (sessionUnlock) return false;
-    return apiLocked;
+    if (viewerUserId !== null && image.userId === viewerUserId) return false;
+    return image.isLocked;
   }
 
   const canLike = isLoggedIn || isAdmin;
@@ -222,7 +226,7 @@ export function GalleryBookClient({
     const prior = images.find((i) => i.id === imageId);
     if (!prior || prior.likedByViewer) return;
     if (viewerUserId !== null && prior.userId === viewerUserId) return;
-    if (displayLocked(prior.isLocked)) return;
+    if (displayLocked(prior)) return;
 
     const beforeLikeCount = prior.likeCount;
     const beforeLikedByViewer = prior.likedByViewer;
@@ -292,7 +296,7 @@ export function GalleryBookClient({
   }
 
   const modalImage = modalIndex !== null ? images[modalIndex] : null;
-  const modalLocked = modalImage ? displayLocked(modalImage.isLocked) : false;
+  const modalLocked = modalImage ? displayLocked(modalImage) : false;
   const chapterGap =
     modalLocked && modalImage
       ? Math.max(1, modalImage.chapterNumberAtTime - (currentChapterNumber ?? 0))
@@ -576,7 +580,7 @@ export function GalleryBookClient({
 
       <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {images.map((image, index) => {
-          const locked = displayLocked(image.isLocked);
+          const locked = displayLocked(image);
           const username = image.username?.trim() || "Anonymous reader";
           const alreadyLiked = image.likedByViewer;
           const likeDisabled = !canLike || !!likingIds[image.id] || alreadyLiked || locked;
@@ -828,6 +832,18 @@ export function GalleryBookClient({
                               : "Make public"}
                         </button>
                       ) : null}
+                      <AdminFeaturedImageToggle
+                        show={isAdmin}
+                        imageId={modalImage.id}
+                        isFeatured={modalImage.isFeatured}
+                        onFeaturedChange={(next) => {
+                          setImages((prev) =>
+                            prev.map((img) =>
+                              img.id === modalImage.id ? { ...img, isFeatured: next } : img,
+                            ),
+                          );
+                        }}
+                      />
                       <Link
                         href={`/gallery/${modalImage.bookId}?from=gallery`}
                         onClick={() => dismissModalImage()}

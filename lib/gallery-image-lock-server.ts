@@ -1,4 +1,4 @@
-import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
+import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
 import { prisma } from "@/lib/prisma";
 
 /** Chapter-gate lock for a public gallery image — same rules as gallery list APIs. Admin always sees unlocked. */
@@ -7,6 +7,7 @@ export async function isGeneratedImageChapterLockedForViewer(args: {
   isAdmin: boolean;
   bookId: string;
   chapterNumberAtTime: number;
+  imageOwnerUserId: string;
   /**
    * Same trust model as `GET /api/gallery/book/[bookId]?session=true` — client session “show everything” for those books.
    */
@@ -35,7 +36,13 @@ export async function isGeneratedImageChapterLockedForViewer(args: {
   const rawChapter = progress?.currentChapterNumber;
   const currentChapter = rawChapter === null || rawChapter === undefined ? undefined : rawChapter;
 
-  return isChapterBehindLock(mode, currentChapter, args.chapterNumberAtTime);
+  return isGalleryImageChapterLocked({
+    viewerUserId: args.userId,
+    imageUserId: args.imageOwnerUserId,
+    mode,
+    currentChapter,
+    imageChapter: args.chapterNumberAtTime,
+  });
 }
 
 export function parseLikeRequestSessionUnlockIds(body: unknown): string[] {

@@ -2,7 +2,7 @@ import { GalleryClient, type GalleryImageCard, type GalleryLockKind } from "./ga
 import { getCurrentUser } from "@/lib/auth";
 import { viewerVisibleCommentCountByImageIds } from "@/lib/gallery-comment-counts";
 import type { CommentVisibilityViewer } from "@/lib/comment-visibility";
-import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
+import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
 import { prisma } from "@/lib/prisma";
 import type { SpoilerProtection } from "@db";
 
@@ -18,6 +18,7 @@ type GeneratedImageForGallery = {
   createdAt: Date;
   likeCount: number;
   isPublic: boolean;
+  isFeatured: boolean;
   bookId: string;
   userId: string;
   book: { title: string; author: string };
@@ -32,6 +33,7 @@ const baseSelect = {
   createdAt: true,
   likeCount: true,
   isPublic: true,
+  isFeatured: true,
   bookId: true,
   userId: true,
   book: {
@@ -61,6 +63,7 @@ function baseFields(
     createdAt: image.createdAt.toISOString(),
     likeCount: image.likeCount,
     isPublic: image.isPublic,
+    isFeatured: image.isFeatured,
     likedByViewer,
     bookId: image.bookId,
     bookTitle: image.book.title,
@@ -90,6 +93,7 @@ function toGuestBlurCard(image: GeneratedImageForGallery, commentCount = 0): Gal
 function memberLock(
   image: GeneratedImageForGallery,
   opts: {
+    viewerUserId: string;
     isAdmin: boolean;
     globalSpoilerProtection: boolean;
     spoilerByBookId: Map<string, SpoilerProtection | undefined>;
@@ -103,7 +107,13 @@ function memberLock(
   const bookSpoiler = opts.spoilerByBookId.get(image.bookId);
   const mode = effectiveChapterGateMode(bookSpoiler, opts.globalSpoilerProtection);
   const currentChapter = opts.progressByBookId.get(image.bookId);
-  const behind = isChapterBehindLock(mode, currentChapter, image.chapterNumberAtTime);
+  const behind = isGalleryImageChapterLocked({
+    viewerUserId: opts.viewerUserId,
+    imageUserId: image.userId,
+    mode,
+    currentChapter,
+    imageChapter: image.chapterNumberAtTime,
+  });
   if (!behind) {
     return { isLocked: false, lockKind: "none" };
   }
@@ -216,6 +226,7 @@ export default async function GalleryPage() {
   const progressByBookId = new Map<string, number>(allProgress.map((p) => [p.bookId, p.currentChapterNumber]));
 
   const lockCtx = {
+    viewerUserId: session.id,
     isAdmin: !!isAdmin,
     globalSpoilerProtection,
     spoilerByBookId,

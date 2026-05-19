@@ -146,6 +146,7 @@ model Book {
   genre                        BookGenre?
   publishedYear                Int?
   openLibraryKey               String?
+  gutenbergId                  Int?       @unique
   isPublicDomain               Boolean    @default(false)
   status                       BookStatus @default(draft)
   rejectionReason              String?

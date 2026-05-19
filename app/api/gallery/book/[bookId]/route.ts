@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { commentCountsForGalleryBook } from "@/lib/gallery-comment-counts";
 import { prisma } from "@/lib/prisma";
-import { effectiveChapterGateMode, isChapterBehindLock } from "@/lib/gallery-spoiler";
+import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
 import type { SpoilerProtection } from "@db";
 import { NextResponse } from "next/server";
 
@@ -107,6 +107,7 @@ export async function GET(request: Request, context: RouteContext) {
       userId: true,
       likeCount: true,
       isPublic: true,
+      isFeatured: true,
       user: { select: { username: true, name: true } },
     },
   });
@@ -148,6 +149,7 @@ export async function GET(request: Request, context: RouteContext) {
         username: img.user.username ?? img.user.name ?? "",
         likeCount: img.likeCount,
         isPublic: img.isPublic,
+        isFeatured: img.isFeatured,
         likedByViewer: viewerLikedIds.has(img.id),
         isLocked: false,
         bookId: book.id,
@@ -186,6 +188,7 @@ export async function GET(request: Request, context: RouteContext) {
         username: img.user.username ?? img.user.name ?? "",
         likeCount: img.likeCount,
         isPublic: img.isPublic,
+        isFeatured: img.isFeatured,
         likedByViewer: viewerLikedIds.has(img.id),
         isLocked: false,
         bookId: book.id,
@@ -239,8 +242,15 @@ export async function GET(request: Request, context: RouteContext) {
       username: img.user.username ?? img.user.name ?? "",
       likeCount: img.likeCount,
       isPublic: img.isPublic,
+      isFeatured: img.isFeatured,
       likedByViewer: viewerLikedIds.has(img.id),
-      isLocked: isChapterBehindLock(mode, currentChapter, img.chapterNumberAtTime),
+      isLocked: isGalleryImageChapterLocked({
+        viewerUserId: user.id,
+        imageUserId: img.userId,
+        mode,
+        currentChapter,
+        imageChapter: img.chapterNumberAtTime,
+      }),
       bookId: book.id,
       bookTitle: book.title,
       author: book.author,

@@ -109,6 +109,30 @@ export async function POST(request: Request) {
     genre = b.genre as BookGenre;
   }
 
+  const confirmDuplicate = b.confirmDuplicate === true;
+  if (!confirmDuplicate) {
+    const existingBook = await prisma.book.findFirst({
+      where: {
+        deletedAt: null,
+        title: { equals: b.title.trim(), mode: "insensitive" },
+        author: { equals: b.author.trim(), mode: "insensitive" },
+      },
+      select: { id: true, title: true, author: true, status: true },
+    });
+    if (existingBook) {
+      return NextResponse.json({
+        duplicateWarning: true,
+        existingBook: {
+          id: existingBook.id,
+          title: existingBook.title,
+          author: existingBook.author,
+          status: existingBook.status,
+        },
+        message: "A book with this title and author already exists in the catalogue.",
+      });
+    }
+  }
+
   const book = await prisma.book.create({
     data: {
       title: b.title.trim(),

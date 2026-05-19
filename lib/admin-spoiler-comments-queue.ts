@@ -9,6 +9,7 @@ export type AdminSpoilerCommentRow = {
   username: string;
   imageId: string;
   imageUrl: string;
+  imageIsFeatured: boolean;
   userPrompt: string | null;
   chapterNumberAtTime: number;
   bookId: string;
@@ -44,6 +45,7 @@ export async function queryAdminSpoilerCommentsQueue(take = 80): Promise<AdminSp
         select: {
           id: true,
           imageUrl: true,
+          isFeatured: true,
           userPrompt: true,
           chapterNumberAtTime: true,
           book: {
@@ -61,6 +63,7 @@ export async function queryAdminSpoilerCommentsQueue(take = 80): Promise<AdminSp
     username: row.user.username ?? row.user.name ?? "Reader",
     imageId: row.image.id,
     imageUrl: row.image.imageUrl,
+    imageIsFeatured: row.image.isFeatured,
     userPrompt: row.image.userPrompt,
     chapterNumberAtTime: row.image.chapterNumberAtTime,
     bookId: row.image.book.id,

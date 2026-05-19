@@ -28,6 +28,23 @@ export function isChapterBehindLock(
   return currentChapter < imageChapter;
 }
 
+/**
+ * Chapter spoiler lock for gallery display — never locks the viewer's own generated images,
+ * even if they moved back to an earlier chapter after creating the image.
+ */
+export function isGalleryImageChapterLocked(args: {
+  viewerUserId: string | null | undefined;
+  imageUserId: string;
+  mode: ChapterGateMode;
+  currentChapter: number | undefined;
+  imageChapter: number;
+}): boolean {
+  if (args.viewerUserId != null && args.viewerUserId === args.imageUserId) {
+    return false;
+  }
+  return isChapterBehindLock(args.mode, args.currentChapter, args.imageChapter);
+}
+
 /** Spoiler-flagged comments always gate on this chapter (ignores per-book UNLOCKED). */
 export function isBehindSpoilerCommentGate(
   currentChapter: number | undefined,

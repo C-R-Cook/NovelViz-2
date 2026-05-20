@@ -2,7 +2,7 @@
 
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const MARQUEE_TITLES = [
   "Dracula",
@@ -108,33 +108,34 @@ const STEPS = [
 ] as const;
 
 function useReveal(threshold = 0.15) {
-  const ref = useRef<HTMLElement>(null);
   const [visible, setVisible] = useState(false);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
+  const ref = useCallback(
+    (el: HTMLElement | null) => {
+      if (!el) return;
 
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) {
-      setVisible(true);
-      return;
-    }
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) {
+        queueMicrotask(() => setVisible(true));
+        return;
+      }
 
-    const obs = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) {
-          setVisible(true);
-          obs.disconnect();
-        }
-      },
-      { threshold },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry?.isIntersecting) {
+            setVisible(true);
+            obs.disconnect();
+          }
+        },
+        { threshold },
+      );
+      obs.observe(el);
+      return () => obs.disconnect();
+    },
+    [threshold],
+  );
 
-  return { ref, visible };
+  return [ref, visible] as const;
 }
 
 function useReducedMotion() {
@@ -182,15 +183,15 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
   const [joined, setJoined] = useState(false);
   const [navScrolled, setNavScrolled] = useState(false);
 
-  const problem = useReveal();
-  const how = useReveal();
-  const features = useReveal();
-  const gallery = useReveal();
-  const cta = useReveal();
+  const [problemRef, problemVisible] = useReveal();
+  const [howRef, howVisible] = useReveal();
+  const [featuresRef, featuresVisible] = useReveal();
+  const [galleryRef, galleryVisible] = useReveal();
+  const [ctaRef, ctaVisible] = useReveal();
 
   useEffect(() => {
     if (reducedMotion) {
-      setHeroIn(true);
+      queueMicrotask(() => setHeroIn(true));
       return;
     }
     const t = window.setTimeout(() => setHeroIn(true), 100);
@@ -199,7 +200,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 40);
-    onScroll();
+    queueMicrotask(() => onScroll());
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -298,8 +299,8 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
       </div>
 
       <section
-        ref={problem.ref}
-        className={`landing-section landing-section--narrow landing-reveal${problem.visible ? " landing-reveal--visible" : ""}`}
+        ref={problemRef}
+        className={`landing-section landing-section--narrow landing-reveal${problemVisible ? " landing-reveal--visible" : ""}`}
       >
         <p className="landing-problem-kicker">The Problem</p>
         <blockquote className="landing-blockquote">
@@ -313,15 +314,15 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
 
       <GemDivider />
 
-      <section id="how-it-works" ref={how.ref} className="landing-section">
+      <section id="how-it-works" ref={howRef} className="landing-section">
         <SectionLabel label="How it works" />
         <div className="landing-how-grid">
           <div className="landing-steps">
             {STEPS.map((step, i) => (
               <div
                 key={step.number}
-                className={`landing-step${how.visible ? " landing-step--visible" : ""}`}
-                style={how.visible ? { transitionDelay: `${i * 100}ms` } : undefined}
+                className={`landing-step${howVisible ? " landing-step--visible" : ""}`}
+                style={howVisible ? { transitionDelay: `${i * 100}ms` } : undefined}
               >
                 <div className="landing-step-num">{step.number}</div>
                 <div>
@@ -332,7 +333,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
             ))}
           </div>
 
-          <div className={`landing-mock-panel${how.visible ? " landing-mock-panel--visible" : ""}`}>
+          <div className={`landing-mock-panel${howVisible ? " landing-mock-panel--visible" : ""}`}>
             <div className="landing-mock-card">
               <div className="landing-mock-header">
                 <div className="landing-mock-dot" aria-hidden />
@@ -366,14 +367,14 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
 
       <GemDivider />
 
-      <section id="features" ref={features.ref} className="landing-section">
+      <section id="features" ref={featuresRef} className="landing-section">
         <SectionLabel label="Features" />
         <div className="landing-features-grid">
           {PRIMARY_FEATURES.map((feat, i) => (
             <article
               key={feat.title}
-              className={`landing-feature-card${features.visible ? " landing-feature-card--visible" : ""}`}
-              style={features.visible ? { transitionDelay: `${i * 100}ms` } : undefined}
+              className={`landing-feature-card${featuresVisible ? " landing-feature-card--visible" : ""}`}
+              style={featuresVisible ? { transitionDelay: `${i * 100}ms` } : undefined}
             >
               <div className="landing-feature-icon" aria-hidden>
                 {feat.icon}
@@ -388,8 +389,8 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           {SECONDARY_FEATURES.map(([title, body], i) => (
             <div
               key={title}
-              className={`landing-feature-secondary${features.visible ? " landing-feature-secondary--visible" : ""}`}
-              style={features.visible ? { transitionDelay: `${300 + i * 80}ms` } : undefined}
+              className={`landing-feature-secondary${featuresVisible ? " landing-feature-secondary--visible" : ""}`}
+              style={featuresVisible ? { transitionDelay: `${300 + i * 80}ms` } : undefined}
             >
               <h4 className="landing-feature-secondary-title">{title}</h4>
               <p className="landing-feature-secondary-body">{body}</p>
@@ -400,7 +401,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
 
       <GemDivider />
 
-      <section id="gallery" ref={gallery.ref} className="landing-section">
+      <section id="gallery" ref={galleryRef} className="landing-section">
         <SectionLabel label="Community Gallery" />
         <div className="landing-gallery-intro">
           <h2>Your story, illustrated.</h2>
@@ -414,8 +415,8 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           {GALLERY.map((item, i) => (
             <div
               key={`${item.book}-${item.chapter}`}
-              className={`landing-gallery-item${gallery.visible ? " landing-gallery-item--visible" : ""}`}
-              style={gallery.visible ? { transitionDelay: `${i * 70}ms` } : undefined}
+              className={`landing-gallery-item${galleryVisible ? " landing-gallery-item--visible" : ""}`}
+              style={galleryVisible ? { transitionDelay: `${i * 70}ms` } : undefined}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={item.src} alt={item.prompt} loading="lazy" />
@@ -437,8 +438,8 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
         </div>
       </section>
 
-      <section id="beta" ref={cta.ref} className="landing-section landing-beta-section">
-        <div className={`landing-beta-card${cta.visible ? " landing-beta-card--visible" : ""}`}>
+      <section id="beta" ref={ctaRef} className="landing-section landing-beta-section">
+        <div className={`landing-beta-card${ctaVisible ? " landing-beta-card--visible" : ""}`}>
           {!reducedMotion ? <DiscoverParticleField count={35} opacity={0.3} linkDistance={90} /> : null}
           <div className="landing-beta-inner">
             <p className="landing-beta-kicker">Now in Beta</p>

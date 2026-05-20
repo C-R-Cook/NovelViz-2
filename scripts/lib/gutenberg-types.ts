@@ -2,7 +2,9 @@ export type FilterResult = "accepted" | "review" | "rejected";
 
 /** Why auto-ingest was skipped (e.g. EPUB over size cap). */
 export const INGEST_SKIP_EPUB_TOO_LARGE = "epub_too_large" as const;
+export const INGEST_DEFER_NO_EPUB = "no_epub" as const;
 export type IngestSkipReason = typeof INGEST_SKIP_EPUB_TOO_LARGE;
+export type DeferReason = typeof INGEST_SKIP_EPUB_TOO_LARGE | typeof INGEST_DEFER_NO_EPUB;
 
 export function shouldSkipAutoIngest(entry: QueueEntry): boolean {
   return entry.skipAutoIngest === true;

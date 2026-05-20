@@ -2,7 +2,6 @@
 
 import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import {
-  ChapterEngagementBarChart,
   PartnerHorizontalBarChart,
   ReadersOverTimeArea,
 } from "@/components/partner/analytics-charts";

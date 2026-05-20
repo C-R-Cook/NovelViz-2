@@ -2,14 +2,14 @@
 
 import type { LibraryBookRow, LibraryProgress } from "./library-types";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export function useLibraryChapterProgress(
   book: LibraryBookRow | null,
   initialProgress: LibraryProgress | null,
 ) {
   const router = useRouter();
-  const chapters = book?.chapters ?? [];
+  const chapters = useMemo(() => book?.chapters ?? [], [book?.chapters]);
   const total = chapters.length;
 
   const [selectedChapterId, setSelectedChapterId] = useState("");

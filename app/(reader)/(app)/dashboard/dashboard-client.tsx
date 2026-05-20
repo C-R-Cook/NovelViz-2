@@ -12,6 +12,7 @@ import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/p
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { UsersAdminClient } from "@/app/admin/users/users-client";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
+import { gutenbergNavLinkIsActive } from "@/lib/gutenberg-admin-nav";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
@@ -357,7 +358,10 @@ export function DashboardClient({
       return <div key={entry.id} className="dashboard-nav-divider" />;
     }
     if (entry.kind === "link") {
-      const active = pathname === entry.href || pathname.startsWith(`${entry.href}/`);
+      const active =
+        entry.href.startsWith("/admin/gutenberg") || entry.href.startsWith("/admin/books")
+          ? gutenbergNavLinkIsActive(pathname ?? "", searchParams.get("tab"), entry.href)
+          : pathname === entry.href || pathname.startsWith(`${entry.href}/`);
       return (
         <Link
           key={entry.id}

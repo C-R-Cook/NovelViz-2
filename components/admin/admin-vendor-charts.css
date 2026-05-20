@@ -1,0 +1,119 @@
+/* Scoped vendor chart panels — not tied to NovelViz reader theme tokens. */
+
+.vendor-charts {
+  --vc-bg: #0a0e14;
+  --vc-surface: #111827;
+  --vc-surface-raised: #1a2332;
+  --vc-border: rgba(91, 159, 255, 0.22);
+  --vc-border-accent: rgba(61, 255, 138, 0.28);
+  --vc-text: #e8f0fa;
+  --vc-muted: #8ba3c7;
+  --vc-stat: #3dff8a;
+  --vc-stat-sub: #9cb8dc;
+  --vc-badge-bg: rgba(61, 255, 138, 0.12);
+  --vc-badge-text: #3dff8a;
+  --vc-badge-border: rgba(61, 255, 138, 0.28);
+}
+
+.vendor-charts--neon {
+  background: radial-gradient(120% 80% at 0% 0%, rgba(61, 255, 138, 0.06), transparent 55%),
+    radial-gradient(90% 70% at 100% 0%, rgba(91, 159, 255, 0.08), transparent 50%),
+    var(--vc-bg);
+  border: 1px solid var(--vc-border);
+  border-radius: 0.625rem;
+  padding: 0.625rem;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2) inset, 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.vendor-charts--neon .vendor-chart-panel {
+  background: var(--vc-surface);
+  border: 1px solid var(--vc-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.vendor-charts--neon .vendor-chart-panel--compact {
+  padding: 0.5rem 0.625rem;
+}
+
+.vendor-charts--neon .vendor-chart-panel--summary {
+  padding: 0.625rem 0.75rem;
+}
+
+.vendor-charts--neon .vendor-chart-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+}
+
+.vendor-charts--neon .vendor-chart-plot {
+  margin-top: 0.25rem;
+  width: 100%;
+}
+
+.vendor-charts--neon .vendor-chart-title {
+  color: var(--vc-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.vendor-charts--neon .vendor-chart-subtitle,
+.vendor-charts--neon .vendor-chart-meta {
+  color: var(--vc-muted);
+  font-size: 0.6875rem;
+  line-height: 1.2;
+}
+
+.vendor-charts--neon .vendor-stat-card {
+  background: var(--vc-surface-raised);
+  border: 1px solid var(--vc-border);
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.5rem;
+}
+
+.vendor-charts--neon .vendor-stat-label {
+  color: var(--vc-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vendor-charts--neon .vendor-stat-value {
+  color: var(--vc-stat);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  margin-top: 0.25rem;
+}
+
+.vendor-charts--neon .vendor-stat-sub {
+  color: var(--vc-stat-sub);
+  font-size: 0.6875rem;
+  margin-top: 0.25rem;
+}
+
+.vendor-charts--neon .vendor-live-badge {
+  background: var(--vc-badge-bg);
+  border: 1px solid var(--vc-badge-border);
+  border-radius: 9999px;
+  color: var(--vc-badge-text);
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+}
+
+.vendor-charts--neon .vendor-chart-footnote {
+  color: var(--vc-muted);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.vendor-charts--neon .vendor-chart-empty {
+  color: var(--vc-muted);
+  font-size: 0.875rem;
+  font-style: italic;
+}

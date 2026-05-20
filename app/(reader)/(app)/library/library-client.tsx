@@ -138,6 +138,16 @@ export function LibraryClient({
   const shelfAnchorRef = useRef<HTMLDivElement>(null);
   const imagesAnchorRef = useRef<HTMLDivElement>(null);
 
+  const onReadingAnchorRef = useCallback((node: HTMLDivElement | null) => {
+    readingAnchorRef.current = node;
+  }, []);
+  const onShelfAnchorRef = useCallback((node: HTMLDivElement | null) => {
+    shelfAnchorRef.current = node;
+  }, []);
+  const onImagesAnchorRef = useCallback((node: HTMLDivElement | null) => {
+    imagesAnchorRef.current = node;
+  }, []);
+
   const scrollToReading = useCallback(() => {
     readingAnchorRef.current?.scrollIntoView({
       behavior: reducedMotion ? "auto" : "smooth",
@@ -203,7 +213,7 @@ export function LibraryClient({
               >
                 <div className="library-scroll-sections">
                   <LibraryStickyHeader
-                    anchorRef={readingAnchorRef}
+                    anchorRef={onReadingAnchorRef}
                     scrollAnchorClassName="library-scroll-anchor--reading"
                     variant="reading"
                     title="Currently reading"
@@ -231,7 +241,7 @@ export function LibraryClient({
                     </div>
                   </div>
                   <LibraryStickyHeader
-                    anchorRef={shelfAnchorRef}
+                    anchorRef={onShelfAnchorRef}
                     scrollAnchorClassName="library-scroll-anchor--shelf"
                     variant="shelf"
                     title="My Book Shelf"
@@ -252,7 +262,7 @@ export function LibraryClient({
                   {images ? (
                     <>
                       <LibraryStickyHeader
-                        anchorRef={imagesAnchorRef}
+                        anchorRef={onImagesAnchorRef}
                         scrollAnchorClassName="library-scroll-anchor--images"
                         variant="images"
                         title={images.title}
@@ -276,7 +286,7 @@ export function LibraryClient({
             style={{ ["--library-nav-offset" as string]: `${NAV_OFFSET_PX}px` }}
           >
             <LibraryStickyHeader
-              anchorRef={shelfAnchorRef}
+              anchorRef={onShelfAnchorRef}
               scrollAnchorClassName="library-scroll-anchor--shelf"
               variant="shelf-solo"
               title="My Book Shelf"

@@ -23,6 +23,13 @@ import {
   formatEpubSize,
 } from "./lib/gutenberg-queue-flags";
 import {
+  parkQueueEntry,
+  readDeferredFile,
+  writeQueueAndDeferred,
+  type GutenbergDeferredFile,
+} from "./lib/gutenberg-deferred";
+import {
+  INGEST_DEFER_NO_EPUB,
   INGEST_SKIP_EPUB_TOO_LARGE,
   shouldSkipAutoIngest,
   type GutenbergQueueFile,
@@ -216,14 +223,20 @@ async function processEntry(
   total: number,
   adminUserId: string,
   dryRun: boolean,
-): Promise<"ok" | "skip" | "fail" | "skip-genre" | "too-large"> {
+  queue: GutenbergQueueFile,
+  deferred: GutenbergDeferredFile,
+): Promise<"ok" | "skip" | "fail" | "skip-genre" | "too-large" | "deferred"> {
   const label = `[${index}/${total}]`;
   const started = Date.now();
   console.log(`${LOG} ${label} Processing "${entry.title}" (gutenbergId: ${entry.gutenbergId})`);
 
   if (!entry.epubUrl) {
-    console.log(`  → No EPUB URL — skipping`);
-    return "fail";
+    console.log(`  → No EPUB URL — parking to deferred queue`);
+    if (!dryRun) {
+      parkQueueEntry(queue, deferred, entry.gutenbergId, INGEST_DEFER_NO_EPUB);
+      writeQueueAndDeferred(queue, deferred);
+    }
+    return "deferred";
   }
 
   let bookId: string | null = null;
@@ -255,6 +268,8 @@ async function processEntry(
       );
       if (!dryRun) {
         flagQueueEntryManualUpload(entry, INGEST_SKIP_EPUB_TOO_LARGE, epubBuffer.length);
+        parkQueueEntry(queue, deferred, entry.gutenbergId, INGEST_SKIP_EPUB_TOO_LARGE);
+        writeQueueAndDeferred(queue, deferred);
       }
       return "too-large";
     }
@@ -362,6 +377,7 @@ async function main(): Promise<void> {
   }
 
   const queue = JSON.parse(fs.readFileSync(queuePath, "utf8")) as GutenbergQueueFile;
+  const deferred = readDeferredFile();
   let approved = queue.entries.filter((e) => e.approved === true);
   if (approved.length === 0) {
     const acceptedCount = queue.entries.filter((e) => e.filterResult === "accepted").length;
@@ -415,14 +431,24 @@ async function main(): Promise<void> {
   let skipped = 0;
   let skipGenre = 0;
   let tooLarge = 0;
+  let deferredCount = 0;
   const failedIds: number[] = [];
   const tooLargeIds: number[] = [];
-  let totalPromptTokens = 0;
-  let totalCompletionTokens = 0;
+  const deferredIds: number[] = [];
+  const totalPromptTokens = 0;
+  const totalCompletionTokens = 0;
 
   for (let i = 0; i < approved.length; i++) {
     const entry = approved[i]!;
-    const result = await processEntry(entry, i + 1, approved.length, adminUserId, dryRun);
+    const result = await processEntry(
+      entry,
+      i + 1,
+      approved.length,
+      adminUserId,
+      dryRun,
+      queue,
+      deferred,
+    );
 
     if (result === "ok") {
       succeeded += 1;
@@ -437,6 +463,9 @@ async function main(): Promise<void> {
     } else if (result === "too-large") {
       tooLarge += 1;
       tooLargeIds.push(entry.gutenbergId);
+    } else if (result === "deferred") {
+      deferredCount += 1;
+      deferredIds.push(entry.gutenbergId);
     } else {
       failed += 1;
       failedIds.push(entry.gutenbergId);
@@ -447,9 +476,8 @@ async function main(): Promise<void> {
     }
   }
 
-  if (!dryRun && (succeeded > 0 || tooLarge > 0)) {
-    queue.fetchedAt = queue.fetchedAt;
-    fs.writeFileSync(queuePath, JSON.stringify(queue, null, 2), "utf8");
+  if (!dryRun && (succeeded > 0 || tooLarge > 0 || deferredCount > 0)) {
+    writeQueueAndDeferred(queue, deferred);
   }
 
   const genreCost =
@@ -462,10 +490,15 @@ async function main(): Promise<void> {
   console.log(`  Failed:     ${failed}`);
   console.log(`  Skipped:    ${skipped} (dedup)`);
   console.log(`  Skip genre: ${skipGenre}`);
-  console.log(`  Too large:  ${tooLarge} (flagged for manual upload)`);
+  console.log(`  Too large:  ${tooLarge} (moved to deferred — manual upload)`);
+  console.log(`  Deferred:   ${deferredCount} (no EPUB or moved to deferred file)`);
   if (tooLargeIds.length > 0) {
-    console.log(`  Manual upload gutenbergIds: ${tooLargeIds.join(", ")}`);
+    console.log(`  Deferred (too large) gutenbergIds: ${tooLargeIds.join(", ")}`);
   }
+  if (deferredIds.length > 0) {
+    console.log(`  Deferred gutenbergIds: ${deferredIds.join(", ")}`);
+  }
+  console.log(`  Deferred queue: scripts/gutenberg-queue-deferred.json (${deferred.entries.length} total)`);
   if (failedIds.length > 0) {
     console.log(`  Failed gutenbergIds: ${failedIds.join(", ")}`);
   }

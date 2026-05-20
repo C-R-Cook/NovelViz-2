@@ -1,3 +1,5 @@
+import { GUTENBERG_ADMIN_NAV_LINKS } from "@/lib/gutenberg-admin-nav";
+
 /** Matches `UserRole` string values from Prisma — kept here so client components never import `@db` (avoids bundling Prisma in the browser). */
 export type DashboardUserRole = "reader" | "partner" | "admin";
 
@@ -96,6 +98,14 @@ export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[
     { kind: "tab", tab: "all-books", icon: "▤" },
     { kind: "tab", tab: "all-users", icon: "◎" },
     { kind: "tab", tab: "admin-stats", icon: "∑" },
+    { kind: "divider", id: "d-gutenberg" },
+    ...GUTENBERG_ADMIN_NAV_LINKS.map((link) => ({
+      kind: "link" as const,
+      id: link.id,
+      href: link.href,
+      label: link.label,
+      icon: link.icon,
+    })),
     { kind: "divider", id: "d3" },
     { kind: "tab", tab: "account", icon: "○" },
   ];

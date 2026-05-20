@@ -1,6 +1,6 @@
 "use client";
 
-import { DEV_USER_COOKIE, DEV_USERS_BY_ID, type DevIdentityUser } from "@/lib/dev-users";
+import { DEV_USER_COOKIE, DEV_USERS_BY_ID } from "@/lib/dev-users";
 import { useCallback, useState } from "react";
 
 const STORAGE_KEY = "dev_user_id";
@@ -25,7 +25,7 @@ function writeDevUserCookie(userId: string) {
   document.cookie = `dev_role=; path=/; max-age=0; SameSite=Lax`;
 }
 
-function getHomeUrlForUser(_user: DevIdentityUser): string {
+function getHomeUrlForUser(): string {
   return "/library";
 }
 
@@ -72,8 +72,7 @@ function DevRoleSwitcherInner({ initialUserId }: Props) {
     setUserId(nextId);
     localStorage.setItem(STORAGE_KEY, nextId);
     writeDevUserCookie(nextId);
-    const user = DEV_USERS_BY_ID[nextId];
-    const target = getHomeUrlForUser(user);
+    const target = getHomeUrlForUser();
     if (window.location.pathname === target) {
       window.location.reload();
       return;

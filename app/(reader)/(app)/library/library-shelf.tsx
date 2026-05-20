@@ -49,20 +49,29 @@ export function LibraryShelf({
   reducedMotion,
   finePointer,
 }: Props) {
-  const drag = useDragScroll({
+  const {
+    setScrollerRef,
+    dragging,
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    onPointerCancel,
+    onPointerLeave,
+    shouldIgnoreClick,
+  } = useDragScroll({
     enabled: finePointer && !reducedMotion,
     ignoreSelector: ".library-shelf-card, .library-active-book-bar, .library-active-book-bar *",
   });
 
   return (
     <div
-      ref={drag.scrollerRef}
-      className={`library-shelf-row library-no-h-scrollbar ${drag.dragging ? "library-shelf-row--dragging" : ""}`}
-      onPointerDownCapture={drag.onPointerDown}
-      onPointerMove={drag.onPointerMove}
-      onPointerUp={drag.onPointerUp}
-      onPointerCancel={drag.onPointerCancel}
-      onPointerLeave={drag.onPointerLeave}
+      ref={setScrollerRef}
+      className={`library-shelf-row library-no-h-scrollbar ${dragging ? "library-shelf-row--dragging" : ""}`}
+      onPointerDownCapture={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onPointerLeave={onPointerLeave}
     >
       {books.map((book) => {
         const active = book.bookId === activeBookId;
@@ -75,7 +84,7 @@ export function LibraryShelf({
             aria-pressed={active}
             aria-label={`${book.title} by ${book.author}`}
             onClick={() => {
-              if (drag.shouldIgnoreClick()) return;
+              if (shouldIgnoreClick()) return;
               onSelectBook(book.bookId);
             }}
           >

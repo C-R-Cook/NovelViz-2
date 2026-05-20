@@ -3,6 +3,12 @@ import {
   formatDayKeyUtc,
   utcStartOfCalendarDay,
 } from "@/lib/costs";
+import {
+  SITE_IMAGINE_FAL_ENDPOINT_SET,
+  SITE_IMAGINE_FAL_ENDPOINT_TO_CHART_KEY,
+  SITE_IMAGINE_FAL_MODELS,
+  type SiteImagineFalChartKey,
+} from "@/lib/imagine-fal-models";
 
 export type OpenAiVendorSnapshot = {
   totalSpendUsd: number;
@@ -12,16 +18,26 @@ export type OpenAiVendorSnapshot = {
 
 export type FalModelBreakdownRow = {
   endpointId: string;
+  label: string;
   quantity: number;
   costUsd: number;
 };
+
+export type FalDailyModelImagesPoint = {
+  date: string;
+} & Record<SiteImagineFalChartKey, number>;
 
 export type FalVendorSnapshot = {
   totalSpendUsd: number;
   imagesGenerated: number;
   dailySpendUsd: { date: string; amountUsd: number }[];
+  dailyImagesByModel: FalDailyModelImagesPoint[];
   byModel: FalModelBreakdownRow[];
 };
+
+function emptyDailyModelImages(): Record<SiteImagineFalChartKey, number> {
+  return { fluxSchnell: 0, grok: 0, seedream: 0 };
+}
 
 export type VendorFetchResult<T> = {
   snapshot: T | null;
@@ -326,6 +342,7 @@ export async function fetchFalVendorSnapshot(
     let totalSpendUsd = 0;
 
     for (const row of body.summary ?? []) {
+      if (!SITE_IMAGINE_FAL_ENDPOINT_SET.has(row.endpoint_id)) continue;
       const cost = typeof row.cost === "number" && Number.isFinite(row.cost) ? row.cost : 0;
       totalSpendUsd += cost;
       const q = typeof row.quantity === "number" && Number.isFinite(row.quantity) ? row.quantity : 0;
@@ -339,13 +356,23 @@ export async function fetchFalVendorSnapshot(
       });
     }
 
+    const imagesByDay = new Map<string, Record<SiteImagineFalChartKey, number>>();
+
     for (const ts of body.time_series ?? []) {
       const dayKey = parseFalBucketDay(ts.bucket);
       let dayUsd = 0;
+      const dayImages = imagesByDay.get(dayKey) ?? emptyDailyModelImages();
       for (const r of ts.results ?? []) {
+        if (!SITE_IMAGINE_FAL_ENDPOINT_SET.has(r.endpoint_id)) continue;
         const cost = typeof r.cost === "number" && Number.isFinite(r.cost) ? r.cost : 0;
         dayUsd += cost;
+        const chartKey = SITE_IMAGINE_FAL_ENDPOINT_TO_CHART_KEY[r.endpoint_id];
+        if (chartKey && (r.unit ?? "").toLowerCase() === "image") {
+          const q = typeof r.quantity === "number" && Number.isFinite(r.quantity) ? r.quantity : 0;
+          dayImages[chartKey] += q;
+        }
       }
+      imagesByDay.set(dayKey, dayImages);
       spendByDay.set(dayKey, (spendByDay.get(dayKey) ?? 0) + dayUsd);
     }
 
@@ -356,18 +383,31 @@ export async function fetchFalVendorSnapshot(
       amountUsd: row.count,
     }));
 
-    const byModel: FalModelBreakdownRow[] = [...byEndpoint.entries()].map(([endpointId, v]) => ({
-      endpointId,
-      quantity: v.quantity,
-      costUsd: v.costUsd,
-    }));
-    byModel.sort((a, b) => b.costUsd - a.costUsd);
+    const dailyImagesByModel: FalDailyModelImagesPoint[] = buildDailySeries(
+      chartStart,
+      chartEnd,
+      new Map(),
+    ).map((row) => {
+      const counts = imagesByDay.get(row.date) ?? emptyDailyModelImages();
+      return { date: row.date, ...counts };
+    });
+
+    const byModel: FalModelBreakdownRow[] = SITE_IMAGINE_FAL_MODELS.map(({ endpoint, label }) => {
+      const v = byEndpoint.get(endpoint) ?? { quantity: 0, costUsd: 0 };
+      return {
+        endpointId: endpoint,
+        label,
+        quantity: v.quantity,
+        costUsd: v.costUsd,
+      };
+    });
 
     return {
       snapshot: {
         totalSpendUsd,
         imagesGenerated,
         dailySpendUsd,
+        dailyImagesByModel,
         byModel,
       },
       errorMessage: null,

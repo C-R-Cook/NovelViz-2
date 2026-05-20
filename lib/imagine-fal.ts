@@ -1,15 +1,19 @@
 import { UserRole } from "@db";
 import {
+  FLUX_SCHNELL_ENDPOINT,
+  GROK_IMAGINE_ENDPOINT,
   IMAGINE_FAL_DEFAULT_ADMIN_KEY,
+  SEEDREAM_V45_ENDPOINT,
   type ImagineFalModelKey,
 } from "@/lib/imagine-fal-models";
 
-export type { ImagineFalModelKey } from "@/lib/imagine-fal-models";
-export { IMAGINE_FAL_DEFAULT_ADMIN_KEY } from "@/lib/imagine-fal-models";
-
-const GROK_ENDPOINT = "xai/grok-imagine-image" as const;
-const FLUX_SCHNELL_ENDPOINT = "fal-ai/flux/schnell" as const;
-const SEEDREAM_V45_ENDPOINT = "fal-ai/bytedance/seedream/v4.5/text-to-image" as const;
+export type { ImagineFalModelKey, SiteImagineFalChartKey } from "@/lib/imagine-fal-models";
+export {
+  IMAGINE_FAL_DEFAULT_ADMIN_KEY,
+  SITE_IMAGINE_FAL_ENDPOINT_SET,
+  SITE_IMAGINE_FAL_ENDPOINT_TO_CHART_KEY,
+  SITE_IMAGINE_FAL_MODELS,
+} from "@/lib/imagine-fal-models";
 
 const ADMIN_SPECS: Record<
   ImagineFalModelKey,
@@ -25,7 +29,7 @@ const ADMIN_SPECS: Record<
     }),
   },
   grok: {
-    endpoint: GROK_ENDPOINT,
+    endpoint: GROK_IMAGINE_ENDPOINT,
     modelLabel: "grok-imagine",
     buildInput: (prompt) => ({
       prompt,

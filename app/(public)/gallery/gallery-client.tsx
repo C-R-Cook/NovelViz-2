@@ -725,10 +725,13 @@ export function GalleryClient(props: GalleryClientProps) {
     setImagesById((prev) => mergeGalleryServerImages(serverImagesById, prev));
   }, [serverImagesById]);
 
+  const memberSpoilerSettings =
+    props.layout === "member" ? props.spoilerSettingsByBookId : undefined;
+
   useEffect(() => {
-    if (props.layout !== "member") return;
-    setSpoilerSettingsByBookId(props.spoilerSettingsByBookId);
-  }, [props.layout, props.layout === "member" ? props.spoilerSettingsByBookId : null]);
+    if (props.layout !== "member" || !memberSpoilerSettings) return;
+    setSpoilerSettingsByBookId(memberSpoilerSettings);
+  }, [props.layout, memberSpoilerSettings]);
 
   const getMemberChapterGateLock = useCallback(
     (image: GalleryImageCard): { locked: boolean; lockKind: GalleryLockKind } => {

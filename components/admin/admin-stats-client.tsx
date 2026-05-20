@@ -1,7 +1,9 @@
 "use client";
 
 import type { AdminStatsPayload } from "@/lib/admin-stats";
-import type { FalVendorSnapshot, OpenAiVendorSnapshot } from "@/lib/admin-vendors";
+import { NeonUsageSection } from "@/components/admin/neon-usage-section";
+import { FalUsageCard } from "@/components/admin/fal-usage-card";
+import type { OpenAiVendorSnapshot } from "@/lib/admin-vendors";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Bar,
@@ -50,7 +52,7 @@ function VendorLiveBadge() {
 
 function VendorSpendMiniChart({ data }: { data: { date: string; amountUsd: number }[] }) {
   return (
-    <div className="mt-3 h-[120px] w-full">
+    <div className="mt-2 h-[100px] w-full">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data}>
           <XAxis dataKey="date" hide />
@@ -74,7 +76,7 @@ function OpenAiCard({
 }) {
   if (!openai) {
     return (
-      <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
+      <div className="rounded-xl border border-border bg-bg-surface p-3 shadow-sm">
         <h3 className="text-sm font-semibold text-text-primary">OpenAI</h3>
         <p className="mt-2 text-sm text-text-secondary italic">
           {message ?? "Configure OPENAI_ADMIN_API_KEY to see live OpenAI billing data."}
@@ -83,7 +85,7 @@ function OpenAiCard({
     );
   }
   return (
-    <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
+    <div className="rounded-xl border border-border bg-bg-surface p-3 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-text-primary">OpenAI</h3>
         <VendorLiveBadge />
@@ -103,67 +105,6 @@ function OpenAiCard({
   );
 }
 
-function FalCard({
-  fal,
-  message,
-  days,
-}: {
-  fal: FalVendorSnapshot | null;
-  message: string | null;
-  days: number;
-}) {
-  if (!fal) {
-    return (
-      <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
-        <h3 className="text-sm font-semibold text-text-primary">fal.ai</h3>
-        <p className="mt-2 text-sm text-text-secondary italic">
-          {message ?? "No fal.ai usage data available. Check FAL_API_KEY is set."}
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">fal.ai</h3>
-        <VendorLiveBadge />
-      </div>
-      <p className="mt-2 text-sm text-text-secondary">
-        Total spend ({days} days):{" "}
-        <span className="font-semibold tabular-nums text-text-primary">${fal.totalSpendUsd.toFixed(4)}</span>
-      </p>
-      <p className="mt-1 text-sm text-text-secondary">
-        Images billed:{" "}
-        <span className="tabular-nums text-text-primary">{fal.imagesGenerated.toLocaleString()}</span>
-      </p>
-      {fal.byModel.length > 0 ? (
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <th className="text-left text-xs text-text-muted pb-2">Model</th>
-                <th className="text-left text-xs text-text-muted pb-2">Images</th>
-                <th className="text-left text-xs text-text-muted pb-2">Cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fal.byModel.map((row) => (
-                <tr key={row.endpointId}>
-                  <td className="py-1.5 border-t border-border text-text-secondary">{row.endpointId}</td>
-                  <td className="py-1.5 border-t border-border tabular-nums text-text-primary">
-                    {row.quantity.toLocaleString()}
-                  </td>
-                  <td className="py-1.5 border-t border-border tabular-nums text-text-primary">${row.costUsd.toFixed(4)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      <VendorSpendMiniChart data={fal.dailySpendUsd} />
-    </div>
-  );
-}
 
 export function AdminStatsClient({ initialData: data }: { initialData: AdminStatsPayload }) {
   const router = useRouter();
@@ -311,27 +252,27 @@ export function AdminStatsClient({ initialData: data }: { initialData: AdminStat
             </select>
           </label>
         </div>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-3 lg:grid-cols-2">
           <OpenAiCard
             openai={data.vendors.openai}
             message={data.vendorMessages.openai}
             days={data.vendorWindowDays}
           />
-          <FalCard fal={data.vendors.fal} message={data.vendorMessages.fal} days={data.vendorWindowDays} />
-          <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
+          <div className="rounded-xl border border-border bg-bg-surface p-3 shadow-sm">
             <h3 className="text-sm font-semibold text-text-primary">Anthropic</h3>
-            <p className="mt-2 text-sm text-text-secondary italic">
+            <p className="mt-2 text-sm leading-snug text-text-secondary italic">
               This account is an individual Anthropic API account. The Anthropic usage API requires an organisation
-              account. Cost estimates are calculated from stored token counts - see the Estimated AI Costs section above.
+              account. Cost estimates are calculated from stored token counts — see Estimated AI Costs above.
             </p>
           </div>
-          <div className="rounded-xl border border-border bg-bg-surface p-4 shadow-sm">
-            <h3 className="text-sm font-semibold text-text-primary">Neon</h3>
-            <p className="mt-2 text-sm text-text-secondary italic">
-              Upgrade to Neon Launch plan and add NEON_API_KEY to enable database usage metrics: compute hours, storage
-              GB-months, and network transfer.
-            </p>
-          </div>
+          <FalUsageCard fal={data.vendors.fal} message={data.vendorMessages.fal} days={data.vendorWindowDays} />
+        </div>
+        <div className="mt-4">
+          <NeonUsageSection
+            neon={data.vendors.neon}
+            message={data.vendorMessages.neon}
+            days={data.vendorWindowDays}
+          />
         </div>
       </section>
     </div>

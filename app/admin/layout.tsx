@@ -14,7 +14,7 @@ export default async function AdminLayout({
     redirect("/library");
   }
   if (user.role !== UserRole.admin) {
-    redirect(getRoleHomeUrl(user.role));
+    redirect(getRoleHomeUrl());
   }
 
   return (

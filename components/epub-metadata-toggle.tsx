@@ -17,7 +17,6 @@ export function EpubMetadataToggle({
   disabled?: boolean;
   id?: string;
 }) {
-  const locked = !unlocked;
   const lockedTitle =
     "Metadata fields will not be overwritten when you upload or change the EPUB file";
   const unlockedTitle =

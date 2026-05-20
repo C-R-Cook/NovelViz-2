@@ -165,6 +165,15 @@ export function NavChrome({
       {isLoggedIn && userRole === "admin" ? (
         <>
           <Link
+            href="/admin/gutenberg-import"
+            className={navLinkClass(
+              isActive(pathname, "/admin/gutenberg-import") || isActive(pathname, "/admin/books"),
+            )}
+            onClick={() => setMenuOpen(false)}
+          >
+            Gutenberg
+          </Link>
+          <Link
             href="/admin/data-flows"
             className={navLinkClass(isActive(pathname, "/admin/data-flows"))}
             onClick={() => setMenuOpen(false)}

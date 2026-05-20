@@ -1,17 +1,29 @@
 "use client";
 
+import { GutenbergSectionNav } from "@/components/admin/gutenberg-section-nav";
+import { parseGutenbergTab, type GutenbergImportTab } from "@/lib/gutenberg-admin-nav";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  deferReasonLabel,
   formatEpubSize,
   ingestSkipReasonLabel,
 } from "@/scripts/lib/gutenberg-queue-flags";
-import type { GutenbergQueueFile, QueueEntry } from "@/scripts/lib/gutenberg-types";
+import type { DeferredQueueEntry, GutenbergDeferredFile } from "@/scripts/lib/gutenberg-deferred";
+import { INGEST_DEFER_NO_EPUB, INGEST_SKIP_EPUB_TOO_LARGE } from "@/scripts/lib/gutenberg-types";
+import type { DeferReason, GutenbergQueueFile, QueueEntry } from "@/scripts/lib/gutenberg-types";
 
 type QueueState =
   | { status: "loading" }
   | { status: "empty" }
   | { status: "error"; message: string }
-  | { status: "ready"; queue: GutenbergQueueFile; entries: QueueEntry[] };
+  | {
+      status: "ready";
+      queue: GutenbergQueueFile;
+      entries: QueueEntry[];
+      deferred: GutenbergDeferredFile;
+    };
 
 function SectionHeader({
   title,
@@ -132,12 +144,15 @@ function BookRow({
 }
 
 export function GutenbergImportClient() {
+  const searchParams = useSearchParams();
+  const activeTab = parseGutenbergTab(searchParams.get("tab"));
   const [state, setState] = useState<QueueState>({ status: "loading" });
   const [checked, setChecked] = useState<Record<number, boolean>>({});
-  const [rejectedExpanded, setRejectedExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [clearingId, setClearingId] = useState<number | null>(null);
+  const [deferredFilter, setDeferredFilter] = useState<"all" | DeferReason>("all");
+  const [restoringId, setRestoringId] = useState<number | null>(null);
 
   const loadQueue = useCallback(async () => {
     setState({ status: "loading" });
@@ -151,8 +166,9 @@ export function GutenbergImportClient() {
         setState({ status: "empty" });
         return;
       }
-      const queue = data as GutenbergQueueFile;
+      const queue = data as GutenbergQueueFile & { deferred?: GutenbergDeferredFile };
       const entries = queue.entries ?? [];
+      const deferred = queue.deferred ?? { updatedAt: "", entries: [] };
       const initialChecked: Record<number, boolean> = {};
       for (const e of entries) {
         if (e.filterResult === "accepted") {
@@ -162,7 +178,7 @@ export function GutenbergImportClient() {
         }
       }
       setChecked(initialChecked);
-      setState({ status: "ready", queue, entries });
+      setState({ status: "ready", queue, entries, deferred });
     } catch (err) {
       setState({
         status: "error",
@@ -198,6 +214,32 @@ export function GutenbergImportClient() {
     }
     return { accepted, review, rejected, manualUpload };
   }, [state]);
+
+  const filteredDeferred = useMemo(() => {
+    if (state.status !== "ready") return [] as DeferredQueueEntry[];
+    if (deferredFilter === "all") return state.deferred.entries;
+    return state.deferred.entries.filter((e) => e.deferReason === deferredFilter);
+  }, [state, deferredFilter]);
+
+  async function restoreDeferred(gutenbergId: number) {
+    setRestoringId(gutenbergId);
+    setSaveMessage(null);
+    try {
+      const res = await fetch("/api/admin/gutenberg-queue", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restoreDeferred: [gutenbergId] }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      await loadQueue();
+      setSaveMessage(`Restored gutenbergId ${gutenbergId} to the discovery queue (not approved).`);
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : "Restore failed");
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   async function clearManualUploadFlag(gutenbergId: number) {
     setClearingId(gutenbergId);
@@ -258,119 +300,244 @@ export function GutenbergImportClient() {
     }
   }
 
+  const publishLink = {
+    href: "/admin/books",
+    label: "Publish",
+    icon: "◎",
+    hint: "Pending review → Discover",
+  } as const;
+
+  const tabCounts = useMemo(() => {
+    if (state.status !== "ready") return undefined;
+    return {
+      overview: state.entries.length,
+      accepted: byFilter.accepted.length,
+      review: byFilter.review.length,
+      rejected: byFilter.rejected.length,
+      deferred: state.deferred.entries.length,
+      manual: byFilter.manualUpload.length,
+    } satisfies Partial<Record<GutenbergImportTab, number>>;
+  }, [state, byFilter]);
+
+  const showApprovalFooter = activeTab === "accepted" || activeTab === "review";
+  const nav = <GutenbergSectionNav counts={tabCounts} externalLinks={[publishLink]} />;
+
   if (state.status === "loading") {
-    return <p className="text-sm text-text-secondary">Loading queue…</p>;
+    return (
+      <div className="space-y-4">
+        {nav}
+        <p className="text-sm text-text-secondary">Loading queue…</p>
+      </div>
+    );
   }
 
   if (state.status === "empty") {
     return (
-      <p className="rounded-lg border border-border bg-bg-surface p-4 text-sm text-text-secondary">
-        No queue file found. Run the discovery script first:{" "}
-        <code className="text-text-primary">npx tsx scripts/gutenberg-fetch.ts</code>
-      </p>
+      <div className="space-y-4">
+        {nav}
+        <p className="rounded-lg border border-border bg-bg-surface p-4 text-sm text-text-secondary">
+          No queue file found. Run the discovery script first:{" "}
+          <code className="text-text-primary">npx tsx scripts/gutenberg-fetch.ts</code>
+        </p>
+      </div>
     );
   }
 
   if (state.status === "error") {
-    return <p className="text-sm text-error">{state.message}</p>;
+    return (
+      <div className="space-y-4">
+        {nav}
+        <p className="text-sm text-error">{state.message}</p>
+      </div>
+    );
   }
 
   const { queue } = state;
 
   return (
     <div className="space-y-6 pb-24">
-      <div className="rounded-lg border border-border bg-bg-surface p-4 text-sm space-y-2">
-        <p className="text-text-secondary">
-          Fetched: <span className="text-text-primary">{new Date(queue.fetchedAt).toLocaleString()}</span>
-          {" · "}
-          Mode: <span className="text-text-primary">{queue.mode}</span>
-        </p>
-        <p className="text-text-secondary">
-          {queue.totalAccepted} accepted · {queue.totalReview} under review · {queue.totalRejected}{" "}
-          rejected
-          {queue.totalSkippedDelta > 0 ? ` · ${queue.totalSkippedDelta} skipped (delta)` : ""}
-        </p>
-        <p className="text-[#C49A3C] border-t border-border/60 pt-2 mt-2">
-          Ingested books are created as <strong>pending_review</strong>. They must be published via{" "}
-          <a href="/admin/books" className="underline text-text-primary">
-            Books admin
-          </a>{" "}
-          before they appear on Discover (requires a cover image).
-        </p>
-      </div>
+      {nav}
 
-      {byFilter.manualUpload.length > 0 ? (
-        <section className="rounded-lg border border-[#8B4513]/40 bg-[#8B4513]/10 p-4">
-          <SectionHeader title="Manual upload required" count={byFilter.manualUpload.length} expanded />
-          <p className="mt-2 text-xs text-text-secondary">
-            These EPUBs exceeded the 4.5 MB ingest cap. Upload the EPUB manually via{" "}
-            <a href="/admin/books" className="underline text-text-primary">
-              Books admin
-            </a>{" "}
-            (use the same title and set <code className="text-text-primary">gutenbergId</code> in the DB if
-            needed), then clear the flag here so bulk ingest will not retry them on{" "}
-            <code className="text-text-primary">--resume</code> / <code className="text-text-primary">--limit</code>
-            .
+      {activeTab === "overview" ? (
+        <div className="rounded-lg border border-border bg-bg-surface p-4 text-sm space-y-2">
+          <p className="text-text-secondary">
+            Fetched: <span className="text-text-primary">{new Date(queue.fetchedAt).toLocaleString()}</span>
+            {" · "}
+            Mode: <span className="text-text-primary">{queue.mode}</span>
           </p>
-          <div className="mt-1">
-            {byFilter.manualUpload.map((e) => (
-              <BookRow
-                key={`manual-${e.gutenbergId}`}
-                entry={e}
-                checked={false}
-                readOnly
-                onClearManualUpload={() => void clearManualUploadFlag(e.gutenbergId)}
-                clearingManual={clearingId === e.gutenbergId}
-              />
+          <p className="text-text-secondary">
+            {queue.totalAccepted} accepted · {queue.totalReview} under review · {queue.totalRejected}{" "}
+            rejected
+            {queue.totalSkippedDelta > 0 ? ` · ${queue.totalSkippedDelta} skipped (delta)` : ""}
+            {state.deferred.entries.length > 0 ? ` · ${state.deferred.entries.length} deferred` : ""}
+          </p>
+          <p className="text-[#C49A3C] border-t border-border/60 pt-2 mt-2">
+            Ingested books are created as <strong>pending_review</strong>. They must be published via{" "}
+            <Link href="/admin/books" className="underline text-text-primary">
+              Books admin
+            </Link>{" "}
+            before they appear on Discover (requires a cover image).
+          </p>
+          <p className="text-xs text-text-muted">
+            Use the tabs above to review each list. After approving, run{" "}
+            <code className="text-text-primary">npm run gutenberg-ingest -- --resume</code>.
+          </p>
+        </div>
+      ) : null}
+
+      {activeTab === "deferred" ? (
+        <section className="rounded-lg border border-[#8B4513]/40 bg-[#8B4513]/10 p-4">
+          <SectionHeader title="Deferred (manual / blocked)" count={state.deferred.entries.length} expanded />
+          <p className="mt-2 text-xs text-text-secondary">
+            Parked titles live in <code className="text-text-primary">scripts/gutenberg-queue-deferred.json</code>.
+            They are removed from the active ingest queue. Upload EPUBs manually via{" "}
+            <Link href="/admin/books" className="underline text-text-primary">
+              Books admin
+            </Link>
+            , or restore below.
+          </p>
+          {state.deferred.entries.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No deferred titles.</p>
+          ) : (
+            <>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                ["all", "All"],
+                [INGEST_DEFER_NO_EPUB, "No EPUB"],
+                [INGEST_SKIP_EPUB_TOO_LARGE, "Too large"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setDeferredFilter(key)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  deferredFilter === key
+                    ? "bg-[var(--accent)] text-text-primary"
+                    : "bg-bg-raised text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {label}
+              </button>
             ))}
           </div>
+          <div className="mt-1">
+            {filteredDeferred.map((e) => (
+              <div
+                key={`deferred-${e.gutenbergId}`}
+                className="flex items-start gap-3 border-b border-border/60 py-2 text-sm"
+              >
+                <span className="min-w-0 flex-1">
+                  <BookRow entry={e} checked={false} readOnly />
+                  <span className="ml-7 block text-[10px] text-text-muted">
+                    Parked {new Date(e.deferredAt).toLocaleString()} · {deferReasonLabel(e.deferReason)}
+                    {e.epubUrl ? (
+                      <>
+                        {" "}
+                        · <span className="font-mono break-all">{e.epubUrl}</span>
+                      </>
+                    ) : null}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={restoringId === e.gutenbergId}
+                  onClick={() => void restoreDeferred(e.gutenbergId)}
+                  className="shrink-0 text-xs underline text-text-secondary hover:text-text-primary disabled:opacity-50"
+                >
+                  {restoringId === e.gutenbergId ? "Restoring…" : "Restore to queue"}
+                </button>
+              </div>
+            ))}
+          </div>
+            </>
+          )}
         </section>
       ) : null}
 
-      <section>
-        <SectionHeader title="Accepted" count={byFilter.accepted.length} expanded />
-        <div className="mt-1">
-          {byFilter.accepted.map((e) => (
-            <BookRow
-              key={e.gutenbergId}
-              entry={e}
-              checked={checked[e.gutenbergId] ?? true}
-              onChange={(v) => setChecked((c) => ({ ...c, [e.gutenbergId]: v }))}
-            />
-          ))}
-        </div>
-      </section>
+      {activeTab === "manual" ? (
+        <section className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+          <SectionHeader title="Still flagged (not parked yet)" count={byFilter.manualUpload.length} expanded />
+          <p className="mt-2 text-xs text-text-secondary">
+            Run <code className="text-text-primary">npm run gutenberg-park-deferred</code> to move these into the
+            deferred file and clean the ingest list.
+          </p>
+          {byFilter.manualUpload.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No flagged titles on the active queue.</p>
+          ) : (
+            <div className="mt-1">
+              {byFilter.manualUpload.map((e) => (
+                <BookRow
+                  key={`manual-${e.gutenbergId}`}
+                  entry={e}
+                  checked={false}
+                  readOnly
+                  onClearManualUpload={() => void clearManualUploadFlag(e.gutenbergId)}
+                  clearingManual={clearingId === e.gutenbergId}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
-      <section>
-        <SectionHeader title="Needs review" count={byFilter.review.length} expanded />
-        <div className="mt-1">
-          {byFilter.review.map((e) => (
-            <BookRow
-              key={e.gutenbergId}
-              entry={e}
-              checked={checked[e.gutenbergId] ?? false}
-              onChange={(v) => setChecked((c) => ({ ...c, [e.gutenbergId]: v }))}
-            />
-          ))}
-        </div>
-      </section>
+      {activeTab === "accepted" ? (
+        <section>
+          <SectionHeader title="Accepted" count={byFilter.accepted.length} expanded />
+          {byFilter.accepted.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No accepted titles in the queue.</p>
+          ) : (
+            <div className="mt-1">
+              {byFilter.accepted.map((e) => (
+                <BookRow
+                  key={e.gutenbergId}
+                  entry={e}
+                  checked={checked[e.gutenbergId] ?? true}
+                  onChange={(v) => setChecked((c) => ({ ...c, [e.gutenbergId]: v }))}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
-      <section>
-        <SectionHeader
-          title="Rejected"
-          count={byFilter.rejected.length}
-          expanded={rejectedExpanded}
-          onToggle={() => setRejectedExpanded((v) => !v)}
-        />
-        {rejectedExpanded ? (
-          <div className="mt-1">
-            {byFilter.rejected.map((e) => (
-              <BookRow key={e.gutenbergId} entry={e} checked={false} readOnly />
-            ))}
-          </div>
-        ) : null}
-      </section>
+      {activeTab === "review" ? (
+        <section>
+          <SectionHeader title="Needs review" count={byFilter.review.length} expanded />
+          {byFilter.review.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No titles need review.</p>
+          ) : (
+            <div className="mt-1">
+              {byFilter.review.map((e) => (
+                <BookRow
+                  key={e.gutenbergId}
+                  entry={e}
+                  checked={checked[e.gutenbergId] ?? false}
+                  onChange={(v) => setChecked((c) => ({ ...c, [e.gutenbergId]: v }))}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
+      {activeTab === "rejected" ? (
+        <section>
+          <SectionHeader title="Rejected" count={byFilter.rejected.length} expanded />
+          {byFilter.rejected.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No rejected titles.</p>
+          ) : (
+            <div className="mt-1">
+              {byFilter.rejected.map((e) => (
+                <BookRow key={e.gutenbergId} entry={e} checked={false} readOnly />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
+      {showApprovalFooter ? (
       <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-bg-base/95 px-4 py-3 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-text-secondary">
@@ -387,6 +554,7 @@ export function GutenbergImportClient() {
           </button>
         </div>
       </div>
+      ) : null}
 
       {saveMessage ? (
         <p className="text-sm text-text-secondary rounded-lg border border-border p-3">{saveMessage}</p>

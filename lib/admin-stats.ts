@@ -1,3 +1,4 @@
+import { fetchNeonVendorSnapshot, type NeonVendorSnapshot } from "@/lib/admin-neon";
 import { fetchFalVendorSnapshot, fetchOpenAiVendorSnapshot, type FalVendorSnapshot, type OpenAiVendorSnapshot } from "@/lib/admin-vendors";
 import {
   buildDailySeries,
@@ -52,10 +53,12 @@ export type AdminStatsPayload = {
   vendors: {
     openai: OpenAiVendorSnapshot | null;
     fal: FalVendorSnapshot | null;
+    neon: NeonVendorSnapshot | null;
   };
   vendorMessages: {
     openai: string | null;
     fal: string | null;
+    neon: string | null;
   };
 };
 
@@ -221,9 +224,10 @@ export async function getAdminStatsPayload(vendorDays = 30): Promise<AdminStatsP
   const imageMap = rowsToDayMap(imageDayRows);
   const userMap = rowsToDayMap(userDayRows);
 
-  const [openaiVendorResult, falVendorResult] = await Promise.all([
+  const [openaiVendorResult, falVendorResult, neonVendorResult] = await Promise.all([
     fetchOpenAiVendorSnapshot(vendorStartInclusive, vendorEndInclusive),
     fetchFalVendorSnapshot(vendorStartInclusive, vendorEndInclusive),
+    fetchNeonVendorSnapshot(vendorStartInclusive, vendorEndInclusive, normalizedVendorDays),
   ]);
 
   return {
@@ -261,10 +265,12 @@ export async function getAdminStatsPayload(vendorDays = 30): Promise<AdminStatsP
     vendors: {
       openai: openaiVendorResult.snapshot,
       fal: falVendorResult.snapshot,
+      neon: neonVendorResult.snapshot,
     },
     vendorMessages: {
       openai: openaiVendorResult.errorMessage,
       fal: falVendorResult.errorMessage,
+      neon: neonVendorResult.errorMessage,
     },
   };
 }

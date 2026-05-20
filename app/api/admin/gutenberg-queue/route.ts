@@ -1,6 +1,12 @@
 import { getCurrentUser } from "@/lib/auth";
+import {
+  readDeferredFile,
+  restoreDeferredEntry,
+  writeDeferredFile,
+  writeQueueAndDeferred,
+} from "@/scripts/lib/gutenberg-deferred";
 import { clearQueueEntryManualUpload } from "@/scripts/lib/gutenberg-queue-flags";
-import type { QueueEntry } from "@/scripts/lib/gutenberg-types";
+import type { GutenbergQueueFile } from "@/scripts/lib/gutenberg-types";
 import { UserRole } from "@db";
 import fs from "node:fs";
 import path from "node:path";
@@ -29,7 +35,8 @@ export async function GET() {
   if (!queue) {
     return NextResponse.json({ exists: false });
   }
-  return NextResponse.json(queue);
+  const deferred = readDeferredFile();
+  return NextResponse.json({ ...(queue as object), deferred });
 }
 
 export async function PATCH(request: Request) {
@@ -53,14 +60,35 @@ export async function PATCH(request: Request) {
   }
 
   const updates = (body as { updates?: unknown }).updates;
-  if (!Array.isArray(updates)) {
-    return NextResponse.json({ error: "updates array required" }, { status: 400 });
-  }
+  const restoreDeferred = (body as { restoreDeferred?: unknown }).restoreDeferred;
 
-  const queue = readQueueFile() as { entries: QueueEntry[] } | null;
+  const queue = readQueueFile() as GutenbergQueueFile | null;
 
   if (!queue || !Array.isArray(queue.entries)) {
     return NextResponse.json({ error: "Queue file not found" }, { status: 404 });
+  }
+
+  const deferred = readDeferredFile();
+  let restoredCount = 0;
+
+  if (Array.isArray(restoreDeferred)) {
+    for (const id of restoreDeferred) {
+      if (typeof id !== "number") continue;
+      if (restoreDeferredEntry(queue, deferred, id)) {
+        restoredCount += 1;
+      }
+    }
+    writeQueueAndDeferred(queue, deferred);
+    return NextResponse.json({
+      ok: true,
+      restoredCount,
+      deferredCount: deferred.entries.length,
+      totalEntries: queue.entries.length,
+    });
+  }
+
+  if (!Array.isArray(updates)) {
+    return NextResponse.json({ error: "updates or restoreDeferred array required" }, { status: 400 });
   }
 
   const approvalMap = new Map<number, boolean>();
@@ -92,6 +120,7 @@ export async function PATCH(request: Request) {
   }
 
   fs.writeFileSync(QUEUE_PATH, JSON.stringify(queue, null, 2), "utf8");
+  writeDeferredFile(deferred);
 
   let approvedCount = 0;
   let rejectedCount = 0;

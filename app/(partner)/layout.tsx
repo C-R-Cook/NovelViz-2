@@ -13,7 +13,7 @@ export default async function PartnerLayout({
     redirect("/sign-in");
   }
   if (user.role === UserRole.reader) {
-    redirect(getRoleHomeUrl(user.role));
+    redirect(getRoleHomeUrl());
   }
 
   return (

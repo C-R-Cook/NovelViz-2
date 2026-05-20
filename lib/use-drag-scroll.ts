@@ -96,8 +96,12 @@ export function useDragScroll(options?: {
     [endDrag],
   );
 
+  const setScrollerRef = useCallback((node: HTMLDivElement | null) => {
+    scrollerRef.current = node;
+  }, []);
+
   return {
-    scrollerRef,
+    setScrollerRef,
     dragging,
     onPointerDown,
     onPointerMove,

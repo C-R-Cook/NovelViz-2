@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
   if (user.username?.trim()) {
-    redirect(getRoleHomeUrl(session.role));
+    redirect(getRoleHomeUrl());
   }
 
   return <OnboardingClient />;

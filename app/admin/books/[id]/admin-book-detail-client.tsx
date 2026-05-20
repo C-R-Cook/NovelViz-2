@@ -73,32 +73,20 @@ export function AdminBookDetailClient({
   publicImages: AdminBookPublicImageRow[];
 }) {
   const router = useRouter();
-  const ingestFileRef = useRef<HTMLInputElement>(null);
-  const coverUploadRef = useRef<HTMLInputElement>(null);
   const [book, setBook] = useState(initial);
 
   useEffect(() => {
     setBook(initial);
   }, [initial]);
 
-  const [title, setTitle] = useState(initial.title);
-  const [author, setAuthor] = useState(initial.author);
-  const [genre, setGenre] = useState<BookGenre | "">((initial.genre ?? "") as BookGenre | "");
   const [publishedYear, setPublishedYear] = useState(
     initial.publishedYear != null ? String(initial.publishedYear) : "",
   );
-  const [description, setDescription] = useState(initial.description ?? "");
 
   useEffect(() => {
-    setTitle(book.title);
-    setAuthor(book.author);
-    setGenre((book.genre ?? "") as BookGenre | "");
     setPublishedYear(book.publishedYear != null ? String(book.publishedYear) : "");
-    setDescription(book.description ?? "");
   }, [book]);
 
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [saveErr, setSaveErr] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [statusErr, setStatusErr] = useState<string | null>(null);
@@ -125,18 +113,9 @@ export function AdminBookDetailClient({
     }, 4000);
   }
 
-  const [ingestErr, setIngestErr] = useState<string | null>(null);
-  const [ingestBusy, setIngestBusy] = useState(false);
-  /** When true, ingest applies Dublin Core from the EPUB OPF to this book. */
-  const [applyEpubMetadata, setApplyEpubMetadata] = useState(false);
-
   const [publishErr, setPublishErr] = useState<string | null>(null);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-
-  const [coverUploadBusy, setCoverUploadBusy] = useState(false);
-  const [coverUploadErr, setCoverUploadErr] = useState<string | null>(null);
-  const [coverUploadMsg, setCoverUploadMsg] = useState<string | null>(null);
 
   const [publicImages, setPublicImages] = useState(initialPublicImages);
   const [imageBusyId, setImageBusyId] = useState<string | null>(null);
@@ -332,51 +311,7 @@ export function AdminBookDetailClient({
     };
   }, []);
 
-  async function saveMetadata(e: React.FormEvent) {
-    e.preventDefault();
-    setSaveErr(null);
-    setSaveMsg(null);
-    setSaving(true);
-    try {
-      const py =
-        publishedYear.trim() === "" ? null : parseInt(publishedYear, 10);
-      if (py !== null && Number.isNaN(py)) {
-        throw new Error("Published year must be a number");
-      }
-      const res = await fetch(`/api/admin/books/${book.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          author,
-          genre: genre === "" ? null : genre,
-          publishedYear: py,
-          description: description.trim() === "" ? null : description,
-        }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || res.statusText);
-      }
-      const data = (await res.json()) as { book: AdminBookDetailModel };
-      setBook((prev) => ({
-        ...prev,
-        ...data.book,
-        chapterCount: prev.chapterCount,
-      }));
-      setSaveMsg("Saved");
-      setTimeout(() => setSaveMsg(null), 3000);
-      router.refresh();
-    } catch (err) {
-      setSaveErr(err instanceof Error ? err.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function savePublishedYearOnly() {
-    setSaveErr(null);
-    setSaveMsg(null);
     setSaving(true);
     try {
       const trimmed = publishedYear.trim();
@@ -398,11 +333,10 @@ export function AdminBookDetailClient({
         throw new Error(data.error || res.statusText);
       }
       setBook((prev) => ({ ...prev, ...data.book, chapterCount: prev.chapterCount }));
-      setSaveMsg("Published year updated");
-      setTimeout(() => setSaveMsg(null), 2500);
+      showFeedback("success", "Published year updated");
       router.refresh();
     } catch (err) {
-      setSaveErr(err instanceof Error ? err.message : "Save failed");
+      showFeedback("error", err instanceof Error ? err.message : "Save failed");
     } finally {
       setSaving(false);
     }
@@ -562,74 +496,6 @@ export function AdminBookDetailClient({
     }
   }
 
-  async function uploadIngest(file: File) {
-    const name = file.name.toLowerCase();
-    const isEpub =
-      name.endsWith(".epub") ||
-      file.type === "application/epub+zip" ||
-      file.type === "application/x-epub+zip";
-    if (!isEpub) {
-      setIngestErr("Only EPUB files are supported.");
-      return;
-    }
-    setIngestErr(null);
-    setIngestBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      fd.append("applyEpubMetadata", applyEpubMetadata ? "true" : "false");
-      const res = await fetch(`/api/admin/books/${book.id}/ingest`, {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || res.statusText);
-      }
-      router.refresh();
-    } catch (err) {
-      setIngestErr(err instanceof Error ? err.message : "Ingest failed");
-    } finally {
-      setIngestBusy(false);
-    }
-  }
-
-  async function uploadCover(file: File) {
-    setCoverUploadErr(null);
-    setCoverUploadMsg(null);
-    setCoverUploadBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(`/api/admin/books/${book.id}/cover`, {
-        method: "POST",
-        body: fd,
-      });
-      const j = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        book?: AdminBookDetailModel;
-      };
-      if (!res.ok) {
-        throw new Error(j.error || res.statusText);
-      }
-      if (j.book) {
-        setBook((prev) => ({
-          ...prev,
-          ...j.book,
-          chapterCount: prev.chapterCount,
-        }));
-      }
-      setCoverUploadMsg("Cover updated");
-      setTimeout(() => setCoverUploadMsg(null), 4000);
-      router.refresh();
-    } catch (err) {
-      setCoverUploadErr(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setCoverUploadBusy(false);
-      if (coverUploadRef.current) coverUploadRef.current.value = "";
-    }
-  }
-
   async function deleteBook() {
     const confirmed = window.confirm(
       `Delete "${book.title}" by ${book.author}? This cannot be undone.`,
@@ -669,7 +535,7 @@ export function AdminBookDetailClient({
                 {showRejectButton ? (
                   <button
                     type="button"
-                    disabled={adminActionBusy || ingestBusy}
+                    disabled={adminActionBusy}
                     onClick={() => {
                       setRejectReason("");
                       setRejectErr(null);
@@ -682,7 +548,7 @@ export function AdminBookDetailClient({
                 ) : null}
                 <button
                   type="button"
-                  disabled={promotingBusy || ingestBusy || statusBusy || rejectBusy}
+                  disabled={promotingBusy || statusBusy || rejectBusy}
                   onClick={() =>
                     book.status === "published"
                       ? void transitionStatus("unlisted", { successMessage: "Book unlisted." })
@@ -703,7 +569,7 @@ export function AdminBookDetailClient({
             <button
               type="button"
               aria-label={`Delete ${book.title}`}
-              disabled={deleteBusy || statusBusy || ingestBusy || promotingBusy || rejectBusy}
+              disabled={deleteBusy || statusBusy || promotingBusy || rejectBusy}
               onClick={() => void deleteBook()}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-error/35 bg-error/15 text-error transition hover:bg-error/25 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1124,28 +990,3 @@ function InfoRow({
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-2">
-      <span className="w-14 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-        {label}
-      </span>
-      <input
-        required={required}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
-      />
-    </label>
-  );
-}

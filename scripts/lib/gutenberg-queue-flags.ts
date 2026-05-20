@@ -1,5 +1,7 @@
 import {
+  INGEST_DEFER_NO_EPUB,
   INGEST_SKIP_EPUB_TOO_LARGE,
+  type DeferReason,
   type IngestSkipReason,
   type QueueEntry,
 } from "./gutenberg-types";
@@ -28,7 +30,14 @@ export function formatEpubSize(bytes: number | null | undefined): string {
   return `${Math.round(bytes / 1024)} KB`;
 }
 
-export function ingestSkipReasonLabel(reason: IngestSkipReason | null | undefined): string {
+export function ingestSkipReasonLabel(
+  reason: IngestSkipReason | DeferReason | null | undefined,
+): string {
   if (reason === INGEST_SKIP_EPUB_TOO_LARGE) return "EPUB over 4.5 MB";
+  if (reason === INGEST_DEFER_NO_EPUB) return "No EPUB available";
   return reason ?? "Manual upload required";
+}
+
+export function deferReasonLabel(reason: DeferReason): string {
+  return ingestSkipReasonLabel(reason);
 }

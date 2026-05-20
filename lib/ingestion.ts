@@ -385,7 +385,6 @@ export function extractEpubMetadataFromOpf(
   const descriptions = getOpfDcElements(opfXml, "description");
   const description =
     descriptions.length > 0 ? descriptions.join("\n\n").slice(0, 50_000) : null;
-  const subjects = getOpfDcElements(opfXml, "subject");
   const genre = null;
   const publishedYear = getBestPublicationYearFromOpf(opfXml, options);
   return {

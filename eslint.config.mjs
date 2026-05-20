@@ -13,6 +13,9 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "app/generated/**",
+    // Local scratch / concept files (also in .gitignore — absent on other machines)
+    "tmp/**",
+    "scripts/**/*.mjs",
   ]),
 ]);
 

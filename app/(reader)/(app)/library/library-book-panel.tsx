@@ -18,14 +18,6 @@ import type { LibraryBookRow, LibraryChapter, LibraryProgress } from "./library-
 
 export type { LibraryChapter, LibraryProgress };
 
-export type QueryHistoryItem = {
-  id: string;
-  questionText: string;
-  responseText: string;
-  chapterNumberAtTime: number;
-  createdAt: string;
-};
-
 export type ImageHistoryItem = {
   id: string;
   userPrompt: string;
@@ -116,11 +108,6 @@ export function LibraryBookPanel({
   const [qaError, setQaError] = useState<string | null>(null);
   const [lastAnswer, setLastAnswer] = useState<string | null>(null);
 
-  const [historyQueries, setHistoryQueries] = useState<QueryHistoryItem[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyInitialized, setHistoryInitialized] = useState(false);
-
   const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("imagine");
 
   useEffect(() => {
@@ -170,30 +157,6 @@ export function LibraryBookPanel({
     }
   }, []);
 
-  const loadQueryHistory = useCallback(async () => {
-    setHistoryLoading(true);
-    setHistoryError(null);
-    try {
-      const res = await fetch(`/api/query?bookId=${encodeURIComponent(book.bookId)}`);
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        queries?: QueryHistoryItem[];
-      };
-      if (!res.ok) {
-        setHistoryError(data.error || "Could not load history");
-        setHistoryQueries([]);
-        return;
-      }
-      setHistoryQueries(Array.isArray(data.queries) ? data.queries : []);
-    } catch {
-      setHistoryError("Network error");
-      setHistoryQueries([]);
-    } finally {
-      setHistoryLoading(false);
-      setHistoryInitialized(true);
-    }
-  }, [book.bookId]);
-
   const submitQuestion = useCallback(async () => {
     const trimmed = question.trim();
     if (!trimmed) return;
@@ -225,7 +188,6 @@ export function LibraryBookPanel({
       if (typeof data.responseText === "string") {
         setLastAnswer(data.responseText);
         setQuestion("");
-        void loadQueryHistory();
       } else {
         setQaError("Invalid response from server");
       }
@@ -234,7 +196,7 @@ export function LibraryBookPanel({
     } finally {
       setQaLoading(false);
     }
-  }, [book.bookId, question, loadQueryHistory]);
+  }, [book.bookId, question]);
 
   const loadImageHistory = useCallback(async () => {
     setImageHistoryLoading(true);
@@ -268,7 +230,6 @@ export function LibraryBookPanel({
   }, [book.bookId]);
 
   useEffect(() => {
-    setHistoryInitialized(false);
     setImageHistoryInitialized(false);
   }, [book.bookId]);
 
@@ -466,12 +427,6 @@ export function LibraryBookPanel({
       void loadImageHistory();
     }
   }, [imageHistoryInitialized, imageHistoryLoading, loadImageHistory]);
-
-  useEffect(() => {
-    if (activeAiTab === "ask" && !historyInitialized && !historyLoading) {
-      void loadQueryHistory();
-    }
-  }, [activeAiTab, historyInitialized, historyLoading, loadQueryHistory]);
 
   const emptyNotice = (
     <p className="rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm text-text-secondary">

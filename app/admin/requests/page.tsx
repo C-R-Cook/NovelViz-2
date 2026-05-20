@@ -23,7 +23,7 @@ export default async function AdminBookRequestsPage() {
     redirect("/sign-in");
   }
   if (session.role !== UserRole.admin) {
-    redirect(getRoleHomeUrl(session.role));
+    redirect(getRoleHomeUrl());
   }
 
   const requests = await prisma.bookRequest.findMany({

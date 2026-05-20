@@ -10,7 +10,8 @@
     "lint": "eslint",
     "gutenberg-fetch": "tsx scripts/gutenberg-fetch.ts",
     "gutenberg-ingest": "tsx scripts/gutenberg-ingest.ts",
-    "gutenberg-enrich": "tsx scripts/gutenberg-enrich.ts"
+    "gutenberg-enrich": "tsx scripts/gutenberg-enrich.ts",
+    "gutenberg-park-deferred": "tsx scripts/gutenberg-park-deferred.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

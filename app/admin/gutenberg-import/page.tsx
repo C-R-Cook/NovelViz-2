@@ -2,6 +2,7 @@ import { GutenbergImportClient } from "./gutenberg-import-client";
 import { getCurrentUser } from "@/lib/auth";
 import { UserRole } from "@db";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
 export default async function GutenbergImportPage() {
   const user = await getCurrentUser();
@@ -17,7 +18,9 @@ export default async function GutenbergImportPage() {
           Review the discovery queue before running the ingestion script locally.
         </p>
       </header>
-      <GutenbergImportClient />
+      <Suspense fallback={<p className="text-sm text-text-secondary">Loading…</p>}>
+        <GutenbergImportClient />
+      </Suspense>
     </div>
   );
 }

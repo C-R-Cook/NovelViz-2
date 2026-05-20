@@ -27,6 +27,7 @@
 
 # Gutenberg bulk import queue (local ops)
 /scripts/gutenberg-queue.json
+/scripts/gutenberg-queue-deferred.json
 
 # debug
 npm-debug.log*

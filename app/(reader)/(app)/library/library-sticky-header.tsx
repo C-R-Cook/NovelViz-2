@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefCallback } from "react";
 import { LibrarySectionHead } from "./library-section-head";
 
 type Variant = "reading" | "shelf" | "shelf-solo" | "images";
@@ -9,7 +9,7 @@ type Props = {
   title: string;
   variant: Variant;
   stickyTop: number;
-  anchorRef?: Ref<HTMLDivElement>;
+  anchorRef?: RefCallback<HTMLDivElement>;
   scrollAnchorClassName?: string;
   headChildren?: ReactNode;
   onTitleClick?: () => void;
@@ -38,15 +38,13 @@ export function LibraryStickyHeader({
     return () => obs.disconnect();
   }, [stickyTop]);
 
-  const setAnchorRef = (node: HTMLDivElement | null) => {
-    sentinelRef.current = node;
-    if (!anchorRef) return;
-    if (typeof anchorRef === "function") {
-      anchorRef(node);
-    } else {
-      anchorRef.current = node;
-    }
-  };
+  const setAnchorRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      sentinelRef.current = node;
+      anchorRef?.(node);
+    },
+    [anchorRef],
+  );
 
   return (
     <>

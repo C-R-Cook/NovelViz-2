@@ -70,7 +70,7 @@ export async function POST(_request: Request, context: RouteContext) {
   const viewer = { id: dbUser.id, role: dbUser.role };
   const isAdmin = dbUser.role === UserRole.admin;
   let userBookSpoiler: SpoilerProtection | null | undefined;
-  let globalSpoilerProtection = dbUser.globalSpoilerProtection;
+  const globalSpoilerProtection = dbUser.globalSpoilerProtection;
   let currentChapterNumber: number | undefined;
 
   if (!isAdmin) {

@@ -78,6 +78,15 @@ const LEGACY_DEV_ROLE_TO_USER_ID: Record<string, string> = {
   admin: "dev_user_admin",
 };
 
+export function hasDevIdentityCookie(
+  devUserId: string | undefined,
+  legacyDevRole: string | undefined,
+): boolean {
+  if (devUserId && DEV_USERS_BY_ID[devUserId]) return true;
+  if (legacyDevRole && LEGACY_DEV_ROLE_TO_USER_ID[legacyDevRole]) return true;
+  return false;
+}
+
 export function resolveDevUserIdFromCookies(
   devUserId: string | undefined,
   legacyDevRole: string | undefined,

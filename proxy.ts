@@ -1,16 +1,19 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/login(.*)",
-  "/register(.*)",
-  "/catalogue(.*)",
-  "/api/webhooks/clerk(.*)",
-  "/api/webhooks/stripe(.*)",
+/** Next.js 16 Clerk middleware entry (this file replaces the legacy `middleware.ts` name). */
+
+const isProtectedAppRoute = createRouteMatcher([
+  "/library(.*)",
+  "/dashboard(.*)",
+  "/reader(.*)",
+  "/onboarding(.*)",
+  "/account(.*)",
+  "/partner(.*)",
+  "/admin(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
+  if (isProtectedAppRoute(req)) {
     await auth.protect();
   }
 });

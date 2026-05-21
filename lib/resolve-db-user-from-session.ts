@@ -9,8 +9,8 @@ export type ApiSessionDbUser = {
 };
 
 /**
- * Resolves the Prisma `User` for API routes from `getCurrentUser()`.
- * Tries `clerkId` first, then `id` (dev identities use stable ids that always match DB rows).
+ * Resolves the Prisma `User` for API routes from `getCurrentUser()` (Clerk in production,
+ * dev cookie or Clerk in development). Tries `clerkId` first, then `id` for dev identities.
  */
 export async function resolveDbUserFromSession(
   sessionUser: CurrentUser,

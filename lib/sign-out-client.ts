@@ -2,7 +2,8 @@ import { clearDevIdentityOnClient } from "@/lib/clear-dev-identity-client";
 
 type SignOutFromAppOptions = {
   isProduction: boolean;
-  isClerkSignedIn: boolean;
+  /** Clerk `useAuth().isSignedIn` may be undefined while loading. */
+  isClerkSignedIn: boolean | undefined;
   clerkSignOut: (opts: { redirectUrl: string }) => Promise<void>;
   redirectUrl?: string;
 };
@@ -21,7 +22,7 @@ export async function signOutFromApp({
     clearDevIdentityOnClient();
   }
 
-  if (isClerkSignedIn) {
+  if (isClerkSignedIn === true) {
     await clerkSignOut({ redirectUrl });
     return;
   }

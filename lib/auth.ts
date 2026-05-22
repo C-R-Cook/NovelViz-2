@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import {
   DEV_USER_COOKIE,
@@ -56,14 +56,43 @@ function mapDbUserToCurrentUser(dbUser: DbUserForSession): CurrentUser {
   };
 }
 
+async function ensureDbUserForClerk(clerkUserId: string): Promise<DbUserForSession | null> {
+  const existing = await prisma.user.findUnique({
+    where: { clerkId: clerkUserId },
+    select: userSelect,
+  });
+  if (existing) return existing;
+
+  const clerkUser = await currentUser();
+  if (!clerkUser || clerkUser.id !== clerkUserId) return null;
+
+  const primary =
+    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId) ??
+    clerkUser.emailAddresses[0];
+  const email = primary?.emailAddress ?? "";
+  const nameFromParts = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ");
+  const name = nameFromParts || clerkUser.username || null;
+  const signupDay = new Date().getDate();
+  const anchorDay = Math.min(signupDay, 28);
+
+  return prisma.user.upsert({
+    where: { clerkId: clerkUserId },
+    create: {
+      clerkId: clerkUserId,
+      email,
+      name,
+      usagePeriodAnchor: anchorDay,
+    },
+    update: { email, name },
+    select: userSelect,
+  });
+}
+
 async function getClerkUser(): Promise<CurrentUser | null> {
   const { userId } = await auth();
   if (!userId) return null;
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: userId },
-    select: userSelect,
-  });
+  const dbUser = await ensureDbUserForClerk(userId);
   if (!dbUser) return null;
 
   return mapDbUserToCurrentUser(dbUser);
@@ -104,9 +133,9 @@ async function getDevUserFromCookies(): Promise<CurrentUser | null> {
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
-    const devUser = await getDevUserFromCookies();
-    if (devUser) return devUser;
-    return getClerkUser();
+    const clerkUser = await getClerkUser();
+    if (clerkUser) return clerkUser;
+    return getDevUserFromCookies();
   }
 
   return getClerkUser();

@@ -85,7 +85,7 @@ export function OnboardingClient() {
         if (res.status === 409) setCheckState("taken");
         return;
       }
-      router.push("/dashboard");
+      router.push("/library");
       router.refresh();
     } finally {
       setSubmitting(false);

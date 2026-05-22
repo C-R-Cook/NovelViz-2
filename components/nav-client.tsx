@@ -1,8 +1,8 @@
 "use client";
 
 import { NotificationsBell } from "@/components/notifications-bell";
-import { DEV_USER_COOKIE } from "@/lib/dev-users";
-import { useClerk } from "@clerk/nextjs";
+import { signOutFromApp } from "@/lib/sign-out-client";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -44,17 +44,17 @@ function NavUserMenu({
   isProduction: boolean;
 }) {
   const { signOut } = useClerk();
+  const { isSignedIn } = useAuth();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   async function handleSignOut() {
     setOpen(false);
-    if (isProduction) {
-      await signOut({ redirectUrl: "/" });
-      return;
-    }
-    document.cookie = `${DEV_USER_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
-    window.location.href = "/";
+    await signOutFromApp({
+      isProduction,
+      isClerkSignedIn: isSignedIn,
+      clerkSignOut: signOut,
+    });
   }
 
   useEffect(() => {
@@ -230,7 +230,7 @@ export function NavChrome({
               />
             </>
           ) : (
-            <Link href="/sign-in" className={signInClass} onClick={() => setMenuOpen(false)}>
+            <Link href="/login" className={signInClass} onClick={() => setMenuOpen(false)}>
               Sign In
             </Link>
           )}

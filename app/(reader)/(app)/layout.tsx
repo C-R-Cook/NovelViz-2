@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { findDbProfileForSession, profileNeedsOnboarding } from "@/lib/session-profile";
 import { redirect } from "next/navigation";
 
 /** Reader routes that require a completed profile (username). Onboarding lives outside this group. */
@@ -13,14 +13,11 @@ export default async function ReaderAppShellLayout({
     redirect("/sign-in");
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: session.clerkId },
-    select: { username: true },
-  });
-  if (!dbUser) {
+  const profile = await findDbProfileForSession(session);
+  if (!profile) {
     redirect("/sign-in");
   }
-  if (!dbUser.username?.trim()) {
+  if (profileNeedsOnboarding(profile)) {
     redirect("/onboarding");
   }
 

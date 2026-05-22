@@ -1202,7 +1202,7 @@ export function GalleryClient(props: GalleryClientProps) {
                         Create a free account to unlock your personalised gallery
                       </p>
                       <div className="mt-4">
-                        <Link href="/sign-up" className="gallery-guest-overlay-cta">
+                        <Link href="/register" className="gallery-guest-overlay-cta">
                           Get Started
                         </Link>
                       </div>

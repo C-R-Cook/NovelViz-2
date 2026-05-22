@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { findDbProfileForSession } from "@/lib/session-profile";
 import { prisma } from "@/lib/prisma";
 import { isValidUsernameFormat } from "@/lib/username";
 import { AgeRange, Gender } from "@db";
@@ -67,10 +68,7 @@ export async function POST(request: Request) {
 
   const subscribedToMailingList = Boolean(b.subscribedToMailingList);
 
-  const me = await prisma.user.findUnique({
-    where: { clerkId: session.clerkId },
-    select: { id: true, username: true },
-  });
+  const me = await findDbProfileForSession(session);
   if (!me) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }

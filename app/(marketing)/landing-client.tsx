@@ -205,11 +205,14 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  const NAV_SCROLL_OFFSET = 72;
+
   const scrollToSection = useCallback(
     (id: string) => {
       const el = document.getElementById(id);
       if (!el) return;
-      el.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      const top = el.getBoundingClientRect().top + window.scrollY - NAV_SCROLL_OFFSET;
+      window.scrollTo({ top, behavior: reducedMotion ? "auto" : "smooth" });
     },
     [reducedMotion],
   );
@@ -220,6 +223,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
   };
 
   const startHref = isLoggedIn ? "/library" : "/register";
+  const joinBetaHref = isLoggedIn ? "/library" : "/register";
   const marqueeItems = [...MARQUEE_TITLES, ...MARQUEE_TITLES];
 
   return (
@@ -249,9 +253,20 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           </button>
         </div>
 
-        <button type="button" className="landing-nav-cta" onClick={() => scrollToSection("beta")}>
-          Join Beta →
-        </button>
+        <div className="landing-nav-actions">
+          {isLoggedIn ? (
+            <Link href="/library" className="landing-nav-signin">
+              My Library
+            </Link>
+          ) : (
+            <Link href="/login" className="landing-nav-signin">
+              Sign In
+            </Link>
+          )}
+          <Link href={joinBetaHref} className="landing-nav-cta">
+            Join Beta →
+          </Link>
+        </div>
       </nav>
 
       <section className={`landing-hero${heroIn ? " landing-hero-in" : ""}`}>
@@ -279,6 +294,11 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           <Link href="/books" className="landing-btn-secondary">
             Browse Books
           </Link>
+          {!isLoggedIn ? (
+            <Link href="/login" className="landing-btn-secondary landing-btn-signin">
+              Sign In
+            </Link>
+          ) : null}
         </div>
 
         <div className="landing-scroll-cue" aria-hidden>

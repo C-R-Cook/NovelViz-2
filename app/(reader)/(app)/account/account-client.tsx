@@ -1,8 +1,8 @@
 "use client";
 
-import { useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { AGE_RANGE_OPTIONS, type AgeRange } from "@/lib/age-range";
-import { DEV_USER_COOKIE } from "@/lib/dev-users";
+import { signOutFromApp } from "@/lib/sign-out-client";
 import { COUNTRY_CODES, COUNTRY_OPTIONS } from "@/lib/countries";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
 import { GENDER_OPTIONS, type Gender } from "@/lib/gender";
@@ -50,6 +50,7 @@ export function AccountPageClient({
 }: AccountPageClientProps) {
   const router = useRouter();
   const { signOut } = useClerk();
+  const { isSignedIn } = useAuth();
 
   const [name, setName] = useState(initialUser.name ?? "");
   const [publicUsername, setPublicUsername] = useState(initialUser.username ?? "");
@@ -247,13 +248,11 @@ export function AccountPageClient({
         return;
       }
       setDeleteOpen(false);
-      if (isProduction) {
-        await signOut({ redirectUrl: "/" });
-        return;
-      }
-      document.cookie = `${DEV_USER_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
-      router.push("/");
-      router.refresh();
+      await signOutFromApp({
+        isProduction,
+        isClerkSignedIn: isSignedIn,
+        clerkSignOut: signOut,
+      });
     } catch {
       setDeleteError("Something went wrong");
     } finally {

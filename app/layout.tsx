@@ -1,10 +1,26 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ConditionalPublicFooter } from "@/components/conditional-public-footer";
 import { THEME_HYDRATION_SCRIPT } from "@/lib/theme-hydration-script";
-import { getCurrentUser } from "@/lib/auth";
+import {
+  DEV_USER_COOKIE,
+  DEV_USERS_BY_ID,
+  hasDevIdentityCookie,
+  resolveDevUserIdFromCookies,
+} from "@/lib/dev-users";
 import "./globals.css";
+
+async function readDevCookieUserId(): Promise<string | null> {
+  const store = await cookies();
+  const devUserId = store.get(DEV_USER_COOKIE)?.value;
+  const legacyRole = store.get("dev_role")?.value;
+  if (!hasDevIdentityCookie(devUserId, legacyRole)) return null;
+  const id = resolveDevUserIdFromCookies(devUserId, legacyRole);
+  return DEV_USERS_BY_ID[id] ? id : null;
+}
 
 export const metadata: Metadata = {
   title: "NovelViz",
@@ -16,12 +32,12 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getCurrentUser();
-  const initialUserId = user?.id ?? null;
+  const { userId: clerkUserId } = await auth();
+  const devCookieUserId = await readDevCookieUserId();
   const isDev = process.env.NODE_ENV !== "production";
 
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl="/login" signUpUrl="/register">
       <html lang="en" data-theme="candle-light" suppressHydrationWarning>
         <head>
           <script dangerouslySetInnerHTML={{ __html: THEME_HYDRATION_SCRIPT }} />
@@ -38,7 +54,10 @@ export default async function RootLayout({
           </div>
           {isDev ? (
             <div className="fixed bottom-4 right-4 z-[200] flex max-w-[calc(100vw-2rem)] flex-wrap items-end gap-3 rounded-lg bg-bg-surface/90 px-3 py-2 shadow-md backdrop-blur-sm">
-              <DevRoleSwitcher initialUserId={initialUserId} />
+              <DevRoleSwitcher
+                clerkSignedIn={!!clerkUserId}
+                devCookieUserId={devCookieUserId}
+              />
             </div>
           ) : null}
         </body>

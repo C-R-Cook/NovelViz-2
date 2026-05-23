@@ -2,6 +2,7 @@
 "use client";
 
 import { ChapterManagerClient } from "./chapter-manager-client";
+import { DEFAULT_ADMIN_BOOK_RETURN } from "@/lib/admin-book-navigation";
 import { formatGenre } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type {
@@ -68,9 +69,11 @@ function actionRowGradientClass(status: BookStatus): string {
 export function AdminBookDetailClient({
   book: initial,
   publicImages: initialPublicImages,
+  returnTo = DEFAULT_ADMIN_BOOK_RETURN,
 }: {
   book: AdminBookDetailModel;
   publicImages: AdminBookPublicImageRow[];
+  returnTo?: string;
 }) {
   const router = useRouter();
   const [book, setBook] = useState(initial);
@@ -402,10 +405,16 @@ export function AdminBookDetailClient({
 
   async function promoteToPublished() {
     const snapshot = { ...book };
+    const previousStatus = book.status;
     const nextStatus: BookStatus =
       book.status === "pending_review"
         ? (book.listingPreferenceAfterReview ?? "published")
         : "published";
+    const returnToQueueAfterApprove =
+      (previousStatus === "pending_review" ||
+        previousStatus === "draft" ||
+        previousStatus === "rejected") &&
+      (nextStatus === "published" || nextStatus === "unlisted");
     setPublishErr(null);
     setStatusErr(null);
     setActionFeedback(null);
@@ -432,6 +441,11 @@ export function AdminBookDetailClient({
           ownerLabel: prev.ownerLabel,
           createdAtLabel: prev.createdAtLabel,
         }));
+      }
+      if (returnToQueueAfterApprove) {
+        router.push(returnTo);
+        router.refresh();
+        return;
       }
       showFeedback("success", nextStatus === "published" ? "Book published." : "Book unlisted.");
       router.refresh();
@@ -483,8 +497,9 @@ export function AdminBookDetailClient({
       }
       setRejectOpen(false);
       setRejectReason("");
-      showFeedback("success", "Book rejected.");
+      router.push(returnTo);
       router.refresh();
+      return;
     } catch (err) {
       setBook(snapshot);
       const msg = err instanceof Error ? err.message : "Rejection failed";
@@ -509,7 +524,7 @@ export function AdminBookDetailClient({
       if (!res.ok) {
         throw new Error(j.error || res.statusText);
       }
-      router.push("/dashboard?tab=all-books");
+      router.push(returnTo);
       router.refresh();
     } catch (err) {
       setDeleteErr(err instanceof Error ? err.message : "Delete failed");
@@ -520,51 +535,62 @@ export function AdminBookDetailClient({
 
   const adminActionBusy = statusBusy || promotingBusy || rejectBusy;
   const showRejectButton = book.status === "pending_review";
+  const showPublishButton = book.status !== "processing";
+  const statusLabel = book.status.replace(/_/g, " ");
 
   return (
     <div className="space-y-6">
       <div
-        className="sticky top-0 z-20 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
+        className="sticky top-[5.5rem] z-30 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
         aria-label="Book actions"
       >
         <div
-          className={`flex flex-wrap items-center justify-end gap-2 rounded-lg px-2 py-2 ${actionRowGradientClass(book.status)}`}
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-2 ${actionRowGradientClass(book.status)}`}
         >
-            {(book.status === "pending_review" || book.status === "published" || book.status === "unlisted") ? (
-              <>
-                {showRejectButton ? (
-                  <button
-                    type="button"
-                    disabled={adminActionBusy}
-                    onClick={() => {
-                      setRejectReason("");
-                      setRejectErr(null);
-                      setRejectOpen(true);
-                    }}
-                    className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-rose-700 disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={promotingBusy || statusBusy || rejectBusy}
-                  onClick={() =>
-                    book.status === "published"
-                      ? void transitionStatus("unlisted", { successMessage: "Book unlisted." })
-                      : void promoteToPublished()
-                  }
-                  className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
-                >
-                  {promotingBusy
-                    ? "Updating…"
-                    : book.status === "published"
-                      ? "Remove from catalogue"
-                      : book.status === "unlisted"
-                        ? "Add to catalogue"
-                        : "Publish"}
-                </button>
-              </>
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+            Status: <span className="text-text-primary">{statusLabel}</span>
+            {book.status === "processing" ? (
+              <span className="ml-2 normal-case text-text-secondary">— ingestion in progress</span>
+            ) : book.status !== "pending_review" ? (
+              <span className="ml-2 normal-case text-text-secondary">
+                — Reject appears when status is pending review
+              </span>
+            ) : null}
+          </p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showRejectButton ? (
+              <button
+                type="button"
+                disabled={adminActionBusy}
+                onClick={() => {
+                  setRejectReason("");
+                  setRejectErr(null);
+                  setRejectOpen(true);
+                }}
+                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-rose-700 disabled:opacity-50"
+              >
+                Reject
+              </button>
+            ) : null}
+            {showPublishButton ? (
+              <button
+                type="button"
+                disabled={promotingBusy || statusBusy || rejectBusy}
+                onClick={() =>
+                  book.status === "published"
+                    ? void transitionStatus("unlisted", { successMessage: "Book unlisted." })
+                    : void promoteToPublished()
+                }
+                className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
+              >
+                {promotingBusy
+                  ? "Updating…"
+                  : book.status === "published"
+                    ? "Remove from catalogue"
+                    : book.status === "unlisted"
+                      ? "Add to catalogue"
+                      : "Publish"}
+              </button>
             ) : null}
             <button
               type="button"
@@ -589,6 +615,7 @@ export function AdminBookDetailClient({
                 <path d="M14 11v6" />
               </svg>
             </button>
+          </div>
         </div>
         {actionFeedback ? (
           <div
@@ -717,7 +744,11 @@ export function AdminBookDetailClient({
             </div>
           </div>
           <div className="rounded-xl border border-border bg-bg-surface/85 p-6">
-            <ChapterManagerClient bookId={book.id} status={book.status} />
+            <ChapterManagerClient
+              bookId={book.id}
+              status={book.status}
+              skipDraftOnStructureChange
+            />
           </div>
         </section>
       ) : null}

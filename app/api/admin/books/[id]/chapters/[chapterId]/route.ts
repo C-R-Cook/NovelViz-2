@@ -1,11 +1,15 @@
 import { getCurrentUser } from "@/lib/auth";
 import {
-  renumberChapters,
+  compactChapterSequencesAfterDelete,
   syncReadingProgressChapterNumbers,
 } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+/** Large books on production Neon can need more than the default 10s serverless limit. */
+export const maxDuration = 60;
 
 type RouteContext = { params: Promise<{ id: string; chapterId: string }> };
 
@@ -122,17 +126,40 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "No fallback chapter" }, { status: 400 });
   }
 
-  await prisma.readingProgress.updateMany({
-    where: { currentChapterId: chapterId },
-    data: {
-      currentChapterId: fallback.id,
-      currentChapterNumber: fallback.sequenceNumber,
-    },
-  });
+  const deletedSequenceNumber = chapter.sequenceNumber;
 
-  await prisma.chapter.delete({ where: { id: chapterId } });
-  await renumberChapters(bookId);
-  await syncReadingProgressChapterNumbers(bookId);
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.readingProgress.updateMany({
+        where: { currentChapterId: chapterId },
+        data: { currentChapterId: fallback.id },
+      });
+      await tx.chapter.delete({ where: { id: chapterId } });
+      await compactChapterSequencesAfterDelete(bookId, deletedSequenceNumber, tx);
+
+      const fallbackAfter = await tx.chapter.findUnique({
+        where: { id: fallback.id },
+        select: { sequenceNumber: true },
+      });
+      if (fallbackAfter) {
+        await tx.readingProgress.updateMany({
+          where: { currentChapterId: fallback.id },
+          data: { currentChapterNumber: fallbackAfter.sequenceNumber },
+        });
+      }
+    },
+    { maxWait: 10_000, timeout: 120_000 },
+  );
+
+  try {
+    await syncReadingProgressChapterNumbers(bookId);
+  } catch (err) {
+    console.error("[chapter-delete] syncReadingProgressChapterNumbers failed", {
+      bookId,
+      chapterId,
+      err,
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }

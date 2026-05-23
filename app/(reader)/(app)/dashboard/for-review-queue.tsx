@@ -1,5 +1,6 @@
 "use client";
 
+import { adminBookDetailHref } from "@/lib/admin-book-navigation";
 import type { ListingPreferenceAfterReview } from "@db";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,6 +19,7 @@ export function ForReviewQueue({
   actionId,
   onModeration,
   className,
+  returnTo = "/dashboard?tab=for-review",
 }: {
   pendingBooks: ForReviewBook[];
   actionId: string | null;
@@ -27,6 +29,7 @@ export function ForReviewQueue({
   ) => void;
   /** Optional wrapper class for dashboard shell layout. */
   className?: string;
+  returnTo?: string;
 }) {
   const [rejectBook, setRejectBook] = useState<ForReviewBook | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -106,7 +109,7 @@ export function ForReviewQueue({
                     Reject
                   </button>
                   <Link
-                    href={`/admin/books/${book.id}`}
+                    href={adminBookDetailHref(book.id, returnTo)}
                     className="inline-flex items-center rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-text-primary hover:bg-bg-surface"
                   >
                     Details

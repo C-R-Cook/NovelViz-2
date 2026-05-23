@@ -3,18 +3,24 @@ import { AdminBookDetailClient } from "./admin-book-detail-client";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CommentStatus } from "@db";
+import { safeAdminReturnTo } from "@/lib/admin-book-navigation";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ returnTo?: string }>;
+};
 
-export default async function AdminBookDetailPage({ params }: PageProps) {
+export default async function AdminBookDetailPage({ params, searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/sign-in");
   }
 
   const { id } = await params;
+  const sp = await searchParams;
+  const returnTo = safeAdminReturnTo(sp.returnTo);
   const row = await prisma.book.findFirst({
     where: { id, deletedAt: null },
     include: {
@@ -91,12 +97,12 @@ export default async function AdminBookDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-8">
       <Link
-        href="/dashboard?tab=for-review"
+        href={returnTo}
         className="inline-flex text-sm font-medium text-text-secondary transition hover:text-accent-text/90"
       >
         ← Back to books
       </Link>
-      <AdminBookDetailClient book={book} publicImages={publicImages} />
+      <AdminBookDetailClient book={book} publicImages={publicImages} returnTo={returnTo} />
     </div>
   );
 }

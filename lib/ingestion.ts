@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { BookGenre } from "@db";
+import type { BookGenre, Prisma } from "@db";
 import { XMLParser } from "fast-xml-parser";
 import JSZip from "jszip";
 import path from "node:path";
@@ -1170,6 +1170,56 @@ export async function embedChunks(chunks: string[]): Promise<number[][]> {
 
 const RENUMBER_OFFSET = 1_000_000;
 
+/** Prisma interactive transaction limits for large chapter renumber passes. */
+const CHAPTER_TX = { maxWait: 10_000, timeout: 120_000 } as const;
+
+async function shiftChapterSequenceNumbersInTx(
+  tx: Prisma.TransactionClient,
+  chapters: { id: string }[],
+  finalStartSequence: number,
+): Promise<void> {
+  for (let i = 0; i < chapters.length; i++) {
+    await tx.chapter.update({
+      where: { id: chapters[i]!.id },
+      data: { sequenceNumber: RENUMBER_OFFSET + i },
+    });
+  }
+  for (let i = 0; i < chapters.length; i++) {
+    await tx.chapter.update({
+      where: { id: chapters[i]!.id },
+      data: { sequenceNumber: finalStartSequence + i },
+    });
+  }
+}
+
+/**
+ * After deleting one chapter, close the gap (e.g. 1,2,4 → 1,2,3) without touching earlier rows.
+ */
+export async function compactChapterSequencesAfterDelete(
+  bookId: string,
+  deletedSequenceNumber: number,
+  tx?: Prisma.TransactionClient,
+): Promise<void> {
+  const db = tx ?? prisma;
+  const toShift = await db.chapter.findMany({
+    where: { bookId, sequenceNumber: { gt: deletedSequenceNumber } },
+    orderBy: { sequenceNumber: "asc" },
+    select: { id: true },
+  });
+  if (toShift.length === 0) return;
+
+  const run = async (client: Prisma.TransactionClient) => {
+    await shiftChapterSequenceNumbersInTx(client, toShift, deletedSequenceNumber);
+  };
+
+  if (tx) {
+    await run(tx);
+    return;
+  }
+
+  await prisma.$transaction(run, CHAPTER_TX);
+}
+
 /**
  * Reassign sequenceNumber to 1…n in creation order (matches ingest order when createdAt aligns).
  */
@@ -1177,23 +1227,16 @@ export async function renumberChapters(bookId: string): Promise<void> {
   const chapters = await prisma.chapter.findMany({
     where: { bookId },
     orderBy: { createdAt: "asc" },
+    select: { id: true },
   });
   if (chapters.length === 0) return;
 
-  await prisma.$transaction(async (tx) => {
-    for (let i = 0; i < chapters.length; i++) {
-      await tx.chapter.update({
-        where: { id: chapters[i]!.id },
-        data: { sequenceNumber: RENUMBER_OFFSET + i },
-      });
-    }
-    for (let i = 0; i < chapters.length; i++) {
-      await tx.chapter.update({
-        where: { id: chapters[i]!.id },
-        data: { sequenceNumber: i + 1 },
-      });
-    }
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await shiftChapterSequenceNumbersInTx(tx, chapters, 1);
+    },
+    CHAPTER_TX,
+  );
 }
 
 /** Keep denormalised currentChapterNumber in sync with chapter.sequenceNumber. */
@@ -1202,16 +1245,29 @@ export async function syncReadingProgressChapterNumbers(
 ): Promise<void> {
   const progresses = await prisma.readingProgress.findMany({
     where: { bookId },
+    select: { id: true, currentChapterId: true, currentChapterNumber: true },
   });
-  for (const p of progresses) {
-    const ch = await prisma.chapter.findUnique({
-      where: { id: p.currentChapterId },
-    });
-    if (ch && ch.sequenceNumber !== p.currentChapterNumber) {
-      await prisma.readingProgress.update({
+  if (progresses.length === 0) return;
+
+  const chapterIds = [...new Set(progresses.map((p) => p.currentChapterId))];
+  const chapters = await prisma.chapter.findMany({
+    where: { id: { in: chapterIds } },
+    select: { id: true, sequenceNumber: true },
+  });
+  const seqByChapterId = new Map(chapters.map((c) => [c.id, c.sequenceNumber]));
+
+  const updates = progresses.filter((p) => {
+    const seq = seqByChapterId.get(p.currentChapterId);
+    return seq != null && seq !== p.currentChapterNumber;
+  });
+  if (updates.length === 0) return;
+
+  await Promise.all(
+    updates.map((p) =>
+      prisma.readingProgress.update({
         where: { id: p.id },
-        data: { currentChapterNumber: ch.sequenceNumber },
-      });
-    }
-  }
+        data: { currentChapterNumber: seqByChapterId.get(p.currentChapterId)! },
+      }),
+    ),
+  );
 }

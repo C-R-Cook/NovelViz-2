@@ -527,6 +527,7 @@ export function DashboardClient({
                 pendingBooks={pendingBooks}
                 actionId={actionId}
                 onModeration={(id, status) => void runModeration(id, status)}
+                returnTo="/dashboard?tab=for-review"
                 className="dashboard-for-review-wrap"
               />
             </div>
@@ -850,6 +851,7 @@ export function DashboardClient({
             pendingBooks={pendingBooks}
             actionId={actionId}
             onModeration={(id, status) => void runModeration(id, status)}
+            returnTo="/dashboard?tab=for-review"
             className="dashboard-for-review-wrap"
           />
         ) : null;
@@ -886,6 +888,7 @@ export function DashboardClient({
             initialSort="createdAt"
             initialSortDir="desc"
             variant="embedded"
+            returnTo="/dashboard?tab=all-books"
           />
         ) : null;
       case "all-users":

@@ -1,6 +1,7 @@
 // TODO: deprecated — functionality moved to /dashboard tabs
 "use client";
 
+import { adminBookDetailHref } from "@/lib/admin-book-navigation";
 import type {
   AdminBookRow,
   AdminBooksFilterKey,
@@ -131,6 +132,7 @@ export function AdminBooksClient({
   initialSort = "createdAt",
   initialSortDir = "desc",
   variant = "page",
+  returnTo,
 }: {
   initialBooks: AdminBookRow[];
   initialFilter: FilterKey;
@@ -139,6 +141,8 @@ export function AdminBooksClient({
   initialSort?: AdminBooksSortField;
   initialSortDir?: AdminBooksSortDirection;
   variant?: "page" | "embedded";
+  /** List URL to return to after publishing from book detail. */
+  returnTo?: string;
 }) {
   const listSeq = useRef(0);
   const [filter, setFilter] = useState<FilterKey>(initialFilter);
@@ -493,7 +497,13 @@ export function AdminBooksClient({
                       {!book.isDeleted ? (
                         <>
                           <Link
-                            href={`/admin/books/${book.id}`}
+                            href={adminBookDetailHref(
+                              book.id,
+                              returnTo ??
+                                (variant === "embedded"
+                                  ? "/dashboard?tab=all-books"
+                                  : `/admin/books?filter=${filter}`),
+                            )}
                             className="inline-flex rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised hover:ring-accent/40"
                           >
                             Manage

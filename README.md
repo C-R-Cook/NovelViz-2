@@ -3,6 +3,7 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Docs
 
 - [Authentication workflow](docs/auth-workflow.md) — Clerk sign-in, onboarding, and local dev impersonation
+- [Database environments](docs/database-environments.md) — separate Neon prod/dev branches, Vercel env vars, `.env.local`
 
 ## Getting Started
 

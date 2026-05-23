@@ -17,11 +17,17 @@ export type ChapterListItem = {
 type Props = {
   bookId: string;
   status: BookStatus;
+  /** Admin editor: do not demote the book to draft after chapter structure changes. */
+  skipDraftOnStructureChange?: boolean;
 };
 
 const STALE_MSG = "Chapters edited — the book stays in draft until you submit for review.";
 
-export function ChapterManagerClient({ bookId, status }: Props) {
+export function ChapterManagerClient({
+  bookId,
+  status,
+  skipDraftOnStructureChange = false,
+}: Props) {
   const router = useRouter();
   const [chapters, setChapters] = useState<ChapterListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,11 +141,15 @@ export function ChapterManagerClient({ bookId, status }: Props) {
   }
 
   async function afterStructureChange() {
-    setStaleMsg(STALE_MSG);
+    setStaleMsg(skipDraftOnStructureChange ? null : STALE_MSG);
     setSelectedId("");
-    await patchBookDraft();
+    if (!skipDraftOnStructureChange) {
+      await patchBookDraft();
+    }
     await loadChapters();
-    router.refresh();
+    if (!skipDraftOnStructureChange) {
+      router.refresh();
+    }
   }
 
   async function saveTitle(e: React.FormEvent) {
@@ -231,6 +241,41 @@ export function ChapterManagerClient({ bookId, status }: Props) {
       await afterStructureChange();
     } catch (e) {
       setActionErr(e instanceof Error ? e.message : "Merge failed");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function renumberAllChapters() {
+    if (
+      !confirm(
+        "Renumber all chapters to 1, 2, 3, … in creation order? Use this to fix gaps in chapter numbers.",
+      )
+    ) {
+      return;
+    }
+    setActionErr(null);
+    setActionBusy(true);
+    try {
+      const res = await fetch(`/api/admin/books/${bookId}/chapters/renumber`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      const data = (await res.json()) as { chapters: ChapterListItem[] };
+      setChapters(data.chapters);
+      setSelectedId("");
+      if (!skipDraftOnStructureChange) {
+        setStaleMsg(STALE_MSG);
+        await patchBookDraft();
+      } else {
+        setStaleMsg(null);
+      }
+      router.refresh();
+    } catch (e) {
+      setActionErr(e instanceof Error ? e.message : "Renumber failed");
     } finally {
       setActionBusy(false);
     }
@@ -357,6 +402,15 @@ export function ChapterManagerClient({ bookId, status }: Props) {
       ) : (
         <>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <button
+              type="button"
+              disabled={disabled || actionBusy}
+              onClick={() => void renumberAllChapters()}
+              className="shrink-0 rounded-lg border border-border bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-surface disabled:opacity-50"
+              title="Fix chapter numbers starting at 2 or with gaps"
+            >
+              Renumber 1…n
+            </button>
             <div className="block min-w-[240px] flex-1 space-y-1.5">
               <span
                 id="chapter-manager-label"

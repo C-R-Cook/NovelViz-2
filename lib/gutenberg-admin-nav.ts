@@ -93,13 +93,23 @@ export function parseGutenbergTab(raw: string | null | undefined): GutenbergImpo
   return "overview";
 }
 
+/** `/admin/books` list only — not `/admin/books/[id]` (partner/for-review book review). */
+export function isAdminBooksListPath(pathname: string): boolean {
+  return pathname === "/admin/books";
+}
+
+/** Top-level “Gutenberg” nav: import pipeline + publish list, not individual book review. */
+export function isGutenbergAdminSectionActive(pathname: string): boolean {
+  return pathname.startsWith("/admin/gutenberg-import") || isAdminBooksListPath(pathname);
+}
+
 export function gutenbergNavLinkIsActive(
   pathname: string,
   tabParam: string | null | undefined,
   href: string,
 ): boolean {
   if (href === "/admin/books" || href.startsWith("/admin/books?")) {
-    return pathname === "/admin/books" || pathname.startsWith("/admin/books/");
+    return isAdminBooksListPath(pathname);
   }
   if (!pathname.startsWith("/admin/gutenberg-import")) return false;
   try {

@@ -122,7 +122,7 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, username, email…"
-          className="min-w-[200px] flex-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className="min-w-0 w-full flex-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:min-w-[200px]"
         />
         {search ? (
           <button
@@ -137,7 +137,63 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
 
       {error ? <p className="text-sm text-error">{error}</p> : null}
 
-      <div className="overflow-x-auto rounded-lg border border-border-subtle">
+      {loading ? (
+        <p className="md:hidden py-8 text-center text-sm text-text-muted">Loading…</p>
+      ) : users.length === 0 ? (
+        <p className="md:hidden py-8 text-center text-sm text-text-muted">No users found.</p>
+      ) : (
+        <ul className="md:hidden space-y-3">
+          {users.map((u) => (
+            <li key={u.id} className="rounded-xl border border-border-subtle bg-bg-base/80 p-4">
+              <Link href={`/admin/users/${u.id}`} className="block no-underline">
+                <p className="font-medium text-text-primary">
+                  {u.username || u.name || "—"}
+                  {u.hasOgBadge ? (
+                    <span className="ml-2 inline-flex rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+                      ★ OG
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-0.5 text-sm text-text-secondary">{u.email}</p>
+              </Link>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <dt className="text-text-muted">Role</dt>
+                  <dd className="font-mono text-accent-text/90">{u.role}</dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">Tier</dt>
+                  <dd>
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 font-medium capitalize ${tierBadgeClass(u.subscriptionTier)}`}
+                    >
+                      {u.subscriptionTier}
+                    </span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">Status</dt>
+                  <dd className={`capitalize ${statusBadgeClass(u.subscriptionStatus)}`}>
+                    {u.subscriptionStatus.replace("_", " ")}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">Joined</dt>
+                  <dd className="text-text-muted">
+                    {new Date(u.createdAt).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="hidden overflow-x-auto rounded-lg border border-border-subtle md:block">
         <table className="w-full min-w-[720px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border-subtle font-mono text-[10px] uppercase tracking-widest text-text-muted">

@@ -59,6 +59,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     genre?: BookGenre | null;
     publishedYear?: number | null;
     description?: string | null;
+    openLibraryKey?: string | null;
+    gutenbergId?: number | null;
     ownerId?: string | null;
     deletedAt?: null;
     status?: BookStatus;
@@ -110,6 +112,28 @@ export async function PATCH(request: Request, context: RouteContext) {
     data.description =
       b.description === null || b.description === "" ? null : b.description;
   }
+  if ("openLibraryKey" in b) {
+    if (b.openLibraryKey !== null && typeof b.openLibraryKey !== "string") {
+      return NextResponse.json(
+        { error: "openLibraryKey must be a string or null" },
+        { status: 400 },
+      );
+    }
+    const trimmed = typeof b.openLibraryKey === "string" ? b.openLibraryKey.trim() : "";
+    data.openLibraryKey = trimmed === "" ? null : trimmed;
+  }
+  if ("gutenbergId" in b) {
+    if (b.gutenbergId === null || b.gutenbergId === "") {
+      data.gutenbergId = null;
+    } else if (typeof b.gutenbergId === "number" && Number.isInteger(b.gutenbergId) && b.gutenbergId > 0) {
+      data.gutenbergId = b.gutenbergId;
+    } else {
+      return NextResponse.json(
+        { error: "gutenbergId must be a positive integer, null, or empty" },
+        { status: 400 },
+      );
+    }
+  }
   if ("ownerId" in b) {
     if (
       b.ownerId !== null &&
@@ -135,17 +159,31 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, ownerId, restoreDeleted",
+          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, ownerId, restoreDeleted",
       },
       { status: 400 },
     );
   }
 
-  const book = await prisma.book.update({
-    where: { id },
-    data,
-  });
-  return NextResponse.json({ book });
+  try {
+    const book = await prisma.book.update({
+      where: { id },
+      data,
+    });
+    return NextResponse.json({ book });
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? (err as { code?: string }).code
+        : undefined;
+    if (code === "P2002") {
+      return NextResponse.json(
+        { error: "That Gutenberg ID is already used by another book" },
+        { status: 409 },
+      );
+    }
+    throw err;
+  }
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {

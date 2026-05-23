@@ -87,7 +87,7 @@ export function ForReviewQueue({
                   <p className="font-medium text-text-primary">{book.title}</p>
                   <p className="text-sm text-text-secondary">{book.author}</p>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-2">
+                <div className="dashboard-for-review-actions dashboard-admin-queue-actions flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
                     disabled={actionId === book.id}

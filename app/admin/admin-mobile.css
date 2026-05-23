@@ -1,0 +1,130 @@
+/* Admin shell — mobile-only overrides (desktop unchanged) */
+
+@media (max-width: 639px) {
+  .admin-mobile-card-actions > .inline-flex.flex-1 {
+    min-width: calc(50% - 0.25rem);
+  }
+
+  .admin-layout-main {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    overflow-x: hidden;
+  }
+}
+
+/* Admin book detail */
+@media (max-width: 767px) {
+  .admin-book-detail-root .admin-book-action-bar {
+    padding: 0.625rem;
+  }
+
+  .admin-book-detail-root .admin-book-action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-book-detail-root .admin-book-action-status {
+    width: 100%;
+  }
+
+  .admin-book-detail-root .admin-book-action-buttons {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .admin-book-detail-root .admin-book-metadata-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-book-detail-root .admin-book-metadata-cover-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-book-detail-root .admin-book-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-book-detail-root .admin-book-action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-book-detail-root .admin-book-action-buttons > button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-book-detail-root .admin-book-image-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .admin-book-detail-root .admin-book-image-actions > * {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
+/* Chapter manager */
+@media (max-width: 639px) {
+  .chapter-manager-root .chapter-manager-merge-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chapter-manager-root .chapter-manager-merge-actions > button {
+    width: 100%;
+  }
+
+  .chapter-manager-root .chapter-manager-title-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chapter-manager-root .chapter-manager-title-row button {
+    width: 100%;
+  }
+}
+
+/* Partner book detail */
+@media (max-width: 767px) {
+  .partner-book-detail-root .partner-book-action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .partner-book-detail-root .partner-book-status-chip {
+    width: 100%;
+    max-width: none;
+  }
+
+  .partner-book-detail-root .partner-book-action-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .partner-book-detail-root .partner-book-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 639px) {
+  .partner-book-detail-root .partner-book-action-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .partner-book-detail-root .partner-book-action-buttons > button,
+  .partner-book-detail-root .partner-book-action-buttons > div {
+    width: 100%;
+  }
+}

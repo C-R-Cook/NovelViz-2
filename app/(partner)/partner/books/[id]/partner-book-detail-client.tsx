@@ -7,6 +7,7 @@ import type { BookGenre, BookStatus, ListingPreferenceAfterReview, FeatureReques
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import "@/app/admin/admin-mobile.css";
 
 export type PartnerBookDetailModel = {
   id: string;
@@ -36,7 +37,7 @@ type TabKey = "details" | "images";
 
 function statusActionChipClass(status: BookStatus): string {
   const base =
-    "inline-flex w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium tracking-tight";
+    "partner-book-status-chip inline-flex w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg px-2 py-2 text-sm font-medium tracking-tight max-md:w-full max-md:shrink";
   switch (status) {
     case "draft":
       return `${base} bg-bg-raised text-text-primary`;
@@ -57,7 +58,7 @@ function statusActionChipClass(status: BookStatus): string {
 
 function statusDropdownShellClass(status: BookStatus): string {
   const base =
-    "inline-flex h-[34px] w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-1 text-sm font-medium tracking-tight bg-bg-surface";
+    "partner-book-status-chip inline-flex h-[34px] w-[10.375rem] shrink-0 items-center justify-center whitespace-nowrap rounded-lg border px-1 text-sm font-medium tracking-tight bg-bg-surface max-md:w-full max-md:shrink";
   switch (status) {
     case "published":
       return `${base} border-success/55 text-text-primary`;
@@ -506,10 +507,10 @@ export function PartnerBookDetailClient({
   const mergeBookAndChapterPanels = book.status === "draft";
 
   return (
-    <div className="space-y-6">
+    <div className="partner-book-detail-root space-y-6">
       {!mergeBookAndChapterPanels ? (
         <div
-          className="flex gap-1 border-b border-border"
+          className="partner-book-tabs flex gap-1 border-b border-border"
           role="tablist"
           aria-label="Partner book tabs"
         >
@@ -547,7 +548,7 @@ export function PartnerBookDetailClient({
         aria-label="Book actions"
       >
         <div
-          className={`flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 ${actionRowGradientClass(book.status)}`}
+          className={`partner-book-action-row flex flex-wrap items-center justify-between gap-2 rounded-lg px-3 py-2 ${actionRowGradientClass(book.status)}`}
         >
           {canToggleCatalogueStatus ? (
             <div ref={statusPickerRef} className={`${statusDropdownShellClass(book.status)} relative`}>
@@ -620,7 +621,7 @@ export function PartnerBookDetailClient({
           ) : (
             <span className={statusActionChipClass(book.status)}>{statusActionChipLabel(book.status)}</span>
           )}
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="partner-book-action-buttons flex flex-wrap items-center justify-end gap-2">
           <input
             ref={ingestFileRef}
             type="file"
@@ -802,7 +803,7 @@ export function PartnerBookDetailClient({
                 </div>
 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-16 lg:grid-cols-[minmax(0,0.64fr)_14rem]">
+                  <div className="grid grid-cols-1 gap-16 max-lg:grid-cols-1 lg:grid-cols-[minmax(0,0.64fr)_14rem]">
                     <div className="space-y-3">
                       <Field
                         label="Title"

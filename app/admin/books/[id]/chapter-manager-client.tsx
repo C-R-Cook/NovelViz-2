@@ -386,7 +386,7 @@ export function ChapterManagerClient({
     ) : null;
 
   return (
-    <section className="rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
+    <section className="chapter-manager-root rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
       <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">
         Chapter Manager
       </h2>
@@ -411,7 +411,7 @@ export function ChapterManagerClient({
             >
               Renumber 1…n
             </button>
-            <div className="block min-w-[240px] flex-1 space-y-1.5">
+            <div className="block min-w-0 w-full flex-1 space-y-1.5 sm:min-w-[240px]">
               <span
                 id="chapter-manager-label"
                 className="text-xs font-medium uppercase tracking-wide text-text-muted"
@@ -466,12 +466,12 @@ export function ChapterManagerClient({
                   <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
                     Chapter title
                   </span>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="chapter-manager-title-row flex flex-wrap items-center gap-2">
                     <input
                       value={chapterTitle}
                       onChange={(e) => setChapterTitle(e.target.value)}
                       disabled={disabled}
-                      className="min-w-[200px] flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:opacity-50 sm:min-w-[200px]"
                     />
                     <button
                       type="submit"
@@ -502,7 +502,7 @@ export function ChapterManagerClient({
                 />
               </label>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="chapter-manager-merge-actions flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={disabled || !canPrev}

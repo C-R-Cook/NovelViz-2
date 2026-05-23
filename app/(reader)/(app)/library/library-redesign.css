@@ -21,6 +21,17 @@
   }
 }
 
+@media (max-width: 767px) {
+  .library-root-inner {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .library-root {
+    overflow-x: hidden;
+  }
+}
+
 .library-no-h-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;

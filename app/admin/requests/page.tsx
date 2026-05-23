@@ -67,7 +67,33 @@ export default async function AdminBookRequestsPage() {
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-bg-surface/90">
+      {rows.length === 0 ? (
+        <p className="md:hidden py-10 text-center text-sm text-text-muted">No book requests yet.</p>
+      ) : (
+        <ul className="md:hidden space-y-3">
+          {rows.map((row) => (
+            <li
+              key={row.bookTitle}
+              className="rounded-xl border border-border/80 bg-bg-base/80 p-4"
+            >
+              <p className="font-medium text-text-primary">{row.bookTitle}</p>
+              <p className="text-sm text-text-secondary">{row.authorName}</p>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <dt className="text-text-muted">Requests</dt>
+                  <dd className="tabular-nums text-text-primary">{row.requestCount}</dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">First requested</dt>
+                  <dd className="text-text-secondary">{formatActivityAtUtc(row.firstRequested)}</dd>
+                </div>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-surface/90 md:block">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-text-muted">

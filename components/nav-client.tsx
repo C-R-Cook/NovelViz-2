@@ -3,6 +3,7 @@
 import { NotificationsBell } from "@/components/notifications-bell";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { useAuth, useClerk } from "@clerk/nextjs";
+import { isGutenbergAdminSectionActive } from "@/lib/gutenberg-admin-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -166,9 +167,7 @@ export function NavChrome({
         <>
           <Link
             href="/admin/gutenberg-import"
-            className={navLinkClass(
-              isActive(pathname, "/admin/gutenberg-import") || isActive(pathname, "/admin/books"),
-            )}
+            className={navLinkClass(isGutenbergAdminSectionActive(pathname))}
             onClick={() => setMenuOpen(false)}
           >
             Gutenberg

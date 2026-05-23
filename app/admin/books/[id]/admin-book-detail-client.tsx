@@ -3,7 +3,7 @@
 
 import { ChapterManagerClient } from "./chapter-manager-client";
 import { DEFAULT_ADMIN_BOOK_RETURN } from "@/lib/admin-book-navigation";
-import { formatGenre } from "@/lib/genre";
+import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type {
   BookGenre,
@@ -15,6 +15,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import "../../admin-mobile.css";
 
 export type AdminBookDetailModel = {
   id: string;
@@ -23,6 +24,7 @@ export type AdminBookDetailModel = {
   genre: BookGenre | null;
   publishedYear: number | null;
   openLibraryKey: string | null;
+  gutenbergId: number | null;
   description: string | null;
   coverImageUrl: string | null;
   status: BookStatus;
@@ -45,6 +47,68 @@ export type AdminBookPublicImageRow = {
 };
 
 type AdminBookTabKey = "details" | "images";
+
+type MetadataFormState = {
+  title: string;
+  author: string;
+  genre: string;
+  publishedYear: string;
+  description: string;
+  openLibraryKey: string;
+  gutenbergId: string;
+};
+
+const metadataInputClass =
+  "mt-1 w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50";
+
+function metadataFormFromBook(book: AdminBookDetailModel): MetadataFormState {
+  return {
+    title: book.title,
+    author: book.author,
+    genre: book.genre ?? "",
+    publishedYear: book.publishedYear != null ? String(book.publishedYear) : "",
+    description: book.description ?? "",
+    openLibraryKey: book.openLibraryKey ?? "",
+    gutenbergId: book.gutenbergId != null ? String(book.gutenbergId) : "",
+  };
+}
+
+function mergeBookFromPatch(
+  prev: AdminBookDetailModel,
+  raw: Record<string, unknown>,
+): AdminBookDetailModel {
+  return {
+    ...prev,
+    title: typeof raw.title === "string" ? raw.title : prev.title,
+    author: typeof raw.author === "string" ? raw.author : prev.author,
+    genre:
+      raw.genre === null || typeof raw.genre === "string"
+        ? (raw.genre as AdminBookDetailModel["genre"])
+        : prev.genre,
+    publishedYear:
+      typeof raw.publishedYear === "number"
+        ? raw.publishedYear
+        : raw.publishedYear === null
+          ? null
+          : prev.publishedYear,
+    description:
+      raw.description === null || typeof raw.description === "string"
+        ? raw.description
+        : prev.description,
+    openLibraryKey:
+      raw.openLibraryKey === null || typeof raw.openLibraryKey === "string"
+        ? raw.openLibraryKey
+        : prev.openLibraryKey,
+    gutenbergId:
+      typeof raw.gutenbergId === "number"
+        ? raw.gutenbergId
+        : raw.gutenbergId === null
+          ? null
+          : prev.gutenbergId,
+    coverImageUrl:
+      typeof raw.coverImageUrl === "string" ? raw.coverImageUrl : prev.coverImageUrl,
+  };
+}
 
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
 function actionRowGradientClass(status: BookStatus): string {
@@ -82,15 +146,18 @@ export function AdminBookDetailClient({
     setBook(initial);
   }, [initial]);
 
-  const [publishedYear, setPublishedYear] = useState(
-    initial.publishedYear != null ? String(initial.publishedYear) : "",
+  const [metadataForm, setMetadataForm] = useState<MetadataFormState>(() =>
+    metadataFormFromBook(initial),
   );
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [metadataSaving, setMetadataSaving] = useState(false);
+  const [metadataErr, setMetadataErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setPublishedYear(book.publishedYear != null ? String(book.publishedYear) : "");
+    setMetadataForm(metadataFormFromBook(book));
+    setCoverFile(null);
+    setMetadataErr(null);
   }, [book]);
-
-  const [saving, setSaving] = useState(false);
 
   const [statusErr, setStatusErr] = useState<string | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -314,34 +381,112 @@ export function AdminBookDetailClient({
     };
   }, []);
 
-  async function savePublishedYearOnly() {
-    setSaving(true);
-    try {
-      const trimmed = publishedYear.trim();
-      const parsed = trimmed === "" ? null : Number.parseInt(trimmed, 10);
-      if (parsed !== null) {
-        if (Number.isNaN(parsed)) throw new Error("Published year must be a number");
-        if (trimmed.length !== 4) throw new Error("Published year must be 4 digits");
+  function isMetadataDirty(): boolean {
+    if (coverFile) return true;
+    const baseline = metadataFormFromBook(book);
+    return (
+      metadataForm.title !== baseline.title ||
+      metadataForm.author !== baseline.author ||
+      metadataForm.genre !== baseline.genre ||
+      metadataForm.publishedYear !== baseline.publishedYear ||
+      metadataForm.description !== baseline.description ||
+      metadataForm.openLibraryKey !== baseline.openLibraryKey ||
+      metadataForm.gutenbergId !== baseline.gutenbergId
+    );
+  }
+
+  async function persistMetadata(): Promise<void> {
+    const title = metadataForm.title.trim();
+    const author = metadataForm.author.trim();
+    if (!title) throw new Error("Title is required");
+    if (!author) throw new Error("Author is required");
+
+    const yearTrimmed = metadataForm.publishedYear.trim();
+    const publishedYear = yearTrimmed === "" ? null : Number.parseInt(yearTrimmed, 10);
+    if (publishedYear !== null) {
+      if (Number.isNaN(publishedYear)) throw new Error("Published year must be a number");
+      if (yearTrimmed.length !== 4) throw new Error("Published year must be 4 digits");
+    }
+
+    const gutenbergTrimmed = metadataForm.gutenbergId.trim();
+    const gutenbergId = gutenbergTrimmed === "" ? null : Number.parseInt(gutenbergTrimmed, 10);
+    if (gutenbergId !== null) {
+      if (!Number.isInteger(gutenbergId) || gutenbergId < 1) {
+        throw new Error("Gutenberg ID must be a positive whole number");
       }
-      const res = await fetch(`/api/admin/books/${book.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ publishedYear: parsed }),
+    }
+
+    const openLibraryKey = metadataForm.openLibraryKey.trim();
+    const description = metadataForm.description.trim();
+
+    if (coverFile) {
+      const fd = new FormData();
+      fd.append("file", coverFile);
+      const coverRes = await fetch(`/api/admin/books/${book.id}/cover`, {
+        method: "POST",
+        body: fd,
       });
-      const data = (await res.json().catch(() => ({}))) as {
+      const coverData = (await coverRes.json().catch(() => ({}))) as {
         error?: string;
-        book?: AdminBookDetailModel;
+        book?: Record<string, unknown>;
       };
-      if (!res.ok || !data.book) {
-        throw new Error(data.error || res.statusText);
+      if (!coverRes.ok) {
+        throw new Error(coverData.error || coverRes.statusText);
       }
-      setBook((prev) => ({ ...prev, ...data.book, chapterCount: prev.chapterCount }));
-      showFeedback("success", "Published year updated");
+      if (coverData.book) {
+        setBook((prev) => mergeBookFromPatch(prev, coverData.book!));
+      }
+      setCoverFile(null);
+    }
+
+    const res = await fetch(`/api/admin/books/${book.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        author,
+        genre: metadataForm.genre === "" ? null : metadataForm.genre,
+        publishedYear,
+        description: description === "" ? null : description,
+        openLibraryKey: openLibraryKey === "" ? null : openLibraryKey,
+        gutenbergId,
+      }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      book?: Record<string, unknown>;
+    };
+    if (!res.ok || !data.book) {
+      throw new Error(data.error || res.statusText);
+    }
+
+    const next = mergeBookFromPatch(book, data.book);
+    setBook((prev) => ({
+      ...next,
+      ownerLabel: prev.ownerLabel,
+      chapterCount: prev.chapterCount,
+      createdAtLabel: prev.createdAtLabel,
+      status: prev.status,
+      rejectionReason: prev.rejectionReason,
+      listingPreferenceAfterReview: prev.listingPreferenceAfterReview,
+    }));
+    setMetadataForm(metadataFormFromBook(next));
+  }
+
+  async function saveMetadata(e: React.FormEvent) {
+    e.preventDefault();
+    setMetadataErr(null);
+    setMetadataSaving(true);
+    try {
+      await persistMetadata();
+      showFeedback("success", "Book metadata saved.");
       router.refresh();
     } catch (err) {
-      showFeedback("error", err instanceof Error ? err.message : "Save failed");
+      const msg = err instanceof Error ? err.message : "Save failed";
+      setMetadataErr(msg);
+      showFeedback("error", msg);
     } finally {
-      setSaving(false);
+      setMetadataSaving(false);
     }
   }
 
@@ -417,10 +562,20 @@ export function AdminBookDetailClient({
       (nextStatus === "published" || nextStatus === "unlisted");
     setPublishErr(null);
     setStatusErr(null);
+    setMetadataErr(null);
     setActionFeedback(null);
     setPromotingBusy(true);
     setBook((prev) => ({ ...prev, status: nextStatus, rejectionReason: null }));
     try {
+      if (isMetadataDirty()) {
+        setMetadataSaving(true);
+        try {
+          await persistMetadata();
+        } finally {
+          setMetadataSaving(false);
+        }
+      }
+
       const res = await fetch(`/api/admin/books/${book.id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -453,6 +608,7 @@ export function AdminBookDetailClient({
       setBook(snapshot);
       const msg = err instanceof Error ? err.message : "Publish failed";
       setPublishErr(msg);
+      setMetadataErr(msg);
       showFeedback("error", msg);
     } finally {
       setPromotingBusy(false);
@@ -537,17 +693,21 @@ export function AdminBookDetailClient({
   const showRejectButton = book.status === "pending_review";
   const showPublishButton = book.status !== "processing";
   const statusLabel = book.status.replace(/_/g, " ");
+  const metadataDisabled = book.status === "processing" || metadataSaving;
+  const openLibraryHref = metadataForm.openLibraryKey.trim()
+    ? `https://openlibrary.org${metadataForm.openLibraryKey.trim().startsWith("/") ? "" : "/"}${metadataForm.openLibraryKey.trim()}`
+    : null;
 
   return (
-    <div className="space-y-6">
+    <div className="admin-book-detail-root space-y-6">
       <div
-        className="sticky top-[5.5rem] z-30 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
+        className="admin-book-action-bar sticky top-[5.5rem] z-30 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
         aria-label="Book actions"
       >
         <div
-          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-2 ${actionRowGradientClass(book.status)}`}
+          className={`admin-book-action-row flex flex-wrap items-center justify-between gap-3 rounded-lg px-2 py-2 ${actionRowGradientClass(book.status)}`}
         >
-          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+          <p className="admin-book-action-status text-xs font-medium uppercase tracking-wide text-text-muted">
             Status: <span className="text-text-primary">{statusLabel}</span>
             {book.status === "processing" ? (
               <span className="ml-2 normal-case text-text-secondary">— ingestion in progress</span>
@@ -557,7 +717,7 @@ export function AdminBookDetailClient({
               </span>
             ) : null}
           </p>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="admin-book-action-buttons flex flex-wrap items-center justify-end gap-2">
             {showRejectButton ? (
               <button
                 type="button"
@@ -575,7 +735,7 @@ export function AdminBookDetailClient({
             {showPublishButton ? (
               <button
                 type="button"
-                disabled={promotingBusy || statusBusy || rejectBusy}
+                disabled={promotingBusy || statusBusy || rejectBusy || metadataSaving}
                 onClick={() =>
                   book.status === "published"
                     ? void transitionStatus("unlisted", { successMessage: "Book unlisted." })
@@ -583,7 +743,7 @@ export function AdminBookDetailClient({
                 }
                 className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-text-primary transition hover:bg-success disabled:opacity-50"
               >
-                {promotingBusy
+                {promotingBusy || metadataSaving
                   ? "Updating…"
                   : book.status === "published"
                     ? "Remove from catalogue"
@@ -637,7 +797,11 @@ export function AdminBookDetailClient({
         ) : null}
       </div>
 
-      <div className="flex gap-1 border-b border-border" role="tablist" aria-label="Admin book tabs">
+      <div
+        className="admin-book-tabs flex gap-1 border-b border-border"
+        role="tablist"
+        aria-label="Admin book tabs"
+      >
         <button
           type="button"
           role="tab"
@@ -668,65 +832,169 @@ export function AdminBookDetailClient({
 
       {adminTab === "details" ? (
         <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-xl border border-border p-6">
+          <form
+            onSubmit={(e) => void saveMetadata(e)}
+            className="relative overflow-hidden rounded-xl border border-border p-6"
+          >
             <div
               className={`pointer-events-none absolute inset-0 ${actionRowGradientClass(book.status)}`}
               aria-hidden
             />
-            <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr] rounded-lg bg-bg-surface/80 p-1">
-              <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
-                {book.coverImageUrl ? (
-                  <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
-                ) : (
-                  <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
-                    No cover image
+            <div className="relative z-10 space-y-6 rounded-lg bg-bg-surface/80 p-1">
+              <div className="admin-book-metadata-cover-row grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
+                <div className="space-y-3">
+                  <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
+                    {book.coverImageUrl && !coverFile ? (
+                      <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
+                    ) : coverFile ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- local preview
+                      <img
+                        src={URL.createObjectURL(coverFile)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center px-2 text-center text-xs text-text-muted">
+                        No cover image
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <InfoRow label="Title" value={book.title} />
-                <InfoRow label="Author" value={book.author} />
-                <InfoRow label="Genre" value={book.genre ? formatGenre(book.genre) : "Unknown"} />
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2">
-                    <span className="w-28 shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">
-                      Published Year
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Cover image
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      disabled={metadataDisabled}
+                      onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+                      className="mt-1 block w-full max-w-[14rem] text-xs text-text-secondary file:mr-2 file:rounded-md file:border-0 file:bg-bg-raised file:px-2 file:py-1.5 file:text-xs file:font-medium file:text-text-primary"
+                    />
+                  </label>
+                </div>
+
+                <div className="admin-book-metadata-grid grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Title</span>
+                    <input
+                      type="text"
+                      required
+                      disabled={metadataDisabled}
+                      value={metadataForm.title}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, title: e.target.value }))
+                      }
+                      className={metadataInputClass}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Author</span>
+                    <input
+                      type="text"
+                      required
+                      disabled={metadataDisabled}
+                      value={metadataForm.author}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, author: e.target.value }))
+                      }
+                      className={metadataInputClass}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">Genre</span>
+                    <select
+                      disabled={metadataDisabled}
+                      value={metadataForm.genre}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, genre: e.target.value }))
+                      }
+                      className={metadataInputClass}
+                    >
+                      <option value="">Select genre</option>
+                      {GENRE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Published year
                     </span>
                     <input
                       type="number"
-                      value={publishedYear}
-                      onChange={(e) => setPublishedYear(e.target.value)}
+                      disabled={metadataDisabled}
+                      value={metadataForm.publishedYear}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, publishedYear: e.target.value }))
+                      }
                       placeholder="e.g. 1847"
-                      className="max-w-[10rem] rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                      className={metadataInputClass}
                     />
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => void savePublishedYearOnly()}
-                      className="rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
-                    >
-                      {saving ? "Saving…" : "Save Year"}
-                    </button>
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Open Library key
+                    </span>
+                    <input
+                      type="text"
+                      disabled={metadataDisabled}
+                      value={metadataForm.openLibraryKey}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, openLibraryKey: e.target.value }))
+                      }
+                      placeholder="/works/OL123456W"
+                      className={metadataInputClass}
+                    />
+                    {openLibraryHref ? (
+                      <Link
+                        href={openLibraryHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-block text-xs font-medium text-accent-text underline-offset-2 hover:underline"
+                      >
+                        Preview on Open Library ↗
+                      </Link>
+                    ) : null}
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Gutenberg ID
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      disabled={metadataDisabled}
+                      value={metadataForm.gutenbergId}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, gutenbergId: e.target.value }))
+                      }
+                      placeholder="e.g. 1342"
+                      className={metadataInputClass}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Description
+                    </span>
+                    <textarea
+                      rows={5}
+                      disabled={metadataDisabled}
+                      value={metadataForm.description}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, description: e.target.value }))
+                      }
+                      className={metadataInputClass}
+                    />
                   </label>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 border-t border-border/60 pt-4 sm:grid-cols-2">
                 <InfoRow label="Publisher" value={book.ownerLabel ?? "Unassigned"} />
                 <InfoRow label="Uploaded" value={book.createdAtLabel} />
                 <InfoRow label="Chapters" value={String(book.chapterCount)} />
-                {book.openLibraryKey ? (
-                  <div className="sm:col-span-2">
-                    <span className="mr-2 text-xs font-medium uppercase tracking-wide text-text-muted">
-                      Open Library:
-                    </span>
-                    <Link
-                      href={`https://openlibrary.org${book.openLibraryKey}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-                    >
-                      Open Library ↗
-                    </Link>
-                  </div>
-                ) : null}
                 {book.status === "pending_review" ? (
                   <div className="sm:col-span-2">
                     <InfoRow
@@ -737,12 +1005,25 @@ export function AdminBookDetailClient({
                     />
                   </div>
                 ) : null}
-                <div className="sm:col-span-2">
-                  <InfoRow label="Description" value={book.description ?? "No description"} multiline />
-                </div>
+              </div>
+
+              {book.status === "processing" ? (
+                <p className="text-sm text-text-secondary">
+                  Metadata cannot be edited while ingestion is in progress.
+                </p>
+              ) : null}
+              {metadataErr ? <p className="text-sm text-error">{metadataErr}</p> : null}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={metadataDisabled}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-text-primary transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {metadataSaving ? "Saving…" : "Save metadata"}
+                </button>
               </div>
             </div>
-          </div>
+          </form>
           <div className="rounded-xl border border-border bg-bg-surface/85 p-6">
             <ChapterManagerClient
               bookId={book.id}
@@ -811,7 +1092,7 @@ export function AdminBookDetailClient({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-auto flex flex-wrap justify-end gap-2">
+                      <div className="admin-book-image-actions mt-auto flex flex-wrap justify-end gap-2">
                         {pending && fr ? (
                           <>
                             <button

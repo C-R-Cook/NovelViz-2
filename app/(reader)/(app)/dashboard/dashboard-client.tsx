@@ -274,6 +274,9 @@ export function DashboardClient({
   const [featureRequestQueue, setFeatureRequestQueue] = useState(admin?.featureRequestsQueue ?? []);
   const [actionId, setActionId] = useState<string | null>(null);
   const [featureActionId, setFeatureActionId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -286,6 +289,37 @@ export function DashboardClient({
       setFeatureRequestQueue(admin?.featureRequestsQueue ?? []);
     });
   }, [admin]);
+
+  useEffect(() => {
+    closeSidebar();
+  }, [tab, closeSidebar]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") closeSidebar();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [sidebarOpen, closeSidebar]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    function onChange() {
+      if (mq.matches) closeSidebar();
+    }
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [closeSidebar]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [sidebarOpen]);
 
   function pushTab(next: DashboardTabSlug) {
     const def = defaultDashboardTab(role);
@@ -368,6 +402,7 @@ export function DashboardClient({
           href={entry.href}
           className="dashboard-nav-btn no-underline"
           data-active={active ? "true" : "false"}
+          onClick={closeSidebar}
         >
           <span className="dashboard-nav-icon" aria-hidden>
             {entry.icon}
@@ -384,7 +419,10 @@ export function DashboardClient({
         type="button"
         className="dashboard-nav-btn"
         data-active={tab === slug ? "true" : "false"}
-        onClick={() => pushTab(slug)}
+        onClick={() => {
+          pushTab(slug);
+          closeSidebar();
+        }}
       >
         <span className="dashboard-nav-icon" aria-hidden>
           {icon}
@@ -392,6 +430,21 @@ export function DashboardClient({
         <span className="dashboard-nav-label">{dashboardTabLabel(slug)}</span>
         {badge && n > 0 ? <span className="dashboard-nav-badge">{n > 99 ? "99+" : n}</span> : null}
       </button>
+    );
+  }
+
+  function SidebarToggleIcon({ open }: { open: boolean }) {
+    if (open) {
+      return (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      );
+    }
+    return (
+      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
     );
   }
 
@@ -528,7 +581,7 @@ export function DashboardClient({
                 actionId={actionId}
                 onModeration={(id, status) => void runModeration(id, status)}
                 returnTo="/dashboard?tab=for-review"
-                className="dashboard-for-review-wrap"
+                className="dashboard-for-review-wrap dashboard-admin-queue-wrap"
               />
             </div>
             <GemDivider />
@@ -852,7 +905,7 @@ export function DashboardClient({
             actionId={actionId}
             onModeration={(id, status) => void runModeration(id, status)}
             returnTo="/dashboard?tab=for-review"
-            className="dashboard-for-review-wrap"
+            className="dashboard-for-review-wrap dashboard-admin-queue-wrap"
           />
         ) : null;
       case "feature-approvals":
@@ -861,14 +914,14 @@ export function DashboardClient({
             items={featureRequestQueue}
             actionRequestId={featureActionId}
             onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
-            className="dashboard-feature-queue-wrap"
+            className="dashboard-feature-queue-wrap dashboard-admin-queue-wrap"
           />
         ) : null;
       case "spoiler-comments":
         return admin ? (
           <SpoilerCommentsQueue
             items={admin.spoilerCommentsQueue}
-            className="dashboard-spoiler-comments-wrap"
+            className="dashboard-spoiler-comments-wrap dashboard-admin-queue-wrap"
           />
         ) : null;
       case "flagged-comments":
@@ -904,7 +957,19 @@ export function DashboardClient({
     <div className="dashboard-root">
       <div className="dashboard-root-inner">
         <div className="dashboard-body">
-          <aside className="dashboard-sidebar">
+          {sidebarOpen ? (
+            <button
+              type="button"
+              className="dashboard-sidebar-backdrop"
+              aria-label="Close menu"
+              onClick={closeSidebar}
+            />
+          ) : null}
+          <aside
+            id="dashboard-sidebar"
+            className="dashboard-sidebar"
+            data-open={sidebarOpen ? "true" : "false"}
+          >
             <div className="dashboard-sidebar-user">
               <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
               <div className="dashboard-sidebar-name">{reader.displayName}</div>
@@ -914,12 +979,28 @@ export function DashboardClient({
 
           <main className="dashboard-main">
             <div key={tab} className="dashboard-section-head dashboard-section-head--animate">
-              <div className="dashboard-section-eyebrow">
-                {reader.displayName} · {roleDisplayLabel}
+              <div className="dashboard-section-head-row">
+                <div className="dashboard-section-head-text">
+                  <div className="dashboard-section-eyebrow">
+                    {reader.displayName} · {roleDisplayLabel}
+                  </div>
+                  {tab !== "partner-program" ? (
+                    <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="dashboard-sidebar-toggle"
+                  aria-expanded={sidebarOpen}
+                  aria-controls="dashboard-sidebar"
+                  onClick={() => setSidebarOpen((o) => !o)}
+                >
+                  <SidebarToggleIcon open={sidebarOpen} />
+                  <span className="dashboard-sidebar-toggle-label">
+                    {sidebarOpen ? "Close" : "Menu"}
+                  </span>
+                </button>
               </div>
-              {tab !== "partner-program" ? (
-                <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
-              ) : null}
             </div>
             {mainInner()}
           </main>

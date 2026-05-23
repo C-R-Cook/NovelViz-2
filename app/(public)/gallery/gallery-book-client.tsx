@@ -730,9 +730,9 @@ export function GalleryBookClient({
               </svg>
             </button>
 
-            <div className="flex min-h-0 w-full flex-1 flex-row overflow-hidden sm:pt-1">
+            <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden max-md:flex-col md:flex-row sm:pt-1">
               <div
-                className={`flex min-h-0 min-w-0 flex-col ${modalLocked ? "w-full" : "flex-[2] border-r border-border"}`}
+                className={`flex min-h-0 min-w-0 flex-col max-md:max-h-[50dvh] max-md:flex-none ${modalLocked ? "w-full" : "md:flex-[2] md:border-r md:border-border"}`}
               >
               <div className="relative flex min-h-[200px] flex-1 bg-bg-base px-4 pt-12 sm:px-6 sm:pt-4">
                 <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden">
@@ -929,7 +929,7 @@ export function GalleryBookClient({
               </div>
 
               {!modalLocked ? (
-                <aside className="flex min-h-0 min-w-0 flex-1 flex-col bg-bg-surface/40">
+                <aside className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-border bg-bg-surface/40 max-md:border-r-0 md:border-t-0">
                   <GalleryImageComments
                       layout="sidebar"
                       className="h-full min-h-0"

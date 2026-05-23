@@ -464,10 +464,64 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
 
       {data && tab === "subscription" ? (
         <div className="space-y-6">
-          <section className="overflow-x-auto rounded-lg border border-border-subtle">
+          <section className="rounded-lg border border-border-subtle">
             <h2 className="border-b border-border-subtle bg-bg-surface px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
               Active grants
             </h2>
+            {data.activeGrants.length === 0 ? (
+              <p className="md:hidden px-4 py-8 text-center text-sm text-text-muted">No active grants.</p>
+            ) : (
+              <ul className="md:hidden divide-y divide-border-subtle">
+                {data.activeGrants.map((g) => (
+                  <li key={g.id} className="space-y-2 px-4 py-4">
+                    <p className="font-medium text-text-primary">{grantTypeLabel(g.grantType)}</p>
+                    <p className="text-sm capitalize text-text-secondary">{grantValueLabel(g)}</p>
+                    <dl className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <dt className="text-text-muted">Source</dt>
+                        <dd className="font-mono text-text-muted">{g.source}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-text-muted">Expires</dt>
+                        <dd className="text-text-muted">{formatDate(g.expiresAt)}</dd>
+                      </div>
+                    </dl>
+                    {g.reason ? (
+                      <p className="text-xs text-text-secondary">{g.reason}</p>
+                    ) : null}
+                    {revokeConfirmId === g.id ? (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={revokeBusy}
+                          onClick={() => void revokeGrant(g.id)}
+                          className="rounded-md bg-error/20 px-3 py-2 text-xs text-error"
+                        >
+                          Confirm revoke
+                        </button>
+                        <button
+                          type="button"
+                          disabled={revokeBusy}
+                          onClick={() => setRevokeConfirmId(null)}
+                          className="rounded-md border border-border px-3 py-2 text-xs text-text-muted"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setRevokeConfirmId(g.id)}
+                        className="text-xs text-error underline-offset-2 hover:underline"
+                      >
+                        Revoke
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-border-subtle font-mono text-[10px] uppercase tracking-widest text-text-muted">
@@ -536,6 +590,7 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                 )}
               </tbody>
             </table>
+            </div>
           </section>
 
           <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">

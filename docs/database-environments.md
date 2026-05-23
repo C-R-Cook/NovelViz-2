@@ -133,8 +133,16 @@ Your real Clerk user (CH) will get a row on **first sign-in** against whichever 
 
 Recommended **Build Command** override:
 
+In the Vercel dashboard, either **clear** the custom Build Command override (the repo’s `vercel.json` runs `scripts/vercel-build.sh`), or set it exactly to:
+
 ```bash
-if [ "$VERCEL_ENV" = "production" ]; then npx prisma migrate deploy; fi && next build
+sh scripts/vercel-build.sh
+```
+
+Do **not** omit the leading `if` if you paste the shell one-liner manually:
+
+```bash
+if [ "$VERCEL_ENV" = "production" ]; then npx prisma migrate deploy; fi && npx prisma generate && next build
 ```
 
 | Environment | Migrations | Build |

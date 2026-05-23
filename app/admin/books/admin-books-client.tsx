@@ -420,7 +420,86 @@ export function AdminBooksClient({
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-bg-surface/90">
+      {filterLoading ? (
+        <p className="md:hidden py-8 text-center text-sm text-text-muted">Loading…</p>
+      ) : books.length === 0 ? (
+        <p className="md:hidden py-8 text-center text-sm text-text-muted">No books match this filter.</p>
+      ) : (
+        <ul className="md:hidden space-y-3">
+          {books.map((book) => (
+            <li
+              key={book.id}
+              className="rounded-xl border border-border/80 bg-bg-base/80 p-4"
+            >
+              <div className="flex gap-3">
+                <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded border border-border bg-bg-surface">
+                  {book.coverImageUrl ? (
+                    <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="44px" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-[10px] text-text-muted">—</div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-text-primary">{book.title}</p>
+                  <p className="text-sm text-text-secondary">{book.author}</p>
+                  <p className="mt-1 text-xs text-text-muted">{book.ownerLabel ?? "Unassigned"}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <StatusBadge status={book.status} isDeleted={book.isDeleted} />
+                    <span className="text-xs tabular-nums text-text-muted">
+                      {book.chapterCount} ch · {book.createdAtLabel}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div className="admin-mobile-card-actions mt-3 flex flex-wrap gap-2">
+                {!book.isDeleted ? (
+                  <>
+                    <Link
+                      href={adminBookDetailHref(
+                        book.id,
+                        returnTo ??
+                          (variant === "embedded"
+                            ? "/dashboard?tab=all-books"
+                            : `/admin/books?filter=${filter}`),
+                      )}
+                      className="inline-flex flex-1 items-center justify-center rounded-lg bg-bg-raised px-3 py-2 text-sm font-medium text-text-primary ring-1 ring-border"
+                    >
+                      Manage
+                    </Link>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${book.title}`}
+                      disabled={deletingId === book.id}
+                      onClick={() => void deleteBook(book)}
+                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-error/35 bg-error/15 text-error"
+                    >
+                      <span className="sr-only">Delete</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-4 w-4" aria-hidden>
+                        <path d="M3 6h18" />
+                        <path d="M8 6V4h8v2" />
+                        <path d="M19 6l-1 14H6L5 6" />
+                        <path d="M10 11v6" />
+                        <path d="M14 11v6" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={restoringId === book.id}
+                    onClick={() => void restoreBook(book)}
+                    className="w-full rounded-lg border border-error/35 bg-error/15 px-3 py-2 text-sm font-medium text-error"
+                  >
+                    {restoringId === book.id ? "Restoring..." : "Restore"}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-bg-surface/90 md:block">
         <table className="w-full min-w-[800px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs">

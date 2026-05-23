@@ -82,7 +82,7 @@ export function FeatureRequestsQueue({
                 </p>
                 <ActivityTimestamp ms={row.createdAtMs} />
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
+              <div className="dashboard-admin-queue-actions flex shrink-0 flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={actionRequestId === row.requestId}

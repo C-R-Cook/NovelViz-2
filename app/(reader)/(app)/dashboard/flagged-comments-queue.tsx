@@ -102,7 +102,7 @@ export function FlaggedCommentsQueue({
                     <p className="whitespace-pre-wrap text-sm text-text-primary">{row.content}</p>
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-border-subtle pt-4">
+                <div className="dashboard-admin-queue-actions mt-4 flex flex-wrap gap-2 border-t border-border-subtle pt-4">
                   <button
                     type="button"
                     disabled={busy}

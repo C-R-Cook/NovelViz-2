@@ -86,7 +86,7 @@ export function LibraryActiveBookBar({ book, chapters, progress }: Props) {
           >
             {chapters.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
+                {c.title?.trim() || "Untitled"}
               </option>
             ))}
           </select>

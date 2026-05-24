@@ -571,6 +571,7 @@ export function DashboardClient({
             <div className="mb-6">
               <ForReviewQueue
                 pendingBooks={pendingBooks}
+                pendingReviewCount={admin.pendingReviewCount}
                 actionId={actionId}
                 onModeration={(id, status) => void runModeration(id, status)}
                 returnTo="/dashboard?tab=for-review"
@@ -895,6 +896,7 @@ export function DashboardClient({
         return admin ? (
           <ForReviewQueue
             pendingBooks={pendingBooks}
+            pendingReviewCount={admin.pendingReviewCount}
             actionId={actionId}
             onModeration={(id, status) => void runModeration(id, status)}
             returnTo="/dashboard?tab=for-review"

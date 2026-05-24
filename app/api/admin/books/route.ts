@@ -1,6 +1,7 @@
 import {
   ADMIN_BOOKS_PAGE_SIZE,
   parseAdminBooksFilterParam,
+  parseAdminBooksSearchParam,
   parseAdminBooksSortDirection,
   parseAdminBooksSortField,
   parseAdminBooksTakeParam,
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
   const take = parseAdminBooksTakeParam(url.searchParams.get("take"), ADMIN_BOOKS_PAGE_SIZE);
   const sort = parseAdminBooksSortField(url.searchParams.get("sort"));
   const dir = parseAdminBooksSortDirection(url.searchParams.get("dir"));
+  const q = parseAdminBooksSearchParam(url.searchParams.get("q"));
 
   const { rows, hasMore } = await queryAdminBooksPage({
     filter,
@@ -35,6 +37,7 @@ export async function GET(request: Request) {
     take,
     sort,
     dir,
+    q,
   });
   return NextResponse.json({
     books: rows,
@@ -42,6 +45,7 @@ export async function GET(request: Request) {
     pageSize: take,
     sort,
     dir,
+    q: q ?? null,
   });
 }
 

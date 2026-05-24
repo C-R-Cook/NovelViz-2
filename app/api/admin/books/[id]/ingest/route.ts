@@ -1,3 +1,4 @@
+import { pickBestDescription } from "@/lib/book-description";
 import { getCurrentUser } from "@/lib/auth";
 import cloudinary from "@/lib/cloudinary";
 import {
@@ -296,6 +297,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         author: true,
         description: true,
         publishedYear: true,
+        openLibraryKey: true,
       },
     });
     if (latestBookForEnrichment) {
@@ -303,18 +305,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
         const olMetadata = await fetchOpenLibraryMetadata(
           latestBookForEnrichment.title,
           latestBookForEnrichment.author,
+          { existingOpenLibraryKey: latestBookForEnrichment.openLibraryKey },
         );
 
         const updateData: Prisma.BookUpdateInput = {
-          openLibraryKey: olMetadata.openLibraryKey,
+          openLibraryKey:
+            latestBookForEnrichment.openLibraryKey ?? olMetadata.openLibraryKey,
         };
 
+        const mergedDescription = pickBestDescription(
+          latestBookForEnrichment.description,
+          olMetadata.description,
+        );
         if (
-          olMetadata.description &&
-          (!latestBookForEnrichment.description ||
-            latestBookForEnrichment.description.trim() === "")
+          mergedDescription &&
+          mergedDescription !== (latestBookForEnrichment.description?.trim() || null)
         ) {
-          updateData.description = olMetadata.description;
+          updateData.description = mergedDescription;
         }
 
         if (olMetadata.firstPublishYear && !latestBookForEnrichment.publishedYear) {

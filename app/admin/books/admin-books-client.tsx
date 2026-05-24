@@ -11,7 +11,7 @@ import type {
 import type { BookStatus } from "@db";
 import Image from "next/image";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type { AdminBookRow } from "@/lib/admin-books-list";
 
@@ -145,7 +145,10 @@ export function AdminBooksClient({
   returnTo?: string;
 }) {
   const listSeq = useRef(0);
+  const prevDebouncedSearch = useRef<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>(initialFilter);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortField, setSortField] = useState<AdminBooksSortField>(initialSort);
   const [sortDir, setSortDir] = useState<AdminBooksSortDirection>(initialSortDir);
   const [books, setBooks] = useState<AdminBookRow[]>(initialBooks);
@@ -158,6 +161,11 @@ export function AdminBooksClient({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(t);
+  }, [search]);
+
   async function fetchBooks(
     spec: {
       filter: FilterKey;
@@ -166,6 +174,7 @@ export function AdminBooksClient({
       sort: AdminBooksSortField;
       dir: AdminBooksSortDirection;
       take: number;
+      q?: string;
     },
     /** Snapshot from `listSeq` — updates are skipped if stale */
     nonce: number,
@@ -177,6 +186,7 @@ export function AdminBooksClient({
       dir: spec.dir,
       take: String(spec.take),
     });
+    if (spec.q) params.set("q", spec.q);
 
     let res: Response;
     try {
@@ -218,10 +228,46 @@ export function AdminBooksClient({
   async function reloadCurrentFilter(): Promise<void> {
     const nonce = ++listSeq.current;
     await fetchBooks(
-      { filter, skip: 0, mode: "replace", sort: sortField, dir: sortDir, take: pageSize },
+      {
+        filter,
+        skip: 0,
+        mode: "replace",
+        sort: sortField,
+        dir: sortDir,
+        take: pageSize,
+        q: debouncedSearch || undefined,
+      },
       nonce,
     );
   }
+
+  useEffect(() => {
+    if (prevDebouncedSearch.current === null) {
+      prevDebouncedSearch.current = debouncedSearch;
+      return;
+    }
+    if (prevDebouncedSearch.current === debouncedSearch) return;
+    prevDebouncedSearch.current = debouncedSearch;
+
+    const nonce = ++listSeq.current;
+    setFilterLoading(true);
+    setBooks([]);
+    setHasMore(false);
+    void fetchBooks(
+      {
+        filter,
+        skip: 0,
+        mode: "replace",
+        sort: sortField,
+        dir: sortDir,
+        take: pageSize,
+        q: debouncedSearch || undefined,
+      },
+      nonce,
+    ).finally(() => {
+      if (nonce === listSeq.current) setFilterLoading(false);
+    });
+  }, [debouncedSearch, filter, sortField, sortDir, pageSize]);
 
   async function onSortHeaderClick(column: AdminBooksSortField) {
     if (filterLoading) return;
@@ -249,7 +295,15 @@ export function AdminBooksClient({
     setHasMore(false);
     try {
       await fetchBooks(
-        { filter, skip: 0, mode: "replace", sort: nextSort, dir: nextDir, take: pageSize },
+        {
+          filter,
+          skip: 0,
+          mode: "replace",
+          sort: nextSort,
+          dir: nextDir,
+          take: pageSize,
+          q: debouncedSearch || undefined,
+        },
         nonce,
       );
     } finally {
@@ -266,7 +320,15 @@ export function AdminBooksClient({
     setHasMore(false);
     try {
       await fetchBooks(
-        { filter: next, skip: 0, mode: "replace", sort: sortField, dir: sortDir, take: pageSize },
+        {
+          filter: next,
+          skip: 0,
+          mode: "replace",
+          sort: sortField,
+          dir: sortDir,
+          take: pageSize,
+          q: debouncedSearch || undefined,
+        },
         nonce,
       );
     } finally {
@@ -287,6 +349,7 @@ export function AdminBooksClient({
           sort: sortField,
           dir: sortDir,
           take: pageSize,
+          q: debouncedSearch || undefined,
         },
         nonceStart,
       );
@@ -418,12 +481,33 @@ export function AdminBooksClient({
             </button>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or author…"
+            aria-label="Search books"
+            className="min-w-0 w-full flex-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-primary outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:min-w-[220px]"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="text-sm text-text-muted underline-offset-2 hover:text-text-primary hover:underline"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {filterLoading ? (
         <p className="md:hidden py-8 text-center text-sm text-text-muted">Loading…</p>
       ) : books.length === 0 ? (
-        <p className="md:hidden py-8 text-center text-sm text-text-muted">No books match this filter.</p>
+        <p className="md:hidden py-8 text-center text-sm text-text-muted">
+          {debouncedSearch ? "No books match your search." : "No books match this filter."}
+        </p>
       ) : (
         <ul className="md:hidden space-y-3">
           {books.map((book) => (
@@ -529,7 +613,7 @@ export function AdminBooksClient({
                   colSpan={8}
                   className="px-4 py-8 text-center text-text-muted"
                 >
-                  No books match this filter.
+                  {debouncedSearch ? "No books match your search." : "No books match this filter."}
                 </td>
               </tr>
             ) : (

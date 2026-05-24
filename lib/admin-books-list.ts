@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { BookStatus } from "@db";
+import type { BookStatus, ListingPreferenceAfterReview } from "@db";
 import type { Prisma } from "@db";
 
 /** Admin books table page size — standalone `/admin/books` — must match GET handler default cap when `take` omitted. */
@@ -10,6 +10,9 @@ export const DASHBOARD_ADMIN_BOOKS_LIMIT = 20;
 
 /** Hard cap per request (`take` query param clamped server-side). */
 export const ADMIN_BOOKS_TAKE_MAX = 50;
+
+/** Max length for admin book search query (`q` param). */
+export const ADMIN_BOOKS_SEARCH_MAX_LEN = 100;
 
 export type AdminBooksFilterKey = "all" | "deleted" | BookStatus;
 
@@ -28,6 +31,7 @@ export type AdminBookRow = {
   /** Pre-formatted server-side */
   createdAtLabel: string;
   chapterCount: number;
+  listingPreferenceAfterReview: ListingPreferenceAfterReview | null;
 };
 
 const FILTER_VALUES: readonly AdminBooksFilterKey[] = [
@@ -76,10 +80,32 @@ export function parseAdminBooksSortDirection(value: string | null): AdminBooksSo
   return value === "asc" ? "asc" : "desc";
 }
 
-function prismaWhere(filter: AdminBooksFilterKey): Prisma.BookWhereInput {
-  if (filter === "all") return {};
-  if (filter === "deleted") return { deletedAt: { not: null } };
-  return { deletedAt: null, status: filter };
+export function parseAdminBooksSearchParam(value: string | null): string | undefined {
+  if (value === null || value === "") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, ADMIN_BOOKS_SEARCH_MAX_LEN);
+}
+
+function adminBooksSearchWhere(q: string): Prisma.BookWhereInput {
+  return {
+    OR: [
+      { title: { contains: q, mode: "insensitive" } },
+      { author: { contains: q, mode: "insensitive" } },
+    ],
+  };
+}
+
+function prismaWhere(filter: AdminBooksFilterKey, q?: string): Prisma.BookWhereInput {
+  const base: Prisma.BookWhereInput =
+    filter === "all"
+      ? {}
+      : filter === "deleted"
+        ? { deletedAt: { not: null } }
+        : { deletedAt: null, status: filter };
+
+  if (!q) return base;
+  return { AND: [base, adminBooksSearchWhere(q)] };
 }
 
 function prismaOrderBy(
@@ -110,6 +136,8 @@ export type QueryAdminBooksPageArgs = {
   take?: number;
   sort?: AdminBooksSortField;
   dir?: AdminBooksSortDirection;
+  /** Case-insensitive match on title or author. */
+  q?: string;
 };
 
 /** One page (skip/take pagination). Uses `take+1` to detect `hasMore`. Sorted server-side by `sort` / `dir` (defaults: createdAt desc). */
@@ -130,7 +158,7 @@ export async function queryAdminBooksPage(
   });
 
   const raw = await prisma.book.findMany({
-    where: prismaWhere(params.filter),
+    where: prismaWhere(params.filter, params.q),
     orderBy: prismaOrderBy(sort, dir),
     skip: safeSkip,
     take: take + 1,
@@ -153,6 +181,7 @@ export async function queryAdminBooksPage(
     ownerLabel: b.owner ? (b.owner.name ?? b.owner.email) : null,
     createdAtLabel: createdAtFormatter.format(b.createdAt),
     chapterCount: b._count.chapters,
+    listingPreferenceAfterReview: b.listingPreferenceAfterReview,
   }));
 
   return { rows, hasMore };

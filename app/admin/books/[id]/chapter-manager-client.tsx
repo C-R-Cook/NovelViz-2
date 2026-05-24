@@ -398,7 +398,7 @@ export function ChapterManagerClient({
                 await loadChapters();
               }}
             >
-              {c.sequenceNumber}. {c.title?.trim() || "Untitled"}
+              {c.title?.trim() || "Untitled"}
             </button>
           </li>
         ))}
@@ -451,7 +451,7 @@ export function ChapterManagerClient({
                 >
                   <span className="min-w-0 flex-1 truncate">
                     {selected
-                      ? `${selected.sequenceNumber}. ${selected.title?.trim() || "Untitled"}`
+                      ? selected.title?.trim() || "Untitled"
                       : "Select a chapter…"}
                   </span>
                   <svg

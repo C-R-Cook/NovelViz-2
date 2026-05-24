@@ -13,7 +13,8 @@ import {
   OPENAI_GPT4O_MINI_USD_PER_M_INPUT,
   OPENAI_GPT4O_MINI_USD_PER_M_OUTPUT,
 } from "@/lib/costs";
-import { chunkText, embedChunks, extractEpubCoverFromBuffer, processBook } from "@/lib/ingestion";
+import { descriptionFromSubjects, pickBestDescription } from "@/lib/book-description";
+import { chunkText, embedChunks, extractEpubCoverFromBuffer, extractEpubMetadataFromOpf, openEpubPackage, processBook } from "@/lib/ingestion";
 import { resolveGutenbergBookEnrichment } from "@/lib/open-library-cover";
 import { prisma } from "@/lib/prisma";
 import { BookStatus, Prisma, UserRole } from "@db";
@@ -281,6 +282,18 @@ async function processEntry(
       console.log(`  → EPUB cover found (${Math.round(epubCoverBuffer.length / 1024)} KB)`);
     }
 
+    let epubDescription: string | null = null;
+    try {
+      const { opfXml } = await openEpubPackage(epubBuffer);
+      const opfMeta = extractEpubMetadataFromOpf(opfXml, { isPublicDomain: true });
+      epubDescription = opfMeta.description?.trim() || null;
+      if (epubDescription) {
+        console.log(`  → EPUB OPF description (${epubDescription.length} chars)`);
+      }
+    } catch {
+      // non-fatal
+    }
+
     let enrichment: Awaited<ReturnType<typeof resolveGutenbergBookEnrichment>> | null = null;
     if (dryRun) {
       console.log(
@@ -292,6 +305,7 @@ async function processEntry(
         title: entry.title,
         author: entry.authorDisplay,
         epubCoverBuffer,
+        epubDescription,
         gutendexCoverUrl: entry.gutendexCoverUrl,
         log: (msg) => console.log(`  → ${msg}`),
       });
@@ -302,7 +316,7 @@ async function processEntry(
       }
       if (enrichment.openLibraryKey) {
         console.log(
-          `  → Open Library: key=${enrichment.openLibraryKey}, year=${enrichment.publishedYear ?? "n/a"}`,
+          `  → Open Library: key=${enrichment.openLibraryKey}, year=${enrichment.publishedYear ?? "n/a"}, description=${enrichment.description ? "yes" : "no"}`,
         );
       } else {
         console.log(`  → No Open Library match for metadata`);
@@ -322,7 +336,12 @@ async function processEntry(
           isPublicDomain: true,
           gutenbergId: entry.gutenbergId,
           coverImageUrl: enrichment?.coverImageUrl ?? null,
-          description: enrichment?.description ?? null,
+          description:
+            pickBestDescription(
+              enrichment?.description,
+              epubDescription,
+              descriptionFromSubjects(entry.subjects),
+            ) ?? null,
           publishedYear: enrichment?.publishedYear ?? null,
           openLibraryKey: enrichment?.openLibraryKey ?? null,
         },

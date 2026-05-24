@@ -1,4 +1,5 @@
 import cloudinary from "@/lib/cloudinary";
+import { pickBestDescription } from "@/lib/book-description";
 import { fetchOpenLibraryMetadata } from "@/lib/open-library";
 
 const COVER_SIZES = ["L", "M", "S"] as const;
@@ -133,6 +134,9 @@ export async function resolveGutenbergBookEnrichment(options: {
   /** Cover image bytes extracted from the Gutenberg EPUB (preferred). */
   epubCoverBuffer?: Buffer | null;
   gutendexCoverUrl?: string | null;
+  /** Pre-parsed OPF description from the Gutenberg EPUB (optional). */
+  epubDescription?: string | null;
+  existingOpenLibraryKey?: string | null;
   existingDescription?: string | null;
   existingPublishedYear?: number | null;
   existingCoverUrl?: string | null;
@@ -144,13 +148,18 @@ export async function resolveGutenbergBookEnrichment(options: {
   const preferOlCover = options.preferOpenLibraryCover === true;
   const gutendexUrl = options.gutendexCoverUrl?.trim() || null;
 
-  const ol = await fetchOpenLibraryMetadata(options.title, options.author);
+  const ol = await fetchOpenLibraryMetadata(options.title, options.author, {
+    existingOpenLibraryKey: options.existingOpenLibraryKey,
+  });
 
-  const description =
-    ol.description &&
-    (!options.existingDescription || options.existingDescription.trim() === "")
-      ? ol.description
-      : options.existingDescription?.trim() || ol.description;
+  const openLibraryKey =
+    options.existingOpenLibraryKey?.trim() || ol.openLibraryKey;
+
+  const description = pickBestDescription(
+    options.existingDescription,
+    options.epubDescription,
+    ol.description,
+  );
 
   const publishedYear =
     ol.firstPublishYear && !options.existingPublishedYear
@@ -201,7 +210,7 @@ export async function resolveGutenbergBookEnrichment(options: {
   }
 
   return {
-    openLibraryKey: ol.openLibraryKey,
+    openLibraryKey,
     description: description ?? null,
     publishedYear: publishedYear ?? null,
     coverImageUrl,

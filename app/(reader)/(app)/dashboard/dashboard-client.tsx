@@ -126,13 +126,6 @@ export type DashboardClientProps = {
     spoilerCommentsPendingCount: number;
     flaggedCommentsQueue: AdminFlaggedCommentRow[];
     flaggedCommentsPendingCount: number;
-    recentUsers: {
-      id: string;
-      username: string | null;
-      email: string;
-      role: string;
-      createdAtMs: number;
-    }[];
   } | null;
   adminBooksAll: {
     initialBooks: AdminBookRow[];

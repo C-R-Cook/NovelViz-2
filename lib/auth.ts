@@ -1,5 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import {
   DEV_USER_COOKIE,
   DEV_USERS_BY_ID,
@@ -131,7 +132,7 @@ async function getDevUserFromCookies(): Promise<CurrentUser | null> {
   };
 }
 
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+async function getCurrentUserUncached(): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
     const clerkUser = await getClerkUser();
     if (clerkUser) return clerkUser;
@@ -140,6 +141,9 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
   return getClerkUser();
 }
+
+/** Deduped per request — safe to call from layout and page in the same render. */
+export const getCurrentUser = cache(getCurrentUserUncached);
 
 export function getRoleHomeUrl(): string {
   return "/library";

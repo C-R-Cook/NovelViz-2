@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function DiscoverCatalogueRoot() {
-  const user = await getCurrentUser();
-  const [featured, allBooks] = await Promise.all([
+  const [user, featured, allBooks] = await Promise.all([
+    getCurrentUser(),
     getDiscoverFeaturedBooks(),
     prisma.book.findMany({
       where: {

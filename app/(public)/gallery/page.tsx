@@ -156,26 +156,18 @@ async function viewerLikedIdSet(userId: string, imageIds: string[]) {
   return new Set(rows.map((r) => r.imageId));
 }
 
-export default async function GalleryPage() {
-  const session = await getCurrentUser();
-  const isAdmin = session?.role === "admin";
-
-  let userLibraryBookIds: string[] = [];
-  if (session) {
-    const userBooks = await prisma.userBook.findMany({
-      where: { userId: session.id, isActive: true },
-      select: { bookId: true },
-    });
-    userLibraryBookIds = userBooks.map((row) => row.bookId);
-  }
-
-  const guestLatestFeatured = prisma.generatedImage.findMany({
+const featuredImagesQuery = () =>
+  prisma.generatedImage.findMany({
     where: { isPublic: true },
     orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
     take: 20,
     select: baseSelect,
   });
 
+export default async function GalleryPage() {
+  const session = await getCurrentUser();
+
+  const guestLatestFeatured = featuredImagesQuery();
   const guestLibraryBlur = prisma.generatedImage.findMany({
     where: { isPublic: true },
     orderBy: { createdAt: "desc" },
@@ -202,46 +194,45 @@ export default async function GalleryPage() {
     );
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: { globalSpoilerProtection: true },
-  });
-  const globalSpoilerProtection = dbUser?.globalSpoilerProtection ?? true;
+  const isAdmin = session.role === "admin";
 
-  const userBookRows = await prisma.userBook.findMany({
-    where: { userId: session.id, isActive: true },
-    select: { bookId: true, spoilerProtection: true },
-  });
+  const [dbUser, userBookRows, allProgress, featured] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.id },
+      select: { globalSpoilerProtection: true },
+    }),
+    prisma.userBook.findMany({
+      where: { userId: session.id, isActive: true },
+      select: { bookId: true, spoilerProtection: true },
+    }),
+    prisma.readingProgress.findMany({
+      where: { userId: session.id },
+      select: { bookId: true, currentChapterNumber: true },
+    }),
+    featuredImagesQuery(),
+  ]);
+
+  const globalSpoilerProtection = dbUser?.globalSpoilerProtection ?? true;
+  const userLibraryBookIds = userBookRows.map((r) => r.bookId);
   const spoilerByBookId = new Map<string, SpoilerProtection | undefined>(
     userBookRows.map((r) => [r.bookId, r.spoilerProtection]),
   );
   const spoilerSettingsByBookId = Object.fromEntries(
     userBookRows.map((r) => [r.bookId, r.spoilerProtection]),
   ) as Record<string, SpoilerProtection>;
-
-  const allProgress = await prisma.readingProgress.findMany({
-    where: { userId: session.id },
-    select: { bookId: true, currentChapterNumber: true },
-  });
-  const progressByBookId = new Map<string, number>(allProgress.map((p) => [p.bookId, p.currentChapterNumber]));
+  const progressByBookId = new Map<string, number>(
+    allProgress.map((p) => [p.bookId, p.currentChapterNumber]),
+  );
 
   const lockCtx = {
     viewerUserId: session.id,
-    isAdmin: !!isAdmin,
+    isAdmin,
     globalSpoilerProtection,
     spoilerByBookId,
     progressByBookId,
   };
 
-  const featuredPromise = prisma.generatedImage.findMany({
-    where: { isPublic: true },
-    orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
-    take: 20,
-    select: baseSelect,
-  });
-
   if (userLibraryBookIds.length === 0) {
-    const featured = await featuredPromise;
     const likedIds = await viewerLikedIdSet(
       session.id,
       featured.map((i) => i.id),
@@ -275,15 +266,12 @@ export default async function GalleryPage() {
     );
   }
 
-  const [libraryRows, featured] = await Promise.all([
-    prisma.generatedImage.findMany({
-      where: { isPublic: true, bookId: { in: userLibraryBookIds } },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-      select: baseSelect,
-    }),
-    featuredPromise,
-  ]);
+  const libraryRows = await prisma.generatedImage.findMany({
+    where: { isPublic: true, bookId: { in: userLibraryBookIds } },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: baseSelect,
+  });
 
   const likedIds = await viewerLikedIdSet(session.id, [
     ...libraryRows.map((i) => i.id),

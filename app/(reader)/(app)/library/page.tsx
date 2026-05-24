@@ -3,7 +3,6 @@ import type { LibraryBookRow, LibraryChapter } from "./library-types";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
 
 export const metadata = {
   title: "My Library | NovelViz",
@@ -41,7 +40,7 @@ function firstParam(v: string | string[] | undefined): string | undefined {
   return undefined;
 }
 
-async function LibraryContent({ searchParams }: LibraryPageProps) {
+export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
@@ -83,55 +82,26 @@ async function LibraryContent({ searchParams }: LibraryPageProps) {
 
   const bookIds = userBooks.map((ub) => ub.bookId);
 
-  if (bookIds.length > 0) {
-    await prisma.userBook.updateMany({
-      where: { userId: session.id, bookId: { in: bookIds }, isActive: false },
-      data: { isActive: true },
-    });
-  }
-
-  const progressRows =
+  const [progressRows, chapterRows, statsBundle] = await Promise.all([
     bookIds.length === 0
-      ? []
-      : await prisma.readingProgress.findMany({
+      ? Promise.resolve([])
+      : prisma.readingProgress.findMany({
           where: { userId: session.id, bookId: { in: bookIds } },
-        });
-
-  const progressByBookId = new Map(
-    progressRows.map((p) => [
-      p.bookId,
-      {
-        currentChapterId: p.currentChapterId,
-        currentChapterNumber: p.currentChapterNumber,
-        updatedAt: p.updatedAt.toISOString(),
-      },
-    ]),
-  );
-
-  const chapterRows =
+        }),
     bookIds.length === 0
-      ? []
-      : await prisma.chapter.findMany({
+      ? Promise.resolve([])
+      : prisma.chapter.findMany({
           where: { bookId: { in: bookIds } },
           orderBy: { sequenceNumber: "asc" },
           select: { id: true, bookId: true, sequenceNumber: true, title: true },
-        });
-
-  const chaptersByBookId = new Map<string, LibraryChapter[]>();
-  for (const ch of chapterRows) {
-    const list = chaptersByBookId.get(ch.bookId) ?? [];
-    list.push({
-      id: ch.id,
-      sequenceNumber: ch.sequenceNumber,
-      title: ch.title,
-    });
-    chaptersByBookId.set(ch.bookId, list);
-  }
-
-  const [queryGroup, imageGroup, queryRowsForLast, totalQueries, totalImages] =
+        }),
     bookIds.length === 0
-      ? [[], [], [], 0, 0]
-      : await Promise.all([
+      ? Promise.resolve([[], [], [], 0, 0] as const)
+      : Promise.all([
+          prisma.userBook.updateMany({
+            where: { userId: session.id, bookId: { in: bookIds }, isActive: false },
+            data: { isActive: true },
+          }).then(() => [] as const),
           prisma.query.groupBy({
             by: ["bookId"],
             where: { userId: session.id, bookId: { in: bookIds } },
@@ -153,7 +123,34 @@ async function LibraryContent({ searchParams }: LibraryPageProps) {
           prisma.generatedImage.count({
             where: { userId: session.id, bookId: { in: bookIds } },
           }),
-        ]);
+        ]).then(([, queryGroup, imageGroup, queryRowsForLast, totalQueries, totalImages]) =>
+          [queryGroup, imageGroup, queryRowsForLast, totalQueries, totalImages] as const,
+        ),
+  ]);
+
+  const progressByBookId = new Map(
+    progressRows.map((p) => [
+      p.bookId,
+      {
+        currentChapterId: p.currentChapterId,
+        currentChapterNumber: p.currentChapterNumber,
+        updatedAt: p.updatedAt.toISOString(),
+      },
+    ]),
+  );
+
+  const chaptersByBookId = new Map<string, LibraryChapter[]>();
+  for (const ch of chapterRows) {
+    const list = chaptersByBookId.get(ch.bookId) ?? [];
+    list.push({
+      id: ch.id,
+      sequenceNumber: ch.sequenceNumber,
+      title: ch.title,
+    });
+    chaptersByBookId.set(ch.bookId, list);
+  }
+
+  const [queryGroup, imageGroup, queryRowsForLast, totalQueries, totalImages] = statsBundle;
 
   const queryCountByBook = new Map(queryGroup.map((g) => [g.bookId, g._count]));
   const imageCountByBook = new Map(imageGroup.map((g) => [g.bookId, g._count]));
@@ -231,21 +228,5 @@ async function LibraryContent({ searchParams }: LibraryPageProps) {
       initialTab={initialTab}
       initialQuestion={initialQuestion}
     />
-  );
-}
-
-function LibraryLoadingFallback() {
-  return (
-    <div className="mx-auto max-w-6xl px-4 py-12 text-center text-sm text-text-muted">
-      Loading library…
-    </div>
-  );
-}
-
-export default function LibraryPage(props: LibraryPageProps) {
-  return (
-    <Suspense fallback={<LibraryLoadingFallback />}>
-      <LibraryContent {...props} />
-    </Suspense>
   );
 }

@@ -166,6 +166,13 @@ export function NavChrome({
       {isLoggedIn && userRole === "admin" ? (
         <>
           <Link
+            href="/admin/cover-refresh"
+            className={navLinkClass(isActive(pathname, "/admin/cover-refresh"))}
+            onClick={() => setMenuOpen(false)}
+          >
+            Covers
+          </Link>
+          <Link
             href="/admin/gutenberg-import"
             className={navLinkClass(isGutenbergAdminSectionActive(pathname))}
             onClick={() => setMenuOpen(false)}

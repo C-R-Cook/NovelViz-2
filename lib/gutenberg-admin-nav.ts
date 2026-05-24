@@ -78,6 +78,13 @@ export const GUTENBERG_ADMIN_NAV_LINKS: readonly GutenbergAdminNavLink[] = [
     hint: "Ready to queue for ingest",
   },
   {
+    id: "gutenberg-covers",
+    href: "/admin/cover-refresh",
+    label: "Cover refresh",
+    icon: "🖼",
+    hint: "Replace PG generic covers with Open Library",
+  },
+  {
     id: "gutenberg-publish",
     href: "/admin/books",
     label: "Publish",

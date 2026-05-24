@@ -150,6 +150,8 @@ model Book {
   isPublicDomain               Boolean    @default(false)
   status                       BookStatus @default(draft)
   rejectionReason              String?
+  /// Admin/partner-only reminders (not shown to readers).
+  internalNotes                String?    @db.Text
   /// Set when submitting for admin review; cleared when review is withdrawn or resolved.
   listingPreferenceAfterReview ListingPreferenceAfterReview?
   scheduledPublishAt           DateTime?

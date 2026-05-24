@@ -55,6 +55,7 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
     genre: book.genre,
     publishedYear: book.publishedYear,
     description: book.description,
+    internalNotes: book.internalNotes ?? null,
     coverImageUrl: book.coverImageUrl,
     status: book.status,
     rejectionReason: book.rejectionReason,

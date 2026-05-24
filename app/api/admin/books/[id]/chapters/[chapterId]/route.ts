@@ -1,15 +1,17 @@
 import { getCurrentUser } from "@/lib/auth";
 import {
   compactChapterSequencesAfterDelete,
+  deleteChunksForChapterInBatches,
   syncReadingProgressChapterNumbers,
 } from "@/lib/ingestion";
+import { Prisma } from "@db";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 /** Large books on production Neon can need more than the default 10s serverless limit. */
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 type RouteContext = { params: Promise<{ id: string; chapterId: string }> };
 
@@ -128,28 +130,55 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   const deletedSequenceNumber = chapter.sequenceNumber;
 
-  await prisma.$transaction(
-    async (tx) => {
-      await tx.readingProgress.updateMany({
-        where: { currentChapterId: chapterId },
-        data: { currentChapterId: fallback.id },
-      });
-      await tx.chapter.delete({ where: { id: chapterId } });
-      await compactChapterSequencesAfterDelete(bookId, deletedSequenceNumber, tx);
-
-      const fallbackAfter = await tx.chapter.findUnique({
-        where: { id: fallback.id },
-        select: { sequenceNumber: true },
-      });
-      if (fallbackAfter) {
+  try {
+    await prisma.$transaction(
+      async (tx) => {
         await tx.readingProgress.updateMany({
-          where: { currentChapterId: fallback.id },
-          data: { currentChapterNumber: fallbackAfter.sequenceNumber },
+          where: { currentChapterId: chapterId },
+          data: { currentChapterId: fallback.id },
         });
+        await deleteChunksForChapterInBatches(chapterId, tx);
+        await tx.chapter.delete({ where: { id: chapterId } });
+        await compactChapterSequencesAfterDelete(bookId, deletedSequenceNumber, tx);
+
+        const fallbackAfter = await tx.chapter.findUnique({
+          where: { id: fallback.id },
+          select: { sequenceNumber: true },
+        });
+        if (fallbackAfter) {
+          await tx.readingProgress.updateMany({
+            where: { currentChapterId: fallback.id },
+            data: { currentChapterNumber: fallbackAfter.sequenceNumber },
+          });
+        }
+      },
+      { maxWait: 15_000, timeout: 110_000 },
+    );
+  } catch (err) {
+    console.error("[chapter-delete] failed", { bookId, chapterId, err });
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2003" || err.code === "P2014") {
+        return NextResponse.json(
+          {
+            error:
+              "Cannot delete this chapter while a reader is still on it. Refresh the page and try again.",
+          },
+          { status: 409 },
+        );
       }
-    },
-    { maxWait: 10_000, timeout: 120_000 },
-  );
+      if (err.code === "P2028") {
+        return NextResponse.json(
+          {
+            error:
+              "Delete timed out — this chapter has many search chunks. Wait a moment and try again, or merge chapters instead.",
+          },
+          { status: 504 },
+        );
+      }
+    }
+    const message = err instanceof Error ? err.message : "Chapter delete failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   try {
     await syncReadingProgressChapterNumbers(bookId);
@@ -161,5 +190,20 @@ export async function DELETE(_request: Request, context: RouteContext) {
     });
   }
 
-  return NextResponse.json({ ok: true });
+  const chapters = await prisma.chapter.findMany({
+    where: { bookId },
+    orderBy: { sequenceNumber: "asc" },
+    include: { _count: { select: { chunks: true } } },
+  });
+
+  return NextResponse.json({
+    ok: true,
+    chapters: chapters.map((c) => ({
+      id: c.id,
+      sequenceNumber: c.sequenceNumber,
+      title: c.title,
+      rawText: c.rawText,
+      chunkCount: c._count.chunks,
+    })),
+  });
 }

@@ -5,9 +5,9 @@
 /* -------------------------------------------------------------------------- */
 :root {
   --status-draft: #4a4a4a;
-  --status-pending: #b45309;
+  --status-pending: #1d4ed8;
   --status-processing: #1d4ed8;
-  --status-ready: #b45309;
+  --status-ready: #1d4ed8;
   --status-published: #15803d;
   --status-unlisted: #c2410c;
   --status-rejected: #b91c1c;

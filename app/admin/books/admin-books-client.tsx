@@ -44,7 +44,7 @@ function filterClassName(key: FilterKey, active: boolean): string {
 
   const activeStyle: Record<BookStatus | "deleted", string> = {
     draft: `${base} border border-status-draft bg-status-draft/35 text-text-primary ring-status-draft/50`,
-    pending_review: `${base} border border-status-ready bg-status-ready/30 text-text-primary ring-status-ready/45`,
+    pending_review: `${base} border border-status-pending bg-status-pending/30 text-text-primary ring-status-pending/45`,
     rejected: `${base} border border-status-rejected bg-status-rejected/30 text-text-primary ring-status-rejected/45`,
     processing: `${base} border border-status-processing bg-status-processing/30 text-text-primary ring-status-processing/45`,
     published: `${base} border border-status-published bg-status-published/30 text-text-primary ring-status-published/45`,
@@ -54,7 +54,7 @@ function filterClassName(key: FilterKey, active: boolean): string {
 
   const inactiveBorder: Record<BookStatus | "deleted", string> = {
     draft: "border-status-draft/50",
-    pending_review: "border-status-ready/50",
+    pending_review: "border-status-pending/50",
     rejected: "border-status-rejected/50",
     processing: "border-status-processing/50",
     published: "border-status-published/50",

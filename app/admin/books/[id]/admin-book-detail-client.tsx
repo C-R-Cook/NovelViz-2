@@ -3,6 +3,7 @@
 
 import { ChapterManagerClient } from "./chapter-manager-client";
 import { DEFAULT_ADMIN_BOOK_RETURN } from "@/lib/admin-book-navigation";
+import { bookStatusBarBorderClass } from "@/lib/book-status-styles";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type {
@@ -26,6 +27,7 @@ export type AdminBookDetailModel = {
   openLibraryKey: string | null;
   gutenbergId: number | null;
   description: string | null;
+  internalNotes: string | null;
   coverImageUrl: string | null;
   status: BookStatus;
   rejectionReason: string | null;
@@ -54,6 +56,7 @@ type MetadataFormState = {
   genre: string;
   publishedYear: string;
   description: string;
+  internalNotes: string;
   openLibraryKey: string;
   gutenbergId: string;
 };
@@ -68,6 +71,7 @@ function metadataFormFromBook(book: AdminBookDetailModel): MetadataFormState {
     genre: book.genre ?? "",
     publishedYear: book.publishedYear != null ? String(book.publishedYear) : "",
     description: book.description ?? "",
+    internalNotes: book.internalNotes ?? "",
     openLibraryKey: book.openLibraryKey ?? "",
     gutenbergId: book.gutenbergId != null ? String(book.gutenbergId) : "",
   };
@@ -95,6 +99,10 @@ function mergeBookFromPatch(
       raw.description === null || typeof raw.description === "string"
         ? raw.description
         : prev.description,
+    internalNotes:
+      raw.internalNotes === null || typeof raw.internalNotes === "string"
+        ? raw.internalNotes
+        : prev.internalNotes,
     openLibraryKey:
       raw.openLibraryKey === null || typeof raw.openLibraryKey === "string"
         ? raw.openLibraryKey
@@ -418,6 +426,7 @@ export function AdminBookDetailClient({
 
     const openLibraryKey = metadataForm.openLibraryKey.trim();
     const description = metadataForm.description.trim();
+    const internalNotes = metadataForm.internalNotes.trim();
 
     if (coverFile) {
       const fd = new FormData();
@@ -448,6 +457,7 @@ export function AdminBookDetailClient({
         genre: metadataForm.genre === "" ? null : metadataForm.genre,
         publishedYear,
         description: description === "" ? null : description,
+        internalNotes: internalNotes === "" ? null : internalNotes,
         openLibraryKey: openLibraryKey === "" ? null : openLibraryKey,
         gutenbergId,
       }),
@@ -701,7 +711,7 @@ export function AdminBookDetailClient({
   return (
     <div className="admin-book-detail-root space-y-6">
       <div
-        className="admin-book-action-bar sticky top-[5.5rem] z-30 space-y-2 rounded-xl border border-border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm"
+        className={`admin-book-action-bar sticky top-[5.5rem] z-30 space-y-2 rounded-xl border bg-bg-surface/95 p-3 shadow-sm backdrop-blur-sm ${bookStatusBarBorderClass(book.status)}`}
         aria-label="Book actions"
       >
         <div
@@ -985,6 +995,24 @@ export function AdminBookDetailClient({
                       onChange={(e) =>
                         setMetadataForm((f) => ({ ...f, description: e.target.value }))
                       }
+                      className={metadataInputClass}
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Internal notes
+                    </span>
+                    <p className="mt-0.5 text-xs text-text-secondary">
+                      For admins and publishers only — not shown to readers.
+                    </p>
+                    <textarea
+                      rows={4}
+                      disabled={metadataDisabled}
+                      value={metadataForm.internalNotes}
+                      onChange={(e) =>
+                        setMetadataForm((f) => ({ ...f, internalNotes: e.target.value }))
+                      }
+                      placeholder="e.g. Holding in draft until cover art is updated…"
                       className={metadataInputClass}
                     />
                   </label>

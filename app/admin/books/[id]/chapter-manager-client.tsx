@@ -297,11 +297,31 @@ export function ChapterManagerClient({
         `/api/admin/books/${bookId}/chapters/${selected.id}`,
         { method: "DELETE" },
       );
+      const j = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        chapters?: ChapterListItem[];
+      };
       if (!res.ok) {
-        const j = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(j.error || res.statusText);
+        const msg =
+          j.error ||
+          (res.status === 504
+            ? "Delete timed out — try again in a moment."
+            : res.statusText || "Delete failed");
+        throw new Error(msg);
       }
-      await afterStructureChange();
+      if (j.chapters) {
+        setChapters(j.chapters);
+        setSelectedId("");
+        setStaleMsg(skipDraftOnStructureChange ? null : STALE_MSG);
+        if (!skipDraftOnStructureChange) {
+          await patchBookDraft();
+        }
+        if (!skipDraftOnStructureChange) {
+          router.refresh();
+        }
+      } else {
+        await afterStructureChange();
+      }
     } catch (e) {
       setActionErr(e instanceof Error ? e.message : "Delete failed");
     } finally {
@@ -522,10 +542,10 @@ export function ChapterManagerClient({
                 <button
                   type="button"
                   disabled={disabled}
-                  onClick={deleteChapter}
+                  onClick={() => void deleteChapter()}
                   className="rounded-lg bg-error/15 px-3 py-2 text-sm text-error ring-1 ring-error/35 transition hover:bg-error/25 disabled:opacity-40"
                 >
-                  Delete
+                  {actionBusy ? "Deleting…" : "Delete"}
                 </button>
               </div>
               {actionErr ? (

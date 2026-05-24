@@ -1192,6 +1192,26 @@ async function shiftChapterSequenceNumbersInTx(
   }
 }
 
+const CHUNK_DELETE_BATCH = 250;
+
+/** Delete embeddings in batches so chapter delete does not rely on one huge cascade. */
+export async function deleteChunksForChapterInBatches(
+  chapterId: string,
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  for (;;) {
+    const batch = await tx.chunk.findMany({
+      where: { chapterId },
+      select: { id: true },
+      take: CHUNK_DELETE_BATCH,
+    });
+    if (batch.length === 0) break;
+    await tx.chunk.deleteMany({
+      where: { id: { in: batch.map((c) => c.id) } },
+    });
+  }
+}
+
 /**
  * After deleting one chapter, close the gap (e.g. 1,2,4 → 1,2,3) without touching earlier rows.
  */

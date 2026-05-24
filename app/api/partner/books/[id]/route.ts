@@ -86,6 +86,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     genre?: BookGenre | null;
     publishedYear?: number | null;
     description?: string | null;
+    internalNotes?: string | null;
     status?: BookStatus;
     rejectionReason?: string | null;
     listingPreferenceAfterReview?: ListingPreferenceAfterReview | null;
@@ -135,6 +136,18 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   /** Draft-only: save catalogue vs unlisted intent before submit. */
+  if ("internalNotes" in b) {
+    if (b.internalNotes !== null && typeof b.internalNotes !== "string") {
+      return NextResponse.json(
+        { error: "internalNotes must be a string or null" },
+        { status: 400 },
+      );
+    }
+    const trimmed =
+      typeof b.internalNotes === "string" ? b.internalNotes.trim() : "";
+    data.internalNotes = trimmed === "" ? null : trimmed;
+  }
+
   if ("listingPreferenceAfterReview" in b && !("status" in b)) {
     const parsed = parseListingPreference(b.listingPreferenceAfterReview);
     if (parsed === "invalid") {
@@ -204,7 +217,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, status, listingPreferenceAfterReview",
+          "Provide at least one of: title, author, genre, publishedYear, description, internalNotes, status, listingPreferenceAfterReview",
       },
       { status: 400 },
     );

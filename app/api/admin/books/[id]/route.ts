@@ -61,6 +61,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     description?: string | null;
     openLibraryKey?: string | null;
     gutenbergId?: number | null;
+    internalNotes?: string | null;
     ownerId?: string | null;
     deletedAt?: null;
     status?: BookStatus;
@@ -134,6 +135,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
   }
+  if ("internalNotes" in b) {
+    if (b.internalNotes !== null && typeof b.internalNotes !== "string") {
+      return NextResponse.json(
+        { error: "internalNotes must be a string or null" },
+        { status: 400 },
+      );
+    }
+    const trimmed =
+      typeof b.internalNotes === "string" ? b.internalNotes.trim() : "";
+    data.internalNotes = trimmed === "" ? null : trimmed;
+  }
   if ("ownerId" in b) {
     if (
       b.ownerId !== null &&
@@ -159,7 +171,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, ownerId, restoreDeleted",
+          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, internalNotes, ownerId, restoreDeleted",
       },
       { status: 400 },
     );

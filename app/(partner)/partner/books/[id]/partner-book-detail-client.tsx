@@ -1,6 +1,7 @@
 "use client";
 
 import { ChapterManagerClient } from "@/app/admin/books/[id]/chapter-manager-client";
+import { bookStatusBarBorderClass } from "@/lib/book-status-styles";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type { BookGenre, BookStatus, ListingPreferenceAfterReview, FeatureRequestStatus } from "@db";
@@ -16,6 +17,7 @@ export type PartnerBookDetailModel = {
   genre: BookGenre | null;
   publishedYear: number | null;
   description: string | null;
+  internalNotes: string | null;
   coverImageUrl: string | null;
   status: BookStatus;
   rejectionReason: string | null;
@@ -203,6 +205,7 @@ export function PartnerBookDetailClient({
     initial.publishedYear != null ? String(initial.publishedYear) : "",
   );
   const [description, setDescription] = useState(initial.description ?? "");
+  const [internalNotes, setInternalNotes] = useState(initial.internalNotes ?? "");
   const [lockTitle, setLockTitle] = useState(false);
   const [lockAuthor, setLockAuthor] = useState(false);
   const [lockGenre, setLockGenre] = useState(false);
@@ -267,6 +270,7 @@ export function PartnerBookDetailClient({
     setGenre((initial.genre ?? "") as BookGenre | "");
     setPublishedYear(initial.publishedYear != null ? String(initial.publishedYear) : "");
     setDescription(initial.description ?? "");
+    setInternalNotes(initial.internalNotes ?? "");
     setListingPref(initial.listingPreferenceAfterReview ?? "published");
     setLockTitle(false);
     setLockAuthor(false);
@@ -326,6 +330,7 @@ export function PartnerBookDetailClient({
           genre: genre === "" ? null : genre,
           publishedYear: py,
           description: description.trim() === "" ? null : description.trim(),
+          internalNotes: internalNotes.trim() === "" ? null : internalNotes.trim(),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as {
@@ -336,6 +341,7 @@ export function PartnerBookDetailClient({
         throw new Error(data.error || res.statusText);
       }
       setBook((prev) => ({ ...prev, ...data.book, chapterCount: prev.chapterCount }));
+      setInternalNotes(data.book.internalNotes ?? "");
       setSaveMsg("Saved");
       setTimeout(() => setSaveMsg(null), 2500);
       router.refresh();
@@ -365,6 +371,7 @@ export function PartnerBookDetailClient({
           genre: genre === "" ? null : genre,
           publishedYear: py,
           description: description.trim() === "" ? null : description.trim(),
+          internalNotes: internalNotes.trim() === "" ? null : internalNotes.trim(),
           status: "draft",
         }),
       });
@@ -376,6 +383,7 @@ export function PartnerBookDetailClient({
         throw new Error(data.error || res.statusText);
       }
       setBook((prev) => ({ ...prev, ...data.book, chapterCount: prev.chapterCount }));
+      setInternalNotes(data.book.internalNotes ?? "");
       setSaveMsg("Back to draft — you can submit for review when ready.");
       setTimeout(() => setSaveMsg(null), 4000);
       router.refresh();
@@ -544,7 +552,7 @@ export function PartnerBookDetailClient({
       ) : null}
 
       <div
-        className="flex flex-col gap-2 border-b border-border pb-4"
+        className={`flex flex-col gap-2 rounded-xl border p-3 pb-4 ${bookStatusBarBorderClass(book.status)}`}
         aria-label="Book actions"
       >
         <div
@@ -887,6 +895,21 @@ export function PartnerBookDetailClient({
                       rows={6}
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
+                      className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
+                    />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                      Internal notes
+                    </span>
+                    <p className="text-xs text-text-secondary">
+                      For you and admins only — not shown to readers.
+                    </p>
+                    <textarea
+                      rows={4}
+                      value={internalNotes}
+                      onChange={(e) => setInternalNotes(e.target.value)}
+                      placeholder="e.g. Waiting on revised cover before submitting for review…"
                       className="w-full resize-y rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25"
                     />
                   </label>

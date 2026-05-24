@@ -83,6 +83,7 @@ export default async function AdminBookDetailPage({ params, searchParams }: Page
     openLibraryKey: row.openLibraryKey,
     gutenbergId: row.gutenbergId,
     description: row.description,
+    internalNotes: row.internalNotes ?? null,
     coverImageUrl: row.coverImageUrl,
     status: row.status,
     rejectionReason: row.rejectionReason ?? null,

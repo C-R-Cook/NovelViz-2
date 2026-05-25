@@ -135,6 +135,26 @@
   flex: 1;
 }
 
+.dashboard-helpers-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-helpers-children {
+  display: flex;
+  flex-direction: column;
+  padding-left: 0.375rem;
+}
+
+.dashboard-helpers-child {
+  padding-left: 2rem;
+}
+
+.dashboard-helpers-child .dashboard-nav-icon {
+  font-size: 13px;
+  width: 1rem;
+}
+
 .dashboard-nav-badge {
   flex-shrink: 0;
   border-radius: 9999px;

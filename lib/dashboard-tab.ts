@@ -31,6 +31,7 @@ export type DashboardNavBadge =
 export type DashboardNavEntry =
   | { kind: "divider"; id: string }
   | { kind: "tab"; tab: DashboardTabSlug; icon: string; badge?: DashboardNavBadge }
+  | { kind: "helpers"; id: string }
   | { kind: "link"; id: string; href: string; label: string; icon: string };
 
 const READER_TABS: DashboardTabSlug[] = [
@@ -98,6 +99,8 @@ export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[
     { kind: "tab", tab: "all-books", icon: "▤" },
     { kind: "tab", tab: "all-users", icon: "◎" },
     { kind: "tab", tab: "admin-stats", icon: "∑" },
+    { kind: "divider", id: "d-helpers" },
+    { kind: "helpers", id: "admin-helpers" },
     { kind: "divider", id: "d-gutenberg" },
     ...GUTENBERG_ADMIN_NAV_LINKS.map((link) => ({
       kind: "link" as const,

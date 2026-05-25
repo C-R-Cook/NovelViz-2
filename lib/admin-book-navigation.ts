@@ -20,3 +20,6 @@ export function adminBookDetailHref(bookId: string, returnTo?: string): string {
   const safe = safeAdminReturnTo(returnTo);
   return `/admin/books/${bookId}?returnTo=${encodeURIComponent(safe)}`;
 }
+
+/** Global bulk chapter delete (pending review queue). */
+export const ADMIN_BULK_CHAPTER_DELETE_HREF = "/admin/chapters/bulk-delete";

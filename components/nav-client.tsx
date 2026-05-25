@@ -3,7 +3,7 @@
 import { NotificationsBell } from "@/components/notifications-bell";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { useAuth, useClerk } from "@clerk/nextjs";
-import { isGutenbergAdminSectionActive } from "@/lib/gutenberg-admin-nav";
+import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -164,36 +164,11 @@ export function NavChrome({
         </Link>
       ) : null}
       {isLoggedIn && userRole === "admin" ? (
-        <>
-          <Link
-            href="/admin/cover-refresh"
-            className={navLinkClass(isActive(pathname, "/admin/cover-refresh"))}
-            onClick={() => setMenuOpen(false)}
-          >
-            Covers
-          </Link>
-          <Link
-            href="/admin/gutenberg-import"
-            className={navLinkClass(isGutenbergAdminSectionActive(pathname))}
-            onClick={() => setMenuOpen(false)}
-          >
-            Gutenberg
-          </Link>
-          <Link
-            href="/admin/data-flows"
-            className={navLinkClass(isActive(pathname, "/admin/data-flows"))}
-            onClick={() => setMenuOpen(false)}
-          >
-            Data flows
-          </Link>
-          <Link
-            href="/admin/t2i-tester"
-            className={navLinkClass(isActive(pathname, "/admin/t2i-tester"))}
-            onClick={() => setMenuOpen(false)}
-          >
-            T2I tester
-          </Link>
-        </>
+        <AdminHelpersNav
+          variant="top"
+          navLinkClass={navLinkClass}
+          onNavigate={() => setMenuOpen(false)}
+        />
       ) : null}
     </>
   );

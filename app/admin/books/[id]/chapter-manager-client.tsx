@@ -407,9 +407,7 @@ export function ChapterManagerClient({
 
   return (
     <section className="chapter-manager-root rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
-      <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">
-        Chapter Manager
-      </h2>
+      <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">Chapter Manager</h2>
 
       {status === "processing" ? (
         <p className="text-sm text-text-muted">

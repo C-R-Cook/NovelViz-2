@@ -11,6 +11,7 @@ import type { AdminSpoilerCommentRow } from "@/lib/admin-spoiler-comments-queue"
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { UsersAdminClient } from "@/app/admin/users/users-client";
+import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { gutenbergNavLinkIsActive } from "@/lib/gutenberg-admin-nav";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
@@ -383,6 +384,9 @@ export function DashboardClient({
   function renderNavRow(entry: DashboardNavEntry) {
     if (entry.kind === "divider") {
       return <div key={entry.id} className="dashboard-nav-divider" />;
+    }
+    if (entry.kind === "helpers") {
+      return <AdminHelpersNav key={entry.id} variant="sidebar" onNavigate={closeSidebar} />;
     }
     if (entry.kind === "link") {
       const active =

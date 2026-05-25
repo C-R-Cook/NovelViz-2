@@ -10,7 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const SCAN_BATCH = 10;
+const SCAN_BATCH = 5;
 const APPLY_BATCH = 3;
 const BATCH_DELAY_MS = 800;
 
@@ -309,13 +309,11 @@ export function CoverRefreshClient({ initialBooks }: { initialBooks: CoverRefres
                       <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">Open Library</p>
                       <div className="relative h-24 w-16 overflow-hidden rounded border border-border bg-bg-surface">
                         {scan?.openLibraryCoverPreviewUrl ? (
-                          <Image
+                          <img
                             src={scan.openLibraryCoverPreviewUrl}
                             alt=""
-                            fill
-                            className="object-cover"
-                            sizes="64px"
-                            unoptimized
+                            className="h-full w-full object-cover"
+                            loading="lazy"
                           />
                         ) : scan ? (
                           <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-text-muted">

@@ -24,6 +24,11 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "covers.openlibrary.org",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "v3.fal.media",
         pathname: "/**",
       },

@@ -84,13 +84,12 @@ export async function listCoverRefreshCandidates(
 export async function scanBookCoverRefresh(
   book: CoverRefreshListRow,
 ): Promise<CoverRefreshScanResult> {
-  const gutendexCoverUrl = book.gutenbergId
-    ? await fetchGutendexCoverUrl(book.gutenbergId)
-    : null;
-
-  const ol: OpenLibraryMetadata = await fetchOpenLibraryMetadata(book.title, book.author, {
-    existingOpenLibraryKey: book.openLibraryKey,
-  });
+  const [gutendexCoverUrl, ol] = await Promise.all([
+    book.gutenbergId ? fetchGutendexCoverUrl(book.gutenbergId) : Promise.resolve(null),
+    fetchOpenLibraryMetadata(book.title, book.author, {
+      existingOpenLibraryKey: book.openLibraryKey,
+    }),
+  ]);
 
   const openLibraryCoverId = ol.coverId;
   return {

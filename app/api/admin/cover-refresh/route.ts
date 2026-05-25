@@ -86,10 +86,7 @@ export async function POST(request: Request) {
   }
 
   if (body.action === "scan") {
-    const results = [];
-    for (const book of selected) {
-      results.push(await scanBookCoverRefresh(book));
-    }
+    const results = await Promise.all(selected.map((book) => scanBookCoverRefresh(book)));
     return NextResponse.json({ action: "scan", results });
   }
 

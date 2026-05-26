@@ -174,7 +174,7 @@ Helpers are grouped under **Helpers** in the top nav and admin dashboard sidebar
 | **Data flows** | `/admin/data-flows` | Read-only Mermaid diagrams of ingest, AI, and moderation pipelines (`lib/admin-data-flows.ts`). |
 | **T2I tester** | `/admin/t2i-tester` | Compare fal.ai image models; writes local files under project output paths (`lib/t2i-local-output.ts`). |
 
-Per-book chapter tools live on **`/admin/books/[id]`** (not under Helpers): **Chapter Manager** → **Editor** (single chapter) and **Bulk delete** (checkbox list, `POST /api/admin/books/[id]/chapters/bulk-delete`).
+Per-book chapter tools live on **`/admin/books/[id]`** (not under Helpers): **Chapter Manager** → **Editor** (single chapter: merge, raw text) and **Bulk edit** (rename titles and/or delete selected, `POST /api/admin/books/[id]/chapters/bulk-delete`).
 
 ---
 

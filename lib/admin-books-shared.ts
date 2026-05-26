@@ -105,4 +105,12 @@ export type QueryAdminBooksPageArgs = {
   dir?: AdminBooksSortDirection;
   /** Case-insensitive match on title or author. */
   q?: string;
+  /** When false (default), soft-deleted rows are excluded from every filter except none. */
+  includeDeleted?: boolean;
 };
+
+export function parseAdminBooksIncludeDeletedParam(value: string | null): boolean {
+  if (value === null || value === "") return false;
+  const v = value.trim().toLowerCase();
+  return v === "1" || v === "true" || v === "yes";
+}

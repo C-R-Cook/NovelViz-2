@@ -20,6 +20,7 @@ export {
   parseAdminBooksSortDirection,
   parseAdminBooksSortField,
   parseAdminBooksTakeParam,
+  parseAdminBooksIncludeDeletedParam,
   type AdminBookRow,
   type AdminBooksFilterKey,
   type AdminBooksSortDirection,
@@ -39,13 +40,17 @@ function adminBooksSearchWhere(q: string): Prisma.BookWhereInput {
 function prismaWhere(
   filter: QueryAdminBooksPageArgs["filter"],
   q?: string,
+  includeDeleted = false,
 ): Prisma.BookWhereInput {
-  const base: Prisma.BookWhereInput =
-    filter === "all"
-      ? {}
-      : filter === "deleted"
-        ? { deletedAt: { not: null } }
-        : { deletedAt: null, status: filter };
+  let base: Prisma.BookWhereInput;
+
+  if (filter === "deleted") {
+    base = includeDeleted ? { deletedAt: { not: null } } : { id: { in: [] } };
+  } else if (filter === "all") {
+    base = includeDeleted ? {} : { deletedAt: null };
+  } else {
+    base = includeDeleted ? { status: filter } : { deletedAt: null, status: filter };
+  }
 
   if (!q) return base;
   return { AND: [base, adminBooksSearchWhere(q)] };
@@ -92,7 +97,7 @@ export async function queryAdminBooksPage(
   });
 
   const raw = await prisma.book.findMany({
-    where: prismaWhere(params.filter, params.q),
+    where: prismaWhere(params.filter, params.q, params.includeDeleted === true),
     orderBy: prismaOrderBy(sort, dir),
     skip: safeSkip,
     take: take + 1,

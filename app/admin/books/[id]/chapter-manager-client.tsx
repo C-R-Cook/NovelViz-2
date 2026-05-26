@@ -5,9 +5,9 @@ import type { BookStatus } from "@db";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChapterBulkDeletePanel } from "./chapter-bulk-delete-panel";
+import { ChapterBulkEditPanel } from "./chapter-bulk-edit-panel";
 
-type ChapterManagerTab = "editor" | "bulk-delete";
+type ChapterManagerTab = "editor" | "bulk-edit";
 
 export type ChapterListItem = {
   id: string;
@@ -50,11 +50,6 @@ export function ChapterManagerClient({
   const chapterPickerRef = useRef<HTMLDivElement>(null);
   const chapterMenuRef = useRef<HTMLUListElement>(null);
 
-  /** Editable titles for the whole list, keyed by chapter id. */
-  const [titlesById, setTitlesById] = useState<Record<string, string>>({});
-  const [savingAllTitles, setSavingAllTitles] = useState(false);
-  const [saveAllMsg, setSaveAllMsg] = useState<string | null>(null);
-
   const loadChapters = useCallback(async () => {
     setLoadErr(null);
     try {
@@ -65,14 +60,6 @@ export function ChapterManagerClient({
       }
       const data = (await res.json()) as { chapters: ChapterListItem[] };
       setChapters(data.chapters);
-      setTitlesById((prev) => {
-        const next: Record<string, string> = {};
-        for (const c of data.chapters) {
-          const existing = prev[c.id];
-          next[c.id] = existing !== undefined ? existing : c.title ?? "";
-        }
-        return next;
-      });
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : "Failed to load chapters");
       setChapters([]);
@@ -162,6 +149,10 @@ export function ChapterManagerClient({
     setSelectedId("");
     setStaleMsg(skipDraftOnStructureChange ? null : STALE_MSG);
     router.refresh();
+  }
+
+  function handleChapterTitlesUpdated(newChapters: ChapterListItem[]) {
+    setChapters(newChapters);
   }
 
   async function afterStructureChange() {
@@ -360,51 +351,6 @@ export function ChapterManagerClient({
   const canNext = idx >= 0 && idx < chapters.length - 1;
   const disabled = status === "processing" || actionBusy;
 
-  function onInlineTitleChange(chapterId: string, value: string) {
-    setSaveAllMsg(null);
-    setTitlesById((prev) => ({ ...prev, [chapterId]: value }));
-  }
-
-  async function saveAllTitles() {
-    setTitleErr(null);
-    setTitleOk(null);
-    setSaveAllMsg(null);
-    if (chapters.length === 0) return;
-
-    const changes = chapters.filter((c) => {
-      const current = c.title ?? "";
-      const next = (titlesById[c.id] ?? "").trim();
-      return next !== current;
-    });
-
-    if (changes.length === 0) {
-      setSaveAllMsg("No title changes to save.");
-      return;
-    }
-
-    setSavingAllTitles(true);
-    try {
-      for (const ch of changes) {
-        const nextTitle = (titlesById[ch.id] ?? "").trim();
-        const res = await fetch(`/api/admin/books/${bookId}/chapters/${ch.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: nextTitle === "" ? null : nextTitle }),
-        });
-        if (!res.ok) {
-          const j = (await res.json().catch(() => ({}))) as { error?: string };
-          throw new Error(j.error || res.statusText);
-        }
-      }
-      await loadChapters();
-      setSaveAllMsg("All titles saved.");
-    } catch (err) {
-      setTitleErr(err instanceof Error ? err.message : "Save all titles failed");
-    } finally {
-      setSavingAllTitles(false);
-    }
-  }
-
   const chapterListMenu =
     chapterPickerOpen && pickerRect && chapterMenuMounted ? (
       <ul
@@ -495,16 +441,16 @@ export function ChapterManagerClient({
           </button>
           <button
             type="button"
-            className={managerTabClass("bulk-delete")}
-            onClick={() => setManagerTab("bulk-delete")}
+            className={managerTabClass("bulk-edit")}
+            onClick={() => setManagerTab("bulk-edit")}
           >
-            Bulk delete
+            Bulk edit
           </button>
         </div>
       </div>
 
-      {managerTab === "bulk-delete" ? (
-        <ChapterBulkDeletePanel
+      {managerTab === "bulk-edit" ? (
+        <ChapterBulkEditPanel
           bookId={bookId}
           status={status}
           chapters={chapters}
@@ -513,6 +459,7 @@ export function ChapterManagerClient({
           disabled={disabled}
           skipDraftOnStructureChange={skipDraftOnStructureChange}
           onChaptersUpdated={handleChaptersUpdatedFromBulk}
+          onTitlesUpdated={handleChapterTitlesUpdated}
         />
       ) : status === "processing" ? (
         <p className="text-sm text-text-muted">
@@ -581,50 +528,6 @@ export function ChapterManagerClient({
               {staleMsg}
             </p>
           ) : null}
-
-          <div className="mb-4 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-                Chapter titles
-              </p>
-              <button
-                type="button"
-                disabled={disabled || savingAllTitles}
-                onClick={() => void saveAllTitles()}
-                className="rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised disabled:opacity-50"
-              >
-                {savingAllTitles ? "Saving titles…" : "Save all titles"}
-              </button>
-            </div>
-            <div className="space-y-1 rounded-lg border border-border bg-bg-base/80 p-3">
-              {chapters.length === 0 ? (
-                <p className="text-sm text-text-muted">No chapters found.</p>
-              ) : (
-                <ul className="space-y-1">
-                  {chapters.map((c) => (
-                    <li key={c.id} className="flex items-center gap-2">
-                      <span className="w-8 shrink-0 text-right text-xs font-mono text-text-muted">
-                        {c.sequenceNumber}.
-                      </span>
-                      <input
-                        value={titlesById[c.id] ?? c.title ?? ""}
-                        onChange={(e) => onInlineTitleChange(c.id, e.target.value)}
-                        disabled={disabled}
-                        className="min-w-0 flex-1 rounded-md border border-border bg-bg-surface px-2 py-1 text-xs text-text-primary outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/25 disabled:opacity-50"
-                        placeholder="Untitled"
-                      />
-                      <span className="w-16 shrink-0 text-right text-[10px] font-mono text-text-muted">
-                        {c.chunkCount} chunks
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {saveAllMsg ? (
-              <p className="text-xs text-text-secondary">{saveAllMsg}</p>
-            ) : null}
-          </div>
 
           {selected ? (
             <div className="space-y-4 border-t border-border pt-4">

@@ -4,6 +4,7 @@ import {
   parseAdminBooksSearchParam,
   parseAdminBooksSortDirection,
   parseAdminBooksSortField,
+  parseAdminBooksIncludeDeletedParam,
   parseAdminBooksTakeParam,
   queryAdminBooksPage,
 } from "@/lib/admin-books-list";
@@ -30,6 +31,9 @@ export async function GET(request: Request) {
   const sort = parseAdminBooksSortField(url.searchParams.get("sort"));
   const dir = parseAdminBooksSortDirection(url.searchParams.get("dir"));
   const q = parseAdminBooksSearchParam(url.searchParams.get("q"));
+  const includeDeleted = parseAdminBooksIncludeDeletedParam(
+    url.searchParams.get("includeDeleted"),
+  );
 
   const { rows, hasMore } = await queryAdminBooksPage({
     filter,
@@ -38,6 +42,7 @@ export async function GET(request: Request) {
     sort,
     dir,
     q,
+    includeDeleted,
   });
   return NextResponse.json({
     books: rows,
@@ -46,6 +51,7 @@ export async function GET(request: Request) {
     sort,
     dir,
     q: q ?? null,
+    includeDeleted,
   });
 }
 

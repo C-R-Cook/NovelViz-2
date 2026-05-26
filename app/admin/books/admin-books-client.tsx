@@ -147,6 +147,7 @@ export function AdminBooksClient({
   const listSeq = useRef(0);
   const prevDebouncedSearch = useRef<string | null>(null);
   const [filter, setFilter] = useState<FilterKey>(initialFilter);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortField, setSortField] = useState<AdminBooksSortField>(initialSort);
@@ -175,6 +176,7 @@ export function AdminBooksClient({
       dir: AdminBooksSortDirection;
       take: number;
       q?: string;
+      includeDeleted: boolean;
     },
     /** Snapshot from `listSeq` — updates are skipped if stale */
     nonce: number,
@@ -185,6 +187,7 @@ export function AdminBooksClient({
       sort: spec.sort,
       dir: spec.dir,
       take: String(spec.take),
+      includeDeleted: spec.includeDeleted ? "true" : "false",
     });
     if (spec.q) params.set("q", spec.q);
 
@@ -236,9 +239,38 @@ export function AdminBooksClient({
         dir: sortDir,
         take: pageSize,
         q: debouncedSearch || undefined,
+        includeDeleted: showDeleted,
       },
       nonce,
     );
+  }
+
+  async function setShowDeletedAndReload(next: boolean) {
+    if (next === showDeleted || filterLoading) return;
+    const nextFilter: FilterKey = !next && filter === "deleted" ? "all" : filter;
+    const nonce = ++listSeq.current;
+    setShowDeleted(next);
+    if (nextFilter !== filter) setFilter(nextFilter);
+    setFilterLoading(true);
+    setBooks([]);
+    setHasMore(false);
+    try {
+      await fetchBooks(
+        {
+          filter: nextFilter,
+          skip: 0,
+          mode: "replace",
+          sort: sortField,
+          dir: sortDir,
+          take: pageSize,
+          q: debouncedSearch || undefined,
+          includeDeleted: next,
+        },
+        nonce,
+      );
+    } finally {
+      if (nonce === listSeq.current) setFilterLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -262,12 +294,13 @@ export function AdminBooksClient({
         dir: sortDir,
         take: pageSize,
         q: debouncedSearch || undefined,
+        includeDeleted: showDeleted,
       },
       nonce,
     ).finally(() => {
       if (nonce === listSeq.current) setFilterLoading(false);
     });
-  }, [debouncedSearch, filter, sortField, sortDir, pageSize]);
+  }, [debouncedSearch, filter, sortField, sortDir, pageSize, showDeleted]);
 
   async function onSortHeaderClick(column: AdminBooksSortField) {
     if (filterLoading) return;
@@ -303,6 +336,7 @@ export function AdminBooksClient({
           dir: nextDir,
           take: pageSize,
           q: debouncedSearch || undefined,
+          includeDeleted: showDeleted,
         },
         nonce,
       );
@@ -328,6 +362,7 @@ export function AdminBooksClient({
           dir: sortDir,
           take: pageSize,
           q: debouncedSearch || undefined,
+          includeDeleted: showDeleted,
         },
         nonce,
       );
@@ -350,6 +385,7 @@ export function AdminBooksClient({
           dir: sortDir,
           take: pageSize,
           q: debouncedSearch || undefined,
+          includeDeleted: showDeleted,
         },
         nonceStart,
       );
@@ -467,8 +503,8 @@ export function AdminBooksClient({
         {actionErr ? (
           <p className="text-sm text-error">{actionErr}</p>
         ) : null}
-        <div className="flex flex-wrap gap-2">
-          {FILTERS.map(({ key, label }) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTERS.filter(({ key }) => showDeleted || key !== "deleted").map(({ key, label }) => (
             <button
               key={key}
               type="button"
@@ -480,6 +516,20 @@ export function AdminBooksClient({
               {label}
             </button>
           ))}
+          <span className="mx-1 hidden h-6 w-px bg-border sm:inline" aria-hidden />
+          <button
+            type="button"
+            disabled={filterLoading}
+            aria-pressed={showDeleted}
+            onClick={() => void setShowDeletedAndReload(!showDeleted)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ring-1 ${
+              showDeleted
+                ? "bg-accent-muted text-accent-text ring-accent/50"
+                : "bg-bg-surface text-text-muted ring-border hover:text-text-primary"
+            }`}
+          >
+            Show deleted: {showDeleted ? "On" : "Off"}
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input

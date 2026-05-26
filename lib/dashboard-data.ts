@@ -394,6 +394,7 @@ export async function loadAdminDashboardData(
           take: DASHBOARD_ADMIN_BOOKS_LIMIT,
           sort: "createdAt",
           dir: "desc",
+          includeDeleted: false,
         })
       : Promise.resolve(null),
   ]);

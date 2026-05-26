@@ -1,7 +1,7 @@
 "use client";
 
 import { adminBookDetailHref } from "@/lib/admin-book-navigation";
-import type { AdminBookRow } from "@/lib/admin-books-list";
+import { FOR_REVIEW_QUEUE_PAGE_SIZE, type AdminBookRow } from "@/lib/admin-books-shared";
 import type { ListingPreferenceAfterReview } from "@db";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,7 +15,7 @@ export type ForReviewBook = {
   listingPreferenceAfterReview: ListingPreferenceAfterReview | null;
 };
 
-function toForReviewBook(book: AdminBookRow): ForReviewBook {
+export function toForReviewBook(book: AdminBookRow): ForReviewBook {
   return {
     id: book.id,
     title: book.title,
@@ -30,6 +30,11 @@ export function ForReviewQueue({
   pendingReviewCount,
   actionId,
   onModeration,
+  onBookDeleted,
+  hasMorePending = false,
+  onLoadMorePending,
+  loadingMorePending = false,
+  loadMorePendingErr = null,
   className,
   returnTo = "/dashboard?tab=for-review",
 }: {
@@ -40,11 +45,19 @@ export function ForReviewQueue({
     bookId: string,
     payload: { status: "published" | "unlisted" | "rejected"; rejectionReason?: string },
   ) => void;
+  /** Called after soft-delete succeeds so the dashboard list can update. */
+  onBookDeleted?: (bookId: string) => void;
+  hasMorePending?: boolean;
+  onLoadMorePending?: () => void;
+  loadingMorePending?: boolean;
+  loadMorePendingErr?: string | null;
   /** Optional wrapper class for dashboard shell layout. */
   className?: string;
   returnTo?: string;
 }) {
   const [rejectBook, setRejectBook] = useState<ForReviewBook | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectErr, setRejectErr] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -82,8 +95,8 @@ export function ForReviewQueue({
     const params = new URLSearchParams({
       filter: "pending_review",
       skip: "0",
-      take: "50",
-      sort: "createdAt",
+      take: String(FOR_REVIEW_QUEUE_PAGE_SIZE),
+      sort: "updatedAt",
       dir: "desc",
       q: debouncedSearch,
     });
@@ -122,14 +135,15 @@ export function ForReviewQueue({
   const searchActive = debouncedSearch.length > 0;
   const displayBooks = searchActive ? (searchBooks ?? []) : pendingBooks;
   const totalPending = pendingReviewCount ?? pendingBooks.length;
+  const shownCount = displayBooks.length;
 
   const subtitle = searchActive
     ? searchLoading
       ? `Searching for "${debouncedSearch}"…`
-      : `${displayBooks.length} result${displayBooks.length === 1 ? "" : "s"} for "${debouncedSearch}"`
-    : totalPending > pendingBooks.length
-      ? `Books awaiting moderation (${pendingBooks.length} shown of ${totalPending}).`
-      : `Books awaiting moderation (${pendingBooks.length} shown).`;
+      : `${shownCount} result${shownCount === 1 ? "" : "s"} for "${debouncedSearch}"`
+    : totalPending > shownCount
+      ? `Books awaiting moderation (${shownCount} shown of ${totalPending}).`
+      : `Books awaiting moderation (${shownCount} shown).`;
 
   function openReject(book: ForReviewBook) {
     setRejectBook(book);
@@ -154,6 +168,35 @@ export function ForReviewQueue({
     setSearchBooks((prev) => (prev ? prev.filter((book) => book.id !== rejectBook.id) : prev));
     closeReject();
   }
+
+  function removeBookFromLists(bookId: string) {
+    setSearchBooks((prev) => (prev ? prev.filter((book) => book.id !== bookId) : prev));
+    onBookDeleted?.(bookId);
+  }
+
+  async function deleteBook(book: ForReviewBook) {
+    const confirmed = window.confirm(
+      `Delete "${book.title}" by ${book.author}? This removes the book from the catalogue.`,
+    );
+    if (!confirmed) return;
+
+    setDeleteErr(null);
+    setDeletingId(book.id);
+    try {
+      const res = await fetch(`/api/admin/books/${book.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error || res.statusText);
+      }
+      removeBookFromLists(book.id);
+    } catch (err) {
+      setDeleteErr(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const rowBusy = (bookId: string) => actionId === bookId || deletingId === bookId;
 
   return (
     <>
@@ -184,6 +227,7 @@ export function ForReviewQueue({
           ) : null}
         </div>
         {searchErr ? <p className="text-sm text-error">{searchErr}</p> : null}
+        {deleteErr ? <p className="text-sm text-error">{deleteErr}</p> : null}
         {searchActive && searchLoading ? (
           <p className="text-sm text-text-muted">Loading…</p>
         ) : displayBooks.length === 0 ? (
@@ -211,7 +255,7 @@ export function ForReviewQueue({
                 <div className="dashboard-for-review-actions dashboard-admin-queue-actions flex shrink-0 flex-wrap gap-2">
                   <button
                     type="button"
-                    disabled={actionId === book.id}
+                    disabled={rowBusy(book.id)}
                     className="rounded-lg bg-success px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-success/100 disabled:opacity-50"
                     onClick={() =>
                       moderateBook(book.id, {
@@ -223,11 +267,20 @@ export function ForReviewQueue({
                   </button>
                   <button
                     type="button"
-                    disabled={actionId === book.id}
+                    disabled={rowBusy(book.id)}
                     className="rounded-lg border border-error/40 bg-transparent px-3 py-1.5 text-sm font-medium text-error transition hover:bg-error/10 disabled:opacity-50"
                     onClick={() => openReject(book)}
                   >
                     Reject
+                  </button>
+                  <button
+                    type="button"
+                    disabled={rowBusy(book.id)}
+                    aria-label={`Delete ${book.title}`}
+                    className="rounded-lg border border-error/35 bg-error/10 px-3 py-1.5 text-sm font-medium text-error transition hover:bg-error/20 disabled:opacity-50"
+                    onClick={() => void deleteBook(book)}
+                  >
+                    {deletingId === book.id ? "…" : "Delete"}
                   </button>
                   <Link
                     href={adminBookDetailHref(book.id, returnTo)}
@@ -240,6 +293,23 @@ export function ForReviewQueue({
             ))}
           </ul>
         )}
+        {!searchActive && hasMorePending && onLoadMorePending ? (
+          <div className="flex flex-col items-start gap-2 pt-2">
+            <button
+              type="button"
+              disabled={loadingMorePending || Boolean(actionId) || Boolean(deletingId)}
+              onClick={onLoadMorePending}
+              className="rounded-lg border border-accent/35 bg-accent/10 px-4 py-2 text-sm font-medium text-accent-text transition hover:bg-accent/20 disabled:opacity-50"
+            >
+              {loadingMorePending
+                ? "Loading…"
+                : `Load next ${FOR_REVIEW_QUEUE_PAGE_SIZE} (${shownCount} of ${totalPending} shown)`}
+            </button>
+            {loadMorePendingErr ? (
+              <p className="text-sm text-error">{loadMorePendingErr}</p>
+            ) : null}
+          </div>
+        ) : null}
       </section>
       {rejectBook ? (
         <div

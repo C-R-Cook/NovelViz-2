@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { mergeRejectionReasonIntoInternalNotes } from "@/lib/book-rejection-notes";
 import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 import { BookStatus, NotificationType, UserRole } from "@db";
@@ -36,7 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id: bookId } = await context.params;
   const book = await prisma.book.findFirst({
     where: { id: bookId, deletedAt: null },
-    select: { id: true, ownerId: true, status: true, title: true },
+    select: { id: true, ownerId: true, status: true, title: true, internalNotes: true },
   });
   if (!book) {
     return NextResponse.json({ error: "Book not found" }, { status: 404 });
@@ -75,6 +76,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const data: {
     status: BookStatus;
     rejectionReason?: string | null;
+    internalNotes?: string | null;
     listingPreferenceAfterReview?: null;
   } = { status };
 
@@ -91,6 +93,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
     data.rejectionReason = reason;
+    data.internalNotes = mergeRejectionReasonIntoInternalNotes(book.internalNotes, reason);
   } else {
     data.rejectionReason = null;
   }
@@ -132,5 +135,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     book: updated,
     status: updated.status,
     rejectionReason: updated.rejectionReason,
+    internalNotes: updated.internalNotes,
   });
 }

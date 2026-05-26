@@ -3,7 +3,11 @@
 import { AccountPageClient, type AccountPageClientProps } from "@/app/(reader)/(app)/account/account-client";
 import { DashboardPartnerSection } from "@/app/(reader)/(app)/dashboard/dashboard-partner-section";
 import { FeatureRequestsQueue } from "@/app/(reader)/(app)/dashboard/feature-requests-queue";
-import { ForReviewQueue } from "@/app/(reader)/(app)/dashboard/for-review-queue";
+import {
+  ForReviewQueue,
+  toForReviewBook,
+} from "@/app/(reader)/(app)/dashboard/for-review-queue";
+import { FOR_REVIEW_QUEUE_PAGE_SIZE, type AdminBookRow } from "@/lib/admin-books-shared";
 import { FlaggedCommentsQueue } from "@/app/(reader)/(app)/dashboard/flagged-comments-queue";
 import { SpoilerCommentsQueue } from "@/app/(reader)/(app)/dashboard/spoiler-comments-queue";
 import type { AdminFlaggedCommentRow } from "@/lib/admin-flagged-comments-queue";
@@ -17,7 +21,6 @@ import { gutenbergNavLinkIsActive } from "@/lib/gutenberg-admin-nav";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
-import type { AdminBookRow } from "@/lib/admin-books-list";
 import {
   dashboardNavForRole,
   dashboardPageTitle,
@@ -107,6 +110,7 @@ export type DashboardClientProps = {
     }[];
     totalUsers: number;
     totalBooks: number;
+    liveBooksCount: number;
     pendingReviewCount: number;
     bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };
     featureRequestsQueue: {
@@ -265,6 +269,8 @@ export function DashboardClient({
   );
 
   const [pendingBooks, setPendingBooks] = useState(admin?.pendingBooks ?? []);
+  const [loadingMorePending, setLoadingMorePending] = useState(false);
+  const [loadMorePendingErr, setLoadMorePendingErr] = useState<string | null>(null);
   const [featureRequestQueue, setFeatureRequestQueue] = useState(admin?.featureRequestsQueue ?? []);
   const [actionId, setActionId] = useState<string | null>(null);
   const [featureActionId, setFeatureActionId] = useState<string | null>(null);
@@ -273,8 +279,14 @@ export function DashboardClient({
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   useEffect(() => {
+    const server = admin?.pendingBooks ?? [];
     queueMicrotask(() => {
-      setPendingBooks(admin?.pendingBooks ?? []);
+      setPendingBooks((prev) => {
+        if (prev.length === 0) return server;
+        // Keep extra pages loaded via "Load next 50" after refresh (delete/moderate).
+        if (prev.length > server.length) return prev;
+        return server;
+      });
     });
   }, [admin]);
 
@@ -357,6 +369,55 @@ export function DashboardClient({
     },
     [router],
   );
+
+  const handleForReviewBookDeleted = useCallback(
+    (bookId: string) => {
+      setPendingBooks((prev) => prev.filter((b) => b.id !== bookId));
+      router.refresh();
+    },
+    [router],
+  );
+
+  const loadMorePendingBooks = useCallback(async () => {
+    if (!admin) return;
+    setLoadingMorePending(true);
+    setLoadMorePendingErr(null);
+    try {
+      const params = new URLSearchParams({
+        filter: "pending_review",
+        skip: String(pendingBooks.length),
+        take: String(FOR_REVIEW_QUEUE_PAGE_SIZE),
+        sort: "updatedAt",
+        dir: "desc",
+      });
+      const res = await fetch(`/api/admin/books?${params.toString()}`);
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(j.error ?? res.statusText);
+      }
+      const data = (await res.json()) as { books?: AdminBookRow[] };
+      const next = Array.isArray(data.books) ? data.books.map(toForReviewBook) : [];
+      if (next.length === 0) return;
+      setPendingBooks((prev) => {
+        const seen = new Set(prev.map((b) => b.id));
+        const merged = [...prev];
+        for (const book of next) {
+          if (!seen.has(book.id)) {
+            seen.add(book.id);
+            merged.push(book);
+          }
+        }
+        return merged;
+      });
+    } catch (err) {
+      setLoadMorePendingErr(err instanceof Error ? err.message : "Could not load more books");
+    } finally {
+      setLoadingMorePending(false);
+    }
+  }, [admin, pendingBooks.length]);
+
+  const hasMorePendingBooks =
+    admin != null && pendingBooks.length < admin.pendingReviewCount;
 
   const runFeatureRequestDecision = useCallback(
     async (requestId: string, action: "approve" | "reject") => {
@@ -522,9 +583,15 @@ export function DashboardClient({
         </div>
 
         {role === "admin" && admin ? (
-          <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
+          <div className="dashboard-kpi-grid dashboard-kpi-grid--5 mt-4">
             <KpiCard label="Total users" value={admin.totalUsers} sub="Registered" delayMs={reducedMotion ? 0 : 80} />
-            <KpiCard label="Total books" value={admin.totalBooks} sub="In catalogue" delayMs={reducedMotion ? 0 : 140} />
+            <KpiCard
+              label="Live books"
+              value={admin.liveBooksCount}
+              sub="Published on Discover"
+              delayMs={reducedMotion ? 0 : 120}
+            />
+            <KpiCard label="Total books" value={admin.totalBooks} sub="All non-deleted" delayMs={reducedMotion ? 0 : 160} />
             <KpiCard
               label="Book requests"
               value={admin.bookRequests.totalCount}
@@ -535,7 +602,7 @@ export function DashboardClient({
               label="Feature approvals"
               value={admin.featureRequestsPendingCount}
               sub="Pending queue"
-              delayMs={reducedMotion ? 0 : 260}
+              delayMs={reducedMotion ? 0 : 240}
             />
           </div>
         ) : null}
@@ -569,15 +636,23 @@ export function DashboardClient({
           </div>
         ) : null}
 
-        {role === "admin" && admin && pendingBooks.length > 0 ? (
+        {role === "admin" && admin && (pendingBooks.length > 0 || admin.pendingReviewCount > 0) ? (
           <>
-            <SectionLabel label="For review" right={`${pendingBooks.length} pending`} />
+            <SectionLabel
+              label="For review"
+              right={`${admin.pendingReviewCount} pending`}
+            />
             <div className="mb-6">
               <ForReviewQueue
                 pendingBooks={pendingBooks}
                 pendingReviewCount={admin.pendingReviewCount}
                 actionId={actionId}
                 onModeration={(id, status) => void runModeration(id, status)}
+                onBookDeleted={handleForReviewBookDeleted}
+                hasMorePending={hasMorePendingBooks}
+                onLoadMorePending={() => void loadMorePendingBooks()}
+                loadingMorePending={loadingMorePending}
+                loadMorePendingErr={loadMorePendingErr}
                 returnTo="/dashboard?tab=for-review"
                 className="dashboard-for-review-wrap dashboard-admin-queue-wrap"
               />
@@ -826,9 +901,10 @@ export function DashboardClient({
 
         <section aria-labelledby="dashboard-admin-quick-stats">
           <SectionLabel label="Quick stats" />
-          <div className="dashboard-kpi-grid dashboard-kpi-grid--3">
+          <div className="dashboard-kpi-grid dashboard-kpi-grid--4">
             <KpiCard label="Total users" value={admin.totalUsers} />
-            <KpiCard label="Total books" value={admin.totalBooks} />
+            <KpiCard label="Live books" value={admin.liveBooksCount} sub="Published on Discover" />
+            <KpiCard label="Total books" value={admin.totalBooks} sub="All non-deleted" />
             <KpiCard label="Pending review" value={admin.pendingReviewCount} />
           </div>
         </section>
@@ -903,6 +979,11 @@ export function DashboardClient({
             pendingReviewCount={admin.pendingReviewCount}
             actionId={actionId}
             onModeration={(id, status) => void runModeration(id, status)}
+            onBookDeleted={handleForReviewBookDeleted}
+            hasMorePending={hasMorePendingBooks}
+            onLoadMorePending={() => void loadMorePendingBooks()}
+            loadingMorePending={loadingMorePending}
+            loadMorePendingErr={loadMorePendingErr}
             returnTo="/dashboard?tab=for-review"
             className="dashboard-for-review-wrap dashboard-admin-queue-wrap"
           />

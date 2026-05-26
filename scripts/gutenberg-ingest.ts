@@ -3,6 +3,10 @@
  *
  * GUTENBERG_ADMIN_USER_ID — DB id of admin user (ownerId for imported books).
  * Find with: SELECT id FROM "User" WHERE role = 'admin' LIMIT 1;
+ *
+ * Book.description: queue `gutenbergSummary` or `resolveGutenbergCatalogDescription`
+ * (Gutendex → gutenberg.org scrape), then Open Library / EPUB / subjects via
+ * `pickBestDescription`. Do not add alternate description sources for PG imports.
  */
 import "./lib/load-env";
 import { randomUUID } from "node:crypto";
@@ -13,7 +17,13 @@ import {
   OPENAI_GPT4O_MINI_USD_PER_M_INPUT,
   OPENAI_GPT4O_MINI_USD_PER_M_OUTPUT,
 } from "@/lib/costs";
-import { descriptionFromSubjects, pickBestDescription } from "@/lib/book-description";
+import {
+  descriptionFromGutenbergSummary,
+  descriptionFromSubjects,
+  fetchGutendexBookById,
+  pickBestDescription,
+} from "@/lib/book-description";
+import { resolveGutenbergCatalogDescription } from "@/lib/gutenberg-page-summary";
 import { chunkText, embedChunks, extractEpubCoverFromBuffer, extractEpubMetadataFromOpf, openEpubPackage, processBook } from "@/lib/ingestion";
 import { resolveGutenbergBookEnrichment } from "@/lib/open-library-cover";
 import { prisma } from "@/lib/prisma";
@@ -323,6 +333,25 @@ async function processEntry(
       }
     }
 
+    let pgSummary = entry.gutenbergSummary ?? null;
+    if (pgSummary && !dryRun) {
+      console.log(`  → Queue summary (${pgSummary.length} chars)`);
+    } else if (!pgSummary) {
+      const gutendex = await fetchGutendexBookById(entry.gutenbergId);
+      const hadGutendex = Boolean(descriptionFromGutenbergSummary(gutendex?.summaries));
+      pgSummary = await resolveGutenbergCatalogDescription(
+        entry.gutenbergId,
+        gutendex?.summaries,
+      );
+      if (pgSummary && !dryRun) {
+        if (hadGutendex) {
+          console.log(`  → Gutendex summary (${pgSummary.length} chars)`);
+        } else {
+          console.log(`  → gutenberg.org scrape (${pgSummary.length} chars)`);
+        }
+      }
+    }
+
     if (dryRun) {
       console.log(`  → Would create Book record: ${bookId}`);
     } else {
@@ -338,6 +367,7 @@ async function processEntry(
           coverImageUrl: enrichment?.coverImageUrl ?? null,
           description:
             pickBestDescription(
+              pgSummary,
               enrichment?.description,
               epubDescription,
               descriptionFromSubjects(entry.subjects),

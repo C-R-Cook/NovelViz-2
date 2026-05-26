@@ -2,7 +2,30 @@
 
 How to discover public-domain books from Project Gutenberg (via [Gutendex](https://gutendex.com)), review them, ingest them into NovelViz, and publish them on Discover.
 
+**Broader guide (Helpers, For review queue, end-to-end diagrams):** [`admin-gutenberg-and-for-review.md`](./admin-gutenberg-and-for-review.md).
+
 This pipeline is **not** `npx prisma db seed`. The Prisma seed only adds a handful of dev placeholder books.
+
+---
+
+## Best practice (future imports)
+
+**Always resolve catalogue descriptions through one helper:** [`resolveGutenbergCatalogDescription`](lib/gutenberg-page-summary.ts) in `lib/gutenberg-page-summary.ts`.
+
+| Step | What to do |
+|------|------------|
+| **Fetch** | `npm run gutenberg-fetch` — fills `gutenbergSummary` on each queue entry (Gutendex, then scrape if needed). |
+| **Ingest** | Uses queue summary or re-resolves via the same helper before Open Library. |
+| **New code** | Do **not** copy summary HTML by hand, skip scrape, or use only Open Library for PG titles. Call `resolveGutenbergCatalogDescription(gutenbergId, summaries)` and pass the result into `pickBestDescription` ahead of OL/EPUB/subjects. |
+| **Repair** | `npm run gutenberg-enrich -- --gutenberg-summaries` for eligible pending-review rows (see below). |
+
+**Description priority (canonical):**
+
+1. Gutendex `summaries[0]` (strip `(This is an automatically generated summary.)`)
+2. Scrape `https://www.gutenberg.org/ebooks/{gutenbergId}` when Gutendex is empty (400ms throttle between scrapes in batch jobs; `[gutenberg-scrape]` on failure; import continues)
+3. Open Library → EPUB OPF → subject-tag blurb
+
+Full runbook: remainder of this doc. Implementation: `lib/book-description.ts` (normalize), `lib/gutenberg-page-summary.ts` (scrape + resolve).
 
 ---
 
@@ -64,6 +87,26 @@ Cover art is loaded via **Cloudinary remote fetch** from `covers.openlibrary.org
 
 Use `gutenberg-enrich` only to repair older books. Use `--refresh-covers` if you explicitly want to prefer Open Library art over existing covers.
 
+### Catalogue descriptions (detail)
+
+Gutendex exposes `summaries[]` per book; when that array is empty, the same auto-generated paragraph is scraped from the live ebook page (`.summary-text-container` on current gutenberg.org layouts, with legacy `<p>` fallback). Both paths strip `(This is an automatically generated summary.)` before storing `Book.description`.
+
+**Backfill pending-review books** only when the current description is one of:
+
+- empty / null
+- starts with `in published order` (case-insensitive)
+- starts with `Public domain classic. Subjects:` (subject-tag fallback blurb)
+- Gutenberg header search chrome: description **starts with** `X` then `Go!` on separate lines (optional `Quick search` between), including long page scrapes that continue after `Go!`
+
+```bash
+npm run gutenberg-enrich -- --gutenberg-summaries --dry-run
+npm run gutenberg-enrich -- --gutenberg-summaries --status pending_review
+```
+
+Optional: `--limit N`. Defaults to `pending_review` when `--gutenberg-summaries` is used without `--status`. Books with other descriptions (e.g. Open Library) are skipped.
+
+Re-run `npm run gutenberg-fetch` so new queue entries include `gutenbergSummary` on each `QueueEntry`.
+
 ---
 
 ## Covers and metadata (during ingest)
@@ -72,10 +115,11 @@ Shared logic: **`lib/open-library-cover.ts`** → `resolveGutenbergBookEnrichmen
 
 | Step | What happens |
 |------|----------------|
-| 1 | One Open Library search per book (metadata) |
-| 2 | **Cover:** image embedded in the Gutenberg EPUB when present |
-| 3 | **Fallback cover:** Gutendex JPEG from the queue, then Open Library via Cloudinary |
-| 4 | **Metadata:** `openLibraryKey`, `description`, `publishedYear` saved on the `Book` row |
+| 1 | **Description:** Gutendex `summaries[0]` (suffix stripped), else scrape `gutenberg.org/ebooks/{id}`, else Open Library |
+| 2 | One Open Library search per book (metadata + cover fallback) |
+| 3 | **Cover:** image embedded in the Gutenberg EPUB when present |
+| 4 | **Fallback cover:** Gutendex JPEG from the queue, then Open Library via Cloudinary |
+| 5 | **Metadata:** `openLibraryKey`, `description`, `publishedYear` saved on the `Book` row |
 
 ---
 
@@ -86,6 +130,8 @@ npm run gutenberg-fetch
 ```
 
 Calls Gutendex for up to **1000** popular English titles, applies accept / review / reject filters, and writes **`scripts/gutenberg-queue.json`**.
+
+**Title auto-reject** (case-insensitive substring in the Gutendex title): `poems`, `collection of`, `translated into english`, `essays`, `library of`, `encyclopaedia` / `encyclopedia`, `works of`, `stories`. Reject reason is logged as `title: <term>`.
 
 **EPUB URL in queue:** `pickEpubUrl()` prefers Gutendex’s **no-images** EPUB when available. If Gutendex only lists a large illustrated EPUB3 URL, fetch stores the derived **no-images** URL (`https://www.gutenberg.org/ebooks/{id}.epub.noimages`) so ingest stays under the size cap. Some titles have **no EPUB** in Gutendex at all (`epubUrl: null`).
 
@@ -309,6 +355,9 @@ Avoid: a **second** `gutenberg-ingest`, **Prisma migrations**, or hand-editing `
 | `scripts/lib/gutenberg-queue-flags.ts` | Manual-upload flags + labels |
 | `scripts/lib/gutenberg-filters.ts` | Accept/reject filters + `pickEpubUrl` |
 | `scripts/lib/load-env.ts` | Env loading for CLI scripts |
+| `lib/book-description.ts` | Normalize PG summary text; OL/subject `pickBestDescription` |
+| `lib/gutenberg-page-summary.ts` | **Canonical** `resolveGutenbergCatalogDescription` + scrape |
+| `lib/book-description-resolve.ts` | Non-ingest description resolve (uses canonical PG helper) |
 | `lib/open-library.ts` | OL search + work metadata |
 | `lib/open-library-cover.ts` | Unified metadata + cover resolution |
 | `app/admin/gutenberg-import/` | Review + deferred UI |

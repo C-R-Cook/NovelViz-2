@@ -4,6 +4,10 @@
 import { ChapterManagerClient } from "./chapter-manager-client";
 import { DEFAULT_ADMIN_BOOK_RETURN } from "@/lib/admin-book-navigation";
 import { bookStatusBarBorderClass } from "@/lib/book-status-styles";
+import {
+  mergeRejectionReasonIntoInternalNotes,
+  REJECTION_REASON_NOTES_PREFIX,
+} from "@/lib/book-rejection-notes";
 import { GENRE_OPTIONS } from "@/lib/genre";
 import { labelListingPreferenceAfterReview } from "@/lib/listing-preference";
 import type {
@@ -64,6 +68,16 @@ type MetadataFormState = {
 const metadataInputClass =
   "mt-1 w-full rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-accent/50 focus:ring-2 focus:ring-accent/25 disabled:cursor-not-allowed disabled:opacity-50";
 
+function internalNotesForAdminDisplay(book: AdminBookDetailModel): string {
+  const notes = book.internalNotes ?? "";
+  const reason = book.rejectionReason?.trim();
+  if (book.status !== "rejected" || !reason) return notes;
+  if (notes.trim().toUpperCase().startsWith(REJECTION_REASON_NOTES_PREFIX.toUpperCase())) {
+    return notes;
+  }
+  return mergeRejectionReasonIntoInternalNotes(notes, reason);
+}
+
 function metadataFormFromBook(book: AdminBookDetailModel): MetadataFormState {
   return {
     title: book.title,
@@ -71,7 +85,7 @@ function metadataFormFromBook(book: AdminBookDetailModel): MetadataFormState {
     genre: book.genre ?? "",
     publishedYear: book.publishedYear != null ? String(book.publishedYear) : "",
     description: book.description ?? "",
-    internalNotes: book.internalNotes ?? "",
+    internalNotes: internalNotesForAdminDisplay(book),
     openLibraryKey: book.openLibraryKey ?? "",
     gutenbergId: book.gutenbergId != null ? String(book.gutenbergId) : "",
   };
@@ -115,7 +129,19 @@ function mergeBookFromPatch(
           : prev.gutenbergId,
     coverImageUrl:
       typeof raw.coverImageUrl === "string" ? raw.coverImageUrl : prev.coverImageUrl,
+    status: isBookStatus(raw.status) ? raw.status : prev.status,
+    rejectionReason:
+      raw.rejectionReason === null || typeof raw.rejectionReason === "string"
+        ? raw.rejectionReason
+        : prev.rejectionReason,
   };
+}
+
+function isBookStatus(v: unknown): v is AdminBookDetailModel["status"] {
+  return (
+    typeof v === "string" &&
+    ["draft", "pending_review", "rejected", "published", "unlisted", "processing"].includes(v)
+  );
 }
 
 /** Status tint behind overview / edit content panels (admins infer meaning from colour). */
@@ -653,13 +679,14 @@ export function AdminBookDetailClient({
         throw new Error(data.error || res.statusText);
       }
       if (data.book) {
-        setBook((prev) => ({
-          ...prev,
-          ...(data.book as Partial<AdminBookDetailModel>),
-          chapterCount: prev.chapterCount,
-          ownerLabel: prev.ownerLabel,
-          createdAtLabel: prev.createdAtLabel,
-        }));
+        const merged = mergeBookFromPatch(book, data.book as Record<string, unknown>);
+        setBook({
+          ...merged,
+          chapterCount: book.chapterCount,
+          ownerLabel: book.ownerLabel,
+          createdAtLabel: book.createdAtLabel,
+        });
+        setMetadataForm(metadataFormFromBook(merged));
       }
       setRejectOpen(false);
       setRejectReason("");

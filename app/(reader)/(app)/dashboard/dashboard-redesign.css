@@ -287,8 +287,18 @@
     grid-template-columns: repeat(4, 1fr);
   }
 
+  .dashboard-kpi-grid--5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+
   .dashboard-kpi-grid--3plus1 {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 640px) and (max-width: 899px) {
+  .dashboard-kpi-grid--5 {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 

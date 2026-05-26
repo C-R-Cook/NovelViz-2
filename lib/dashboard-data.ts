@@ -10,6 +10,7 @@ import {
 } from "@/lib/admin-spoiler-comments-queue";
 import {
   DASHBOARD_ADMIN_BOOKS_LIMIT,
+  FOR_REVIEW_QUEUE_PAGE_SIZE,
   queryAdminBooksPage,
   type AdminBookRow,
 } from "@/lib/admin-books-list";
@@ -87,6 +88,8 @@ export type DashboardAdminData = {
   }[];
   totalUsers: number;
   totalBooks: number;
+  /** Published, non-deleted — visible on Discover (/books). */
+  liveBooksCount: number;
   pendingReviewCount: number;
   bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };
   featureRequestsQueue: {
@@ -330,6 +333,7 @@ export async function loadAdminDashboardData(
     pendingBooks,
     totalUsers,
     totalBooks,
+    liveBooksCount,
     pendingReviewCount,
     bookRequestTotalCount,
     featureRequestsPendingCount,
@@ -339,7 +343,7 @@ export async function loadAdminDashboardData(
     prisma.book.findMany({
       where: { status: "pending_review", deletedAt: null },
       orderBy: { updatedAt: "desc" },
-      take: 50,
+      take: FOR_REVIEW_QUEUE_PAGE_SIZE,
       select: {
         id: true,
         title: true,
@@ -350,6 +354,7 @@ export async function loadAdminDashboardData(
     }),
     prisma.user.count(),
     prisma.book.count({ where: { deletedAt: null } }),
+    prisma.book.count({ where: { status: "published", deletedAt: null } }),
     prisma.book.count({ where: { status: "pending_review", deletedAt: null } }),
     prisma.bookRequest.count(),
     prisma.featureRequest.count({ where: { status: FeatureRequestStatus.PENDING } }),
@@ -407,6 +412,7 @@ export async function loadAdminDashboardData(
       pendingBooks,
       totalUsers,
       totalBooks,
+      liveBooksCount,
       pendingReviewCount,
       bookRequests: {
         totalCount: bookRequestTotalCount,

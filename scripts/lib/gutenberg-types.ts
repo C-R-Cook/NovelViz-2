@@ -43,6 +43,11 @@ export interface QueueEntry {
   manualUploadRequired: boolean;
   ingestSkipReason: IngestSkipReason | null;
   epubSizeBytes: number | null;
+  /**
+   * Normalized PG plot summary (Gutendex summaries[0] or gutenberg.org scrape).
+   * Set at fetch time via `resolveGutenbergCatalogDescription` — required for new imports.
+   */
+  gutenbergSummary: string | null;
 }
 
 export interface GutenbergQueueFile {
@@ -61,6 +66,7 @@ export interface GutendexBook {
   title: string;
   authors: Array<{ name: string }>;
   subjects: string[];
+  summaries?: string[];
   bookshelves: string[];
   formats: Record<string, string>;
   download_count: number;

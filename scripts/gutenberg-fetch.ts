@@ -1,8 +1,20 @@
+/**
+ * Gutenberg discovery queue builder.
+ *
+ * Descriptions: always via `resolveGutenbergCatalogDescription` (Gutendex summary,
+ * then gutenberg.org scrape). See `lib/gutenberg-page-summary.ts` and
+ * `docs/gutenberg-import.md` — best practice for future imports.
+ */
 import "./lib/load-env";
 import fs from "node:fs";
 import path from "node:path";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "@db";
+import { descriptionFromGutenbergSummary } from "@/lib/book-description";
+import {
+  GUTENBERG_SCRAPE_DELAY_MS,
+  resolveGutenbergCatalogDescription,
+} from "@/lib/gutenberg-page-summary";
 import {
   classifyBook,
   formatAuthorDisplay,
@@ -41,6 +53,7 @@ function toQueueEntry(book: GutendexBook): QueueEntry {
   const { filterResult, rejectReason, reviewReasons } = classifyBook(
     book.subjects,
     book.bookshelves,
+    book.title,
   );
   return {
     gutenbergId: book.id,
@@ -57,7 +70,34 @@ function toQueueEntry(book: GutendexBook): QueueEntry {
     reviewReasons,
     approved: null,
     ingestedAt: null,
+    gutenbergSummary: null,
     ...defaultQueueIngestFlags(),
+  };
+}
+
+async function buildQueueEntry(
+  book: GutendexBook,
+  verbose: boolean,
+): Promise<{ entry: QueueEntry; scraped: boolean; scrapeOk: boolean }> {
+  const base = toQueueEntry(book);
+  const hadGutendex = Boolean(descriptionFromGutenbergSummary(book.summaries));
+  const gutenbergSummary = await resolveGutenbergCatalogDescription(
+    book.id,
+    book.summaries,
+  );
+  const scraped = !hadGutendex;
+  const scrapeOk = scraped && Boolean(gutenbergSummary);
+
+  if (verbose && scrapeOk) {
+    console.log(
+      `${LOG} "${book.title}" — Gutendex summary empty; scraped gutenberg.org (${gutenbergSummary!.length} chars)`,
+    );
+  }
+
+  return {
+    entry: { ...base, gutenbergSummary },
+    scraped,
+    scrapeOk,
   };
 }
 
@@ -125,13 +165,24 @@ async function main(): Promise<void> {
   let totalAccepted = 0;
   let totalReview = 0;
   let totalRejected = 0;
+  let scrapeAttempts = 0;
+  let scrapeSucceeded = 0;
 
-  for (const book of collected) {
-    const entry = toQueueEntry(book);
+  for (let i = 0; i < collected.length; i++) {
+    const book = collected[i]!;
+    const { entry, scraped, scrapeOk } = await buildQueueEntry(book, verbose);
     entries.push(entry);
     if (entry.filterResult === "accepted") totalAccepted += 1;
     else if (entry.filterResult === "review") totalReview += 1;
     else totalRejected += 1;
+
+    if (scraped) {
+      scrapeAttempts += 1;
+      if (scrapeOk) scrapeSucceeded += 1;
+      if (i < collected.length - 1) {
+        await sleep(GUTENBERG_SCRAPE_DELAY_MS);
+      }
+    }
 
     if (verbose) {
       if (entry.filterResult === "rejected") {
@@ -162,6 +213,7 @@ async function main(): Promise<void> {
   console.log(`  Review:    ${totalReview}`);
   console.log(`  Rejected:  ${totalRejected}`);
   console.log(`  Skipped (delta): ${skippedDelta}`);
+  console.log(`  Scrape attempts: ${scrapeAttempts} (${scrapeSucceeded} with summary)`);
   console.log(`  Queue written to ${QUEUE_PATH}`);
 }
 

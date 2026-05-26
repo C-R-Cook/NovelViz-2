@@ -1,8 +1,11 @@
 import {
+  descriptionFromGutenbergSummary,
   descriptionFromSubjects,
+  fetchGutendexBookById,
   gutenbergEpubNoImagesUrl,
   pickBestDescription,
 } from "@/lib/book-description";
+import { resolveGutenbergCatalogDescription } from "@/lib/gutenberg-page-summary";
 import { extractEpubMetadataFromOpf, openEpubPackage } from "@/lib/ingestion";
 import { fetchOpenLibraryMetadata, fetchOpenLibraryWorkByKey } from "@/lib/open-library";
 
@@ -12,22 +15,6 @@ export type ResolvedBookDescription = {
   publishedYear: number | null;
   sources: string[];
 };
-
-async function fetchGutendexSubjects(gutenbergId: number): Promise<string[]> {
-  try {
-    const res = await fetch(`https://gutendex.com/books/?ids=${gutenbergId}`, {
-      headers: { "User-Agent": "NovelViz/1.0 (book-description-resolve)" },
-      signal: AbortSignal.timeout(25_000),
-    });
-    if (!res.ok) return [];
-    const data = (await res.json()) as {
-      results?: Array<{ subjects?: string[] }>;
-    };
-    return data.results?.[0]?.subjects ?? [];
-  } catch {
-    return [];
-  }
-}
 
 async function descriptionFromGutenbergEpub(gutenbergId: number): Promise<string | null> {
   try {
@@ -46,7 +33,8 @@ async function descriptionFromGutenbergEpub(gutenbergId: number): Promise<string
 
 /**
  * Resolve a catalogue description without touching covers.
- * Order: existing OL work key → OL search → EPUB OPF → Gutendex subjects blurb.
+ * PG titles: `resolveGutenbergCatalogDescription` first (see gutenberg-import.md).
+ * Then OL work key → OL search → EPUB OPF → subjects blurb.
  */
 export async function resolveMissingBookDescription(options: {
   title: string;
@@ -63,9 +51,31 @@ export async function resolveMissingBookDescription(options: {
 
   let openLibraryKey = options.openLibraryKey?.trim() || null;
   let publishedYear: number | null = null;
+  let pgSummary: string | null = null;
   let olDescription: string | null = null;
   let epubDescription: string | null = null;
   let subjectLines = options.subjects ?? [];
+
+  if (options.gutenbergId) {
+    const gutendex = await fetchGutendexBookById(options.gutenbergId);
+    if (gutendex) {
+      if (subjectLines.length === 0) subjectLines = gutendex.subjects;
+    }
+    const hadGutendex = Boolean(descriptionFromGutenbergSummary(gutendex?.summaries));
+    pgSummary = await resolveGutenbergCatalogDescription(
+      options.gutenbergId,
+      gutendex?.summaries,
+    );
+    if (pgSummary) {
+      if (hadGutendex) {
+        sources.push("gutenberg-summary");
+        log("Description from Gutendex summary");
+      } else {
+        sources.push("gutenberg-page-scrape");
+        log("Description from gutenberg.org page scrape");
+      }
+    }
+  }
 
   if (openLibraryKey) {
     const fromKey = await fetchOpenLibraryWorkByKey(openLibraryKey);
@@ -111,16 +121,17 @@ export async function resolveMissingBookDescription(options: {
   }
 
   let subjectDescription: string | null = null;
-  if (subjectLines.length === 0 && options.gutenbergId) {
-    subjectLines = await fetchGutendexSubjects(options.gutenbergId);
-  }
   subjectDescription = descriptionFromSubjects(subjectLines);
-  if (subjectDescription && !pickBestDescription(olDescription, epubDescription)) {
+  if (
+    subjectDescription &&
+    !pickBestDescription(pgSummary, olDescription, epubDescription)
+  ) {
     sources.push("subjects-fallback");
     log("Using subject-tag fallback blurb");
   }
 
   const description = pickBestDescription(
+    pgSummary,
     olDescription,
     epubDescription,
     subjectDescription,

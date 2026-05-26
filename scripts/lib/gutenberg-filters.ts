@@ -1,5 +1,18 @@
 import type { FilterResult } from "./gutenberg-types";
 
+/** Case-insensitive substrings in the Gutendex title — auto-reject on fetch. */
+const TITLE_HARD_REJECT_TERMS = [
+  "poems",
+  "collection of",
+  "translated into english",
+  "essays",
+  "library of",
+  "encyclopaedia",
+  "encyclopedia",
+  "works of",
+  "stories",
+] as const;
+
 const HARD_REJECT_TERMS = [
   "medicine",
   "surgery",
@@ -117,11 +130,22 @@ function findAllMatches(haystack: string, terms: readonly string[]): string[] {
 export function classifyBook(
   subjects: string[],
   bookshelves: string[],
+  title = "",
 ): {
   filterResult: FilterResult;
   rejectReason: string | null;
   reviewReasons: string[];
 } {
+  const titleHaystack = title.toLowerCase();
+  const titleReject = findFirstMatch(titleHaystack, TITLE_HARD_REJECT_TERMS);
+  if (titleReject) {
+    return {
+      filterResult: "rejected",
+      rejectReason: `title: ${titleReject}`,
+      reviewReasons: [],
+    };
+  }
+
   const haystack = combinedHaystack(subjects, bookshelves);
 
   const rejectReason = findFirstMatch(haystack, HARD_REJECT_TERMS);

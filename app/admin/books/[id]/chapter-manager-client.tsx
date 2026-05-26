@@ -5,6 +5,9 @@ import type { BookStatus } from "@db";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { ChapterBulkDeletePanel } from "./chapter-bulk-delete-panel";
+
+type ChapterManagerTab = "editor" | "bulk-delete";
 
 export type ChapterListItem = {
   id: string;
@@ -40,6 +43,7 @@ export function ChapterManagerClient({
   const [actionErr, setActionErr] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [staleMsg, setStaleMsg] = useState<string | null>(null);
+  const [managerTab, setManagerTab] = useState<ChapterManagerTab>("editor");
   const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
   const [chapterMenuMounted, setChapterMenuMounted] = useState(false);
   const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
@@ -138,6 +142,13 @@ export function ChapterManagerClient({
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(j.error || res.statusText);
     }
+  }
+
+  function handleChaptersUpdatedFromBulk(newChapters: ChapterListItem[]) {
+    setChapters(newChapters);
+    setSelectedId("");
+    setStaleMsg(skipDraftOnStructureChange ? null : STALE_MSG);
+    router.refresh();
   }
 
   async function afterStructureChange() {
@@ -405,11 +416,47 @@ export function ChapterManagerClient({
       </ul>
     ) : null;
 
+  const managerTabClass = (tab: ChapterManagerTab) =>
+    `rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+      managerTab === tab
+        ? "bg-accent-muted text-text-primary ring-1 ring-accent/40"
+        : "text-text-secondary hover:bg-bg-raised hover:text-text-primary"
+    }`;
+
   return (
     <section className="chapter-manager-root rounded-xl border border-border bg-bg-surface/85 p-6 shadow-sm shadow-bg-overlay/5">
-      <h2 className="mb-4 font-serif text-lg font-semibold text-accent-text">Chapter Manager</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-serif text-lg font-semibold text-accent-text">Chapter Manager</h2>
+        <div className="flex gap-1 rounded-lg border border-border bg-bg-base/50 p-1">
+          <button
+            type="button"
+            className={managerTabClass("editor")}
+            onClick={() => setManagerTab("editor")}
+          >
+            Editor
+          </button>
+          <button
+            type="button"
+            className={managerTabClass("bulk-delete")}
+            onClick={() => setManagerTab("bulk-delete")}
+          >
+            Bulk delete
+          </button>
+        </div>
+      </div>
 
-      {status === "processing" ? (
+      {managerTab === "bulk-delete" ? (
+        <ChapterBulkDeletePanel
+          bookId={bookId}
+          status={status}
+          chapters={chapters}
+          loading={loading}
+          loadErr={loadErr}
+          disabled={disabled}
+          skipDraftOnStructureChange={skipDraftOnStructureChange}
+          onChaptersUpdated={handleChaptersUpdatedFromBulk}
+        />
+      ) : status === "processing" ? (
         <p className="text-sm text-text-muted">
           Chapters are not editable while ingestion is running.
         </p>

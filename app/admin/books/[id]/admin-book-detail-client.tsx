@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import "../../admin-mobile.css";
+import { CoverAiModal } from "@/components/cover-ai/cover-ai-modal";
 
 export type AdminBookDetailModel = {
   id: string;
@@ -175,10 +176,39 @@ export function AdminBookDetailClient({
 }) {
   const router = useRouter();
   const [book, setBook] = useState(initial);
+  const [coverAiOpen, setCoverAiOpen] = useState(false);
+  const [coverAiPendingRequest, setCoverAiPendingRequest] = useState(false);
+  const [coverAiRemainingAttempts, setCoverAiRemainingAttempts] = useState<number | null>(null);
 
   useEffect(() => {
     setBook(initial);
   }, [initial]);
+
+  useEffect(() => {
+    // Fetch lightweight quota/pending state to show publishers’ “request more generations” signal.
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetch(`/api/books/${book.id}/cover-ai/config`);
+        const data = (await res.json().catch(() => ({}))) as {
+          hasPendingQuotaRequest?: boolean;
+          remainingAttempts?: number | null;
+        };
+        if (!res.ok) return;
+        if (cancelled) return;
+        setCoverAiPendingRequest(Boolean(data.hasPendingQuotaRequest));
+        setCoverAiRemainingAttempts(
+          typeof data.remainingAttempts === "number" ? data.remainingAttempts : null,
+        );
+      } catch {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [book.id]);
 
   const [metadataForm, setMetadataForm] = useState<MetadataFormState>(() =>
     metadataFormFromBook(initial),
@@ -908,6 +938,20 @@ export function AdminBookDetailClient({
                       className="mt-1 block w-full max-w-[14rem] text-xs text-text-secondary file:mr-2 file:rounded-md file:border-0 file:bg-bg-raised file:px-2 file:py-1.5 file:text-xs file:font-medium file:text-text-primary"
                     />
                   </label>
+                  <button
+                    type="button"
+                    disabled={metadataDisabled}
+                    onClick={() => setCoverAiOpen(true)}
+                    className="mt-2 w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
+                  >
+                    Generate AI cover
+                  </button>
+                  {coverAiPendingRequest ? (
+                    <p className="mt-2 text-xs text-text-secondary">
+                      A publisher has requested additional cover generations for this book.
+                      {typeof coverAiRemainingAttempts === "number" ? ` Remaining: ${coverAiRemainingAttempts}.` : null}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="admin-book-metadata-grid grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1332,6 +1376,17 @@ export function AdminBookDetailClient({
           </div>
         </div>
       ) : null}
+      <CoverAiModal
+        bookId={book.id}
+        open={coverAiOpen}
+        onClose={() => setCoverAiOpen(false)}
+        quotaExempt={book.status === "pending_review" || book.status === "processing"}
+        onCommitted={(coverImageUrl) => {
+          setBook((prev) => ({ ...prev, coverImageUrl }));
+          setCoverFile(null);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

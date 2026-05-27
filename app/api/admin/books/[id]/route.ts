@@ -65,7 +65,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     ownerId?: string | null;
     deletedAt?: null;
     status?: BookStatus;
+    coverGenAttemptsGranted?: number;
   } = {};
+
+  let grantQuotaTouched = false;
 
   if ("title" in b) {
     if (typeof b.title !== "string") {
@@ -167,11 +170,47 @@ export async function PATCH(request: Request, context: RouteContext) {
     data.status = BookStatus.unlisted;
   }
 
+  if ("coverGenAttemptsGranted" in b || "coverGenAttemptsGrantedDelta" in b) {
+    if (user.role !== UserRole.admin) {
+      return NextResponse.json(
+        { error: "Only admins can change cover generation allowance" },
+        { status: 403 },
+      );
+    }
+    if ("coverGenAttemptsGrantedDelta" in b) {
+      const d = b.coverGenAttemptsGrantedDelta;
+      if (typeof d !== "number" || !Number.isInteger(d)) {
+        return NextResponse.json(
+          { error: "coverGenAttemptsGrantedDelta must be an integer" },
+          { status: 400 },
+        );
+      }
+      const current = await prisma.book.findUnique({
+        where: { id },
+        select: { coverGenAttemptsGranted: true },
+      });
+      const base = current?.coverGenAttemptsGranted ?? 0;
+      const next = Math.max(0, base + d);
+      data.coverGenAttemptsGranted = next;
+      grantQuotaTouched = true;
+    } else if ("coverGenAttemptsGranted" in b) {
+      const v = b.coverGenAttemptsGranted;
+      if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
+        return NextResponse.json(
+          { error: "coverGenAttemptsGranted must be a non-negative integer" },
+          { status: 400 },
+        );
+      }
+      data.coverGenAttemptsGranted = v;
+      grantQuotaTouched = true;
+    }
+  }
+
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, internalNotes, ownerId, restoreDeleted",
+          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, internalNotes, ownerId, restoreDeleted, coverGenAttemptsGranted, coverGenAttemptsGrantedDelta",
       },
       { status: 400 },
     );
@@ -182,6 +221,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       where: { id },
       data,
     });
+    if (grantQuotaTouched) {
+      await prisma.coverAiQuotaRequest.updateMany({
+        where: { bookId: id, handledAt: null },
+        data: { handledAt: new Date() },
+      });
+    }
     return NextResponse.json({ book });
   } catch (err) {
     const code =

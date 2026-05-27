@@ -142,6 +142,8 @@ export async function resolveGutenbergBookEnrichment(options: {
   existingCoverUrl?: string | null;
   /** When true, try Open Library before Gutendex (e.g. `gutenberg-enrich --refresh-covers`). */
   preferOpenLibraryCover?: boolean;
+  /** When true, do not import any cover (EPUB, Gutendex, or Open Library); admin generates during review. */
+  skipCover?: boolean;
   log?: (message: string) => void;
 }): Promise<GutenbergBookEnrichment> {
   const log = options.log ?? (() => {});
@@ -167,6 +169,16 @@ export async function resolveGutenbergBookEnrichment(options: {
       : options.existingPublishedYear ?? ol.firstPublishYear;
 
   let coverImageUrl = options.existingCoverUrl?.trim() || null;
+
+  if (options.skipCover === true) {
+    coverImageUrl = null;
+    return {
+      openLibraryKey,
+      description: description ?? null,
+      publishedYear: publishedYear ?? null,
+      coverImageUrl: null,
+    };
+  }
 
   async function tryEpubCover(): Promise<void> {
     const buf = options.epubCoverBuffer;

@@ -9,6 +9,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import "@/app/admin/admin-mobile.css";
+import { CoverAiModal } from "@/components/cover-ai/cover-ai-modal";
 
 export type PartnerBookDetailModel = {
   id: string;
@@ -190,9 +191,11 @@ function actionRowGradientClass(status: BookStatus): string {
 export function PartnerBookDetailClient({
   book: initial,
   publicImages: initialPublicImages,
+  openCoverAiOnLoad = false,
 }: {
   book: PartnerBookDetailModel;
   publicImages: PartnerPublicImageRow[];
+  openCoverAiOnLoad?: boolean;
 }) {
   const router = useRouter();
   const ingestFileRef = useRef<HTMLInputElement>(null);
@@ -227,10 +230,15 @@ export function PartnerBookDetailClient({
 
   const [publicImages, setPublicImages] = useState(initialPublicImages);
   const [featureRequestBusyId, setFeatureRequestBusyId] = useState<string | null>(null);
+  const [coverAiOpen, setCoverAiOpen] = useState(openCoverAiOnLoad);
 
   useEffect(() => {
     setPublicImages(initialPublicImages);
   }, [initialPublicImages]);
+
+  useEffect(() => {
+    if (openCoverAiOnLoad) setCoverAiOpen(true);
+  }, [openCoverAiOnLoad]);
 
   async function submitFeatureRequest(imageId: string) {
     setFeatureRequestBusyId(imageId);
@@ -777,7 +785,6 @@ export function PartnerBookDetailClient({
             >
               <div className="grid grid-cols-1 gap-6 md:grid-cols-[9rem_1fr]">
                 <div className="space-y-2">
-                  {/* TODO: Add partner cover upload endpoint and action. */}
                   <div className="relative h-52 w-36 overflow-hidden rounded-lg border border-border bg-bg-surface">
                     {book.coverImageUrl ? (
                       <Image src={book.coverImageUrl} alt="" fill className="object-cover" sizes="144px" />
@@ -786,6 +793,16 @@ export function PartnerBookDetailClient({
                         No cover image
                       </div>
                     )}
+                  </div>
+                  <div className="w-36 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setCoverAiOpen(true)}
+                      disabled={saving || ingestBusy || statusBusy || deleteBusy}
+                      className="w-full rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:opacity-50"
+                    >
+                      Generate AI cover
+                    </button>
                   </div>
                   <div className="w-36 space-y-2">
                     {book.status === "rejected" ? (
@@ -938,6 +955,17 @@ export function PartnerBookDetailClient({
           onRequestFeature={(id) => void submitFeatureRequest(id)}
         />
       ) : null}
+
+      <CoverAiModal
+        bookId={book.id}
+        open={coverAiOpen}
+        onClose={() => setCoverAiOpen(false)}
+        quotaExempt={false}
+        onCommitted={(coverImageUrl) => {
+          setBook((prev) => ({ ...prev, coverImageUrl }));
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

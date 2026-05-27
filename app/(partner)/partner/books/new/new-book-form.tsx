@@ -17,6 +17,7 @@ export function NewPartnerBookForm() {
   const [ingestFile, setIngestFile] = useState<File | null>(null);
   const [applyEpubMetadata, setApplyEpubMetadata] = useState(true);
   const [extractingMetadata, setExtractingMetadata] = useState(false);
+  const [openCoverAiAfterCreate, setOpenCoverAiAfterCreate] = useState(false);
   const [metadataErr, setMetadataErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -151,7 +152,11 @@ export function NewPartnerBookForm() {
         }
       }
 
-      router.push(`/partner/books/${data.book.id}`);
+      router.push(
+        openCoverAiAfterCreate
+          ? `/partner/books/${data.book.id}?openCoverAi=1`
+          : `/partner/books/${data.book.id}`,
+      );
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Create failed");
@@ -303,6 +308,17 @@ export function NewPartnerBookForm() {
         </div>
       ) : null}
       {error ? <p className="text-sm text-error">{error}</p> : null}
+      <label className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={openCoverAiAfterCreate}
+          onChange={(e) => setOpenCoverAiAfterCreate(e.target.checked)}
+          className="mt-1 h-4 w-4 rounded border-border bg-bg-surface text-accent focus:ring-accent/25"
+        />
+        <span className="text-sm text-text-secondary">
+          Open AI cover generator after creating this book
+        </span>
+      </label>
       <button
         type="submit"
         disabled={submitting || extractingMetadata || duplicateWarning !== null}

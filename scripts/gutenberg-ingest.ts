@@ -306,9 +306,7 @@ async function processEntry(
 
     let enrichment: Awaited<ReturnType<typeof resolveGutenbergBookEnrichment>> | null = null;
     if (dryRun) {
-      console.log(
-        `  → Would resolve Open Library metadata + cover (EPUB, then Gutendex, then Open Library)`,
-      );
+      console.log(`  → Would resolve Open Library metadata (cover left blank — admin AI cover)`);
     } else {
       enrichment = await resolveGutenbergBookEnrichment({
         bookId,
@@ -317,13 +315,10 @@ async function processEntry(
         epubCoverBuffer,
         epubDescription,
         gutendexCoverUrl: entry.gutendexCoverUrl,
+        skipCover: true,
         log: (msg) => console.log(`  → ${msg}`),
       });
-      if (enrichment.coverImageUrl) {
-        console.log(`  → Cover on Cloudinary`);
-      } else {
-        console.log(`  → No cover available`);
-      }
+      console.log(`  → Cover left blank for admin AI approval`);
       if (enrichment.openLibraryKey) {
         console.log(
           `  → Open Library: key=${enrichment.openLibraryKey}, year=${enrichment.publishedYear ?? "n/a"}, description=${enrichment.description ? "yes" : "no"}`,

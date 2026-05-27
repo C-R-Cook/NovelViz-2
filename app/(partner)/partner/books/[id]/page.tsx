@@ -4,9 +4,12 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { forbidden, notFound, redirect } from "next/navigation";
 
-type PageProps = { params: Promise<{ id: string }> };
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ openCoverAi?: string }>;
+};
 
-export default async function PartnerBookDetailPage({ params }: PageProps) {
+export default async function PartnerBookDetailPage({ params, searchParams }: PageProps) {
   const user = await getCurrentUser();
   if (!user) {
     redirect("/sign-in");
@@ -18,6 +21,8 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
   }
 
   const { id } = await params;
+  const sp = await searchParams;
+  const openCoverAiOnLoad = sp.openCoverAi === "1";
   const book = await prisma.book.findFirst({
     where: { id, deletedAt: null },
     include: { _count: { select: { chapters: true } } },
@@ -71,7 +76,11 @@ export default async function PartnerBookDetailPage({ params }: PageProps) {
       >
         ← Back to dashboard
       </Link>
-      <PartnerBookDetailClient book={model} publicImages={publicImages} />
+      <PartnerBookDetailClient
+        book={model}
+        publicImages={publicImages}
+        openCoverAiOnLoad={openCoverAiOnLoad}
+      />
     </div>
   );
 }

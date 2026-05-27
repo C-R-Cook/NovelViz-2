@@ -18,6 +18,13 @@ export const ADMIN_HELPERS_NAV_LINKS: readonly AdminHelperNavLink[] = [
     hint: "Replace PG generic covers with Open Library",
   },
   {
+    id: "helper-cover-ai-settings",
+    href: "/admin/cover-ai-settings",
+    label: "Cover AI settings",
+    icon: "✦",
+    hint: "Edit default prompts + allowed fal models",
+  },
+  {
     id: "helper-bulk-chapters",
     href: "/admin/chapters/bulk-delete",
     label: "Bulk chapter delete",

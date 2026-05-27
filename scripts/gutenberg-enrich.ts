@@ -108,6 +108,12 @@ async function enrichBook(
       return "enriched";
     }
 
+    const skipCover = book.gutenbergId != null;
+    if (skipCover && coversOnly) {
+      console.log(`  → Skipping cover refresh for Gutenberg catalogue book (use admin AI cover)`);
+      return "unchanged";
+    }
+
     const enrichment = await resolveGutenbergBookEnrichment({
       bookId: book.id,
       title: book.title,
@@ -117,6 +123,7 @@ async function enrichBook(
       existingPublishedYear: book.publishedYear,
       existingCoverUrl: book.coverImageUrl,
       preferOpenLibraryCover: coversOnly,
+      skipCover,
       log: (msg) => console.log(`  → ${msg}`),
     });
 
@@ -125,7 +132,10 @@ async function enrichBook(
       return "no-match";
     }
 
+    const nextCoverUrl = skipCover ? book.coverImageUrl : enrichment.coverImageUrl;
+
     const coverChanged =
+      !skipCover &&
       enrichment.coverImageUrl &&
       enrichment.coverImageUrl !== (book.coverImageUrl?.trim() || null);
     const metaChanged =
@@ -135,7 +145,9 @@ async function enrichBook(
         !book.description?.trim());
 
     if (coversOnly && !coverChanged) {
-      if (!enrichment.coverImageUrl) {
+      if (skipCover) {
+        console.log(`  → Cover unchanged`);
+      } else if (!enrichment.coverImageUrl) {
         console.log(`  → Open Library has no cover art — skipped`);
       } else {
         console.log(`  → Cover unchanged`);
@@ -149,7 +161,7 @@ async function enrichBook(
         openLibraryKey: enrichment.openLibraryKey,
         description: enrichment.description,
         publishedYear: enrichment.publishedYear,
-        coverImageUrl: enrichment.coverImageUrl,
+        coverImageUrl: nextCoverUrl,
       },
     });
 

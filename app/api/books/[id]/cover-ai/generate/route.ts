@@ -14,6 +14,7 @@ import {
 } from "@/lib/cover-ai-settings";
 import fal from "@/lib/fal";
 import cloudinary from "@/lib/cloudinary";
+import { fetchAndPrepareFalImageForCloudinary } from "@/lib/prepare-fal-image-for-cloudinary";
 import { prisma } from "@/lib/prisma";
 import { resolveDbUserFromSession } from "@/lib/resolve-db-user-from-session";
 import { NextResponse } from "next/server";
@@ -25,48 +26,14 @@ export const maxDuration = 300;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-function sniffImageMimeType(buf: Buffer): string {
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) {
-    return "image/jpeg";
-  }
-  if (
-    buf.length >= 8 &&
-    buf[0] === 0x89 &&
-    buf[1] === 0x50 &&
-    buf[2] === 0x4e &&
-    buf[3] === 0x47
-  ) {
-    return "image/png";
-  }
-  return "image/jpeg";
-}
-
 async function uploadCoverDraftFromUrl(options: {
   bookId: string;
   draftLeaf: string;
   imageUrl: string;
 }): Promise<{ publicId: string; secureUrl: string }> {
-  // Attempt 1: Cloudinary fetches remote URL (fast path).
-  try {
-    const result = await cloudinary.uploader.upload(options.imageUrl, {
-      folder: `novelviz/cover-drafts/${options.bookId}`,
-      public_id: options.draftLeaf,
-      resource_type: "image",
-      overwrite: false,
-    });
-    return { publicId: result.public_id, secureUrl: result.secure_url };
-  } catch (e) {
-    console.error("[cover-ai generate] Cloudinary remote fetch failed; falling back to buffer upload", e);
-  }
-
-  // Attempt 2: Download ourselves (handles transient remote issues), then upload data URI.
-  const res = await fetch(options.imageUrl, { signal: AbortSignal.timeout(60_000) });
-  if (!res.ok) {
-    throw new Error(`Failed to download generated image (HTTP ${res.status})`);
-  }
-  const buf = Buffer.from(await res.arrayBuffer());
-  const mime = sniffImageMimeType(buf);
-  const dataUri = `data:${mime};base64,${buf.toString("base64")}`;
+  // Seedream and other models can return multi‑MB PNGs; Cloudinary caps uploads at 10MB.
+  const jpegBuffer = await fetchAndPrepareFalImageForCloudinary(options.imageUrl);
+  const dataUri = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
   const result = await cloudinary.uploader.upload(dataUri, {
     folder: `novelviz/cover-drafts/${options.bookId}`,
     public_id: options.draftLeaf,
@@ -93,7 +60,6 @@ export async function POST(request: Request, context: RouteContext) {
     publisherPrompt?: unknown;
     overlayTitle?: unknown;
     overlayAuthor?: unknown;
-    quotaExempt?: unknown;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -107,8 +73,6 @@ export async function POST(request: Request, context: RouteContext) {
   const overlayTitle = typeof body.overlayTitle === "string" ? body.overlayTitle : "";
   const overlayAuthor =
     typeof body.overlayAuthor === "string" ? body.overlayAuthor : "";
-  const quotaExemptRequested = body.quotaExempt === true;
-
   if (!modelKey) {
     return NextResponse.json({ error: "modelKey is required" }, { status: 400 });
   }
@@ -131,11 +95,7 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const quotaExempt = resolveCoverAiQuotaExempt({
-    role: dbUser.role,
-    quotaExemptRequested,
-    book,
-  });
+  const quotaExempt = resolveCoverAiQuotaExempt({ role: dbUser.role });
 
   const settings = await getCoverAiAdminSettings();
   const modelEntry = findCoverAiModelEntry(settings.modelsJson, modelKey);
@@ -171,10 +131,6 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    await prisma.book.update({
-      where: { id: bookId },
-      data: { coverGenAttemptsConsumed: { increment: 1 } },
-    });
   }
 
   let falUrl: string;
@@ -219,21 +175,25 @@ export async function POST(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "Image storage failed" }, { status: 502 });
   }
 
-  const refreshed = await prisma.book.findUnique({
-    where: { id: bookId },
-    select: {
-      coverGenAttemptsConsumed: true,
-      coverGenAttemptsGranted: true,
-    },
-  });
-
-  const grantedNow = refreshed?.coverGenAttemptsGranted ?? 0;
-  const consumedNow = refreshed?.coverGenAttemptsConsumed ?? 0;
+  let remainingAttempts: number | null = null;
+  if (!quotaExempt) {
+    const refreshed = await prisma.book.update({
+      where: { id: bookId },
+      data: { coverGenAttemptsConsumed: { increment: 1 } },
+      select: {
+        coverGenAttemptsConsumed: true,
+        coverGenAttemptsGranted: true,
+      },
+    });
+    const grantedNow = refreshed.coverGenAttemptsGranted ?? 0;
+    const consumedNow = refreshed.coverGenAttemptsConsumed ?? 0;
+    remainingAttempts = Math.max(0, grantedNow - consumedNow);
+  }
 
   return NextResponse.json({
     imageUrl: secureUrl,
     publicId,
-    remainingAttempts: quotaExempt ? null : Math.max(0, grantedNow - consumedNow),
+    remainingAttempts,
     quotaExempt,
   });
 }

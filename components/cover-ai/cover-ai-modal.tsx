@@ -5,7 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const CAROUSEL_MAX = 5;
 
-type DraftSlide = { imageUrl: string; publicId: string };
+type DraftSlide =
+  | { kind: "loading"; slotId: string }
+  | { kind: "ready"; slotId: string; imageUrl: string; publicId: string };
+
+function readySlideCount(slides: DraftSlide[]): number {
+  return slides.filter((s) => s.kind === "ready").length;
+}
 
 type ConfigResponse = {
   models: Array<{ key: string; label: string }>;
@@ -23,8 +29,10 @@ type Props = {
   bookId: string;
   open: boolean;
   onClose: () => void;
-  /** Admin approval path: skips quota increments */
+  /** When true, hide partner quota UI (admins are always exempt server-side). */
   quotaExempt: boolean;
+  /** When set (e.g. after create-book), empty overlay fields skip title/author prompt blocks. */
+  overlayIncludes?: { title: boolean; author: boolean };
   onCommitted?: (coverImageUrl: string) => void;
 };
 
@@ -37,6 +45,7 @@ export function CoverAiModal({
   open,
   onClose,
   quotaExempt: quotaExemptProp,
+  overlayIncludes,
   onCommitted,
 }: Props) {
   const [configReady, setConfigReady] = useState(false);
@@ -65,8 +74,7 @@ export function CoverAiModal({
   const touchStartXRef = useRef<number | null>(null);
 
   const loadConfig = useCallback(async () => {
-    const q = quotaExemptProp ? "?quotaExempt=1" : "";
-    const res = await fetch(`/api/books/${bookId}/cover-ai/config${q}`);
+    const res = await fetch(`/api/books/${bookId}/cover-ai/config`);
     const data = (await res.json().catch(() => ({}))) as ConfigResponse & { error?: string };
     if (!res.ok) {
       throw new Error(data.error || res.statusText);
@@ -82,10 +90,16 @@ export function CoverAiModal({
       typeof data.remainingAttempts === "number" ? data.remainingAttempts : null,
     );
     setHasPendingQuotaRequest(Boolean(data.hasPendingQuotaRequest));
-    setOverlayTitle(data.suggestionTitle ?? "");
-    setOverlayAuthor(data.suggestionAuthor ?? "");
+    const suggestionTitle = data.suggestionTitle ?? "";
+    const suggestionAuthor = data.suggestionAuthor ?? "";
+    setOverlayTitle(
+      overlayIncludes && !overlayIncludes.title ? "" : suggestionTitle,
+    );
+    setOverlayAuthor(
+      overlayIncludes && !overlayIncludes.author ? "" : suggestionAuthor,
+    );
     setConfigReady(true);
-  }, [bookId, quotaExemptProp]);
+  }, [bookId, quotaExemptProp, overlayIncludes]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,12 +147,13 @@ export function CoverAiModal({
       slides.length > 0 || generating || hasChargedGenerationThisSession
         ? confirmLeave(
             "Close without choosing a cover? Generated preview images are not saved. " +
-              "Generations you already ran still count toward this book’s allowance. " +
-              "If you close while an image is generating, that run still counts toward your limit.",
+              "Successful generations still count toward this book’s allowance.",
           )
         : true;
     if (!leave) return;
-    void discardAllDrafts(slides.map((s) => s.publicId));
+    void discardAllDrafts(
+      slides.filter((s) => s.kind === "ready").map((s) => s.publicId),
+    );
     setSlides([]);
     setCarouselIndex(0);
     setGenerating(false);
@@ -162,7 +177,7 @@ export function CoverAiModal({
 
   async function runGenerate() {
     if (generating || !modelKey) return;
-    if (slides.length >= CAROUSEL_MAX) {
+    if (readySlideCount(slides) >= CAROUSEL_MAX) {
       setError(
         `You can keep at most ${CAROUSEL_MAX} previews. Choose one as the cover or discard some by closing.`,
       );
@@ -172,8 +187,14 @@ export function CoverAiModal({
       setError("No cover generations remaining for this book.");
       return;
     }
+    const slotId = crypto.randomUUID();
     setGenerating(true);
     setError(null);
+    setSlides((prev) => {
+      const merged: DraftSlide[] = [...prev, { kind: "loading", slotId }];
+      setCarouselIndex(merged.length - 1);
+      return merged;
+    });
     try {
       const res = await fetch(`/api/books/${bookId}/cover-ai/generate`, {
         method: "POST",
@@ -197,26 +218,29 @@ export function CoverAiModal({
         if (data.code === "COVER_AI_QUOTA_EXHAUSTED") {
           setRemainingAttempts(0);
         }
-        // If the server made it past quota validation but failed later, the attempt may already be counted.
-        if (!quotaExempt && res.status >= 500) {
-          setHasChargedGenerationThisSession(true);
-        }
         throw new Error(data.error || res.statusText);
       }
       if (!quotaExempt) {
         setHasChargedGenerationThisSession(true);
       }
       if (!data.imageUrl || !data.publicId) throw new Error("Invalid response");
-      const next: DraftSlide = { imageUrl: data.imageUrl, publicId: data.publicId };
-      setSlides((prev) => {
-        const merged = [...prev, next];
-        setCarouselIndex(merged.length - 1);
-        return merged;
-      });
+      setSlides((prev) =>
+        prev.map((s) =>
+          s.kind === "loading" && s.slotId === slotId
+            ? {
+                kind: "ready",
+                slotId,
+                imageUrl: data.imageUrl!,
+                publicId: data.publicId!,
+              }
+            : s,
+        ),
+      );
       if (!quotaExempt && typeof data.remainingAttempts === "number") {
         setRemainingAttempts(data.remainingAttempts);
       }
     } catch (e) {
+      setSlides((prev) => prev.filter((s) => !(s.kind === "loading" && s.slotId === slotId)));
       setError(e instanceof Error ? e.message : "Generation failed");
     } finally {
       setGenerating(false);
@@ -225,11 +249,14 @@ export function CoverAiModal({
 
   async function commitChosen() {
     const slide = slides[carouselIndex];
-    if (!slide || committing) return;
+    if (!slide || slide.kind !== "ready" || committing) return;
     setCommitting(true);
     setError(null);
     try {
-      const discard = slides.filter((s) => s.publicId !== slide.publicId).map((s) => s.publicId);
+      const discard = slides
+        .filter((s): s is Extract<DraftSlide, { kind: "ready" }> => s.kind === "ready")
+        .filter((s) => s.publicId !== slide.publicId)
+        .map((s) => s.publicId);
       const res = await fetch(`/api/books/${bookId}/cover-ai/commit`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -290,9 +317,12 @@ export function CoverAiModal({
   const atQuota = !quotaExempt && remainingAttempts !== null && remainingAttempts <= 0;
   const canGenerateMore =
     quotaExempt ||
-    (remainingAttempts !== null && remainingAttempts > 0 && slides.length < CAROUSEL_MAX);
+    (remainingAttempts !== null &&
+      remainingAttempts > 0 &&
+      readySlideCount(slides) < CAROUSEL_MAX);
 
   const currentSlide = slides[carouselIndex] ?? null;
+  const currentReadySlide = currentSlide?.kind === "ready" ? currentSlide : null;
 
   if (!open) return null;
 
@@ -359,22 +389,6 @@ export function CoverAiModal({
               ) : null}
 
               <label className={labelClass}>
-                Model
-                <select
-                  value={modelKey}
-                  onChange={(e) => setModelKey(e.target.value)}
-                  className={`${inputClass} bg-bg-surface`}
-                  disabled={generating || committing}
-                >
-                  {models.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className={labelClass}>
                 Your description <span className="font-normal lowercase text-text-muted">(required)</span>
                 <textarea
                   value={publisherPrompt}
@@ -409,6 +423,22 @@ export function CoverAiModal({
                 </label>
               </div>
 
+              <label className={labelClass}>
+                Model
+                <select
+                  value={modelKey}
+                  onChange={(e) => setModelKey(e.target.value)}
+                  className={`${inputClass} bg-bg-surface`}
+                  disabled={generating || committing}
+                >
+                  {models.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
               <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -416,15 +446,9 @@ export function CoverAiModal({
                   disabled={generating || committing || !canGenerateMore}
                   className="rounded-lg bg-accent-muted px-4 py-2 text-sm font-medium text-text-primary ring-1 ring-accent/40 transition hover:bg-accent-hover/90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {slides.length === 0
-                    ? generating
-                      ? "Generating…"
-                      : "Generate"
-                    : generating
-                      ? "Generating…"
-                      : "Regenerate (add another)"}
+                  {readySlideCount(slides) === 0 ? "Generate" : "Regenerate (add another)"}
                 </button>
-                {currentSlide ? (
+                {currentReadySlide ? (
                   <button
                     type="button"
                     onClick={() => void commitChosen()}
@@ -439,7 +463,7 @@ export function CoverAiModal({
               {slides.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-xs text-text-muted">
-                    Preview {carouselIndex + 1} / {slides.length} (max {CAROUSEL_MAX})
+                    Preview {carouselIndex + 1} / {slides.length} (max {CAROUSEL_MAX} saved)
                   </p>
                   <div
                     className="relative mx-auto aspect-[3/4] w-full max-w-xs overflow-hidden rounded-xl border border-border bg-bg-base"
@@ -461,7 +485,20 @@ export function CoverAiModal({
                       touchStartXRef.current = null;
                     }}
                   >
-                    {currentSlide ? (
+                    {currentSlide?.kind === "loading" ? (
+                      <div
+                        className="flex h-full flex-col items-center justify-center gap-3 px-4"
+                        role="status"
+                        aria-live="polite"
+                        aria-label="Generating cover image"
+                      >
+                        <div
+                          className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-accent"
+                          aria-hidden
+                        />
+                        <p className="text-center text-sm text-text-muted">Generating cover…</p>
+                      </div>
+                    ) : currentSlide?.kind === "ready" ? (
                       <Image
                         src={currentSlide.imageUrl}
                         alt=""

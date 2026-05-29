@@ -11,20 +11,29 @@ export function EpubMetadataToggle({
   onChange,
   disabled,
   id = "epub-metadata-toggle",
+  showLabel = true,
+  className,
 }: {
   unlocked: boolean;
   onChange: (nextUnlocked: boolean) => void;
   disabled?: boolean;
   id?: string;
+  /** When false, hides the “EPUB metadata” section heading (e.g. inline on create-book). */
+  showLabel?: boolean;
+  className?: string;
 }) {
   const lockedTitle =
-    "Metadata fields will not be overwritten when you upload or change the EPUB file";
+    "Title, author, description, genre, and year will not be replaced when you upload an EPUB";
   const unlockedTitle =
-    "Title, author, description, genre, and published year will be filled from the EPUB file when uploaded";
+    "Title, author, description, genre, and year will be filled from the EPUB when you upload";
 
   return (
-    <div className="flex flex-col gap-2">
-      <span className="text-xs font-medium uppercase tracking-wide text-text-muted">EPUB metadata</span>
+    <div className={`flex min-w-0 flex-col gap-2 ${className ?? ""}`}>
+      {showLabel ? (
+        <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
+          EPUB metadata
+        </span>
+      ) : null}
       <button
         id={id}
         type="button"
@@ -32,26 +41,21 @@ export function EpubMetadataToggle({
         aria-pressed={unlocked}
         title={unlocked ? unlockedTitle : lockedTitle}
         onClick={() => onChange(!unlocked)}
-        className={`flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+        className={`flex ${showLabel ? "w-full" : "min-h-[2.25rem] flex-1"} items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
           unlocked
             ? "border-accent/40 bg-accent-muted/35 text-text-primary"
             : "border-border bg-bg-raised text-text-primary"
         }`}
       >
-        <span className="mt-0.5 shrink-0 text-text-muted" aria-hidden>
+        <span className="shrink-0 text-text-muted" aria-hidden>
           {unlocked ? (
             <Unlock className="h-4 w-4" strokeWidth={2} aria-hidden />
           ) : (
             <Lock className="h-4 w-4" strokeWidth={2} aria-hidden />
           )}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="font-medium text-text-primary">
-            {unlocked ? "Unlocked — Pull metadata from EPUB" : "Locked — Keep existing metadata"}
-          </span>
-          <span className="mt-1 block text-xs leading-snug text-text-secondary">
-            {unlocked ? unlockedTitle : lockedTitle}
-          </span>
+        <span className="min-w-0 flex-1 font-medium text-text-primary">
+          {unlocked ? "Get book details from EPUB" : "Keep book details as entered"}
         </span>
       </button>
     </div>

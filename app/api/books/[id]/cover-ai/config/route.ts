@@ -23,8 +23,6 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const { id: bookId } = await context.params;
-  const { searchParams } = new URL(request.url);
-  const quotaExemptQuery = searchParams.get("quotaExempt") === "1";
 
   const book = await prisma.book.findFirst({
     where: { id: bookId, deletedAt: null },
@@ -47,11 +45,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const settings = await getCoverAiAdminSettings();
-  const quotaExempt = resolveCoverAiQuotaExempt({
-    role: dbUser.role,
-    quotaExemptRequested: quotaExemptQuery,
-    book,
-  });
+  const quotaExempt = resolveCoverAiQuotaExempt({ role: dbUser.role });
 
   const pending = await prisma.coverAiQuotaRequest.findFirst({
     where: { bookId, handledAt: null },

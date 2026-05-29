@@ -6,7 +6,11 @@ import { forbidden, notFound, redirect } from "next/navigation";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ openCoverAi?: string }>;
+  searchParams: Promise<{
+    openCoverAi?: string;
+    coverIncludeTitle?: string;
+    coverIncludeAuthor?: string;
+  }>;
 };
 
 export default async function PartnerBookDetailPage({ params, searchParams }: PageProps) {
@@ -23,6 +27,8 @@ export default async function PartnerBookDetailPage({ params, searchParams }: Pa
   const { id } = await params;
   const sp = await searchParams;
   const openCoverAiOnLoad = sp.openCoverAi === "1";
+  const coverIncludeTitleOnLoad = sp.coverIncludeTitle === "1";
+  const coverIncludeAuthorOnLoad = sp.coverIncludeAuthor === "1";
   const book = await prisma.book.findFirst({
     where: { id, deletedAt: null },
     include: { _count: { select: { chapters: true } } },
@@ -80,6 +86,8 @@ export default async function PartnerBookDetailPage({ params, searchParams }: Pa
         book={model}
         publicImages={publicImages}
         openCoverAiOnLoad={openCoverAiOnLoad}
+        coverIncludeTitleOnLoad={coverIncludeTitleOnLoad}
+        coverIncludeAuthorOnLoad={coverIncludeAuthorOnLoad}
       />
     </div>
   );

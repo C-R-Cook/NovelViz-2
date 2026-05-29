@@ -17,7 +17,9 @@ export function NewPartnerBookForm() {
   const [ingestFile, setIngestFile] = useState<File | null>(null);
   const [applyEpubMetadata, setApplyEpubMetadata] = useState(true);
   const [extractingMetadata, setExtractingMetadata] = useState(false);
-  const [openCoverAiAfterCreate, setOpenCoverAiAfterCreate] = useState(false);
+  const [generateCoverAfterCreate, setGenerateCoverAfterCreate] = useState(false);
+  const [includeCoverTitleText, setIncludeCoverTitleText] = useState(false);
+  const [includeCoverAuthorText, setIncludeCoverAuthorText] = useState(false);
   const [metadataErr, setMetadataErr] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,13 +82,32 @@ export function NewPartnerBookForm() {
     void prefillFromEpub(ingestFile);
   }, [applyEpubMetadata, ingestFile]);
 
+  useEffect(() => {
+    if (!generateCoverAfterCreate) {
+      setIncludeCoverTitleText(false);
+      setIncludeCoverAuthorText(false);
+    }
+  }, [generateCoverAfterCreate]);
+
   async function submitBook(confirmDuplicate: boolean) {
     setError(null);
     setSubmitting(true);
     try {
       const missingRequired: string[] = [];
-      if (title.trim() === "") missingRequired.push("title");
-      if (author.trim() === "") missingRequired.push("author");
+      if (title.trim() === "") {
+        missingRequired.push(
+          generateCoverAfterCreate && includeCoverTitleText
+            ? "title (required when including title on the cover)"
+            : "title",
+        );
+      }
+      if (author.trim() === "") {
+        missingRequired.push(
+          generateCoverAfterCreate && includeCoverAuthorText
+            ? "author (required when including author on the cover)"
+            : "author",
+        );
+      }
       if (missingRequired.length > 0) {
         throw new Error(`Please provide: ${missingRequired.join(", ")}`);
       }
@@ -152,11 +173,14 @@ export function NewPartnerBookForm() {
         }
       }
 
-      router.push(
-        openCoverAiAfterCreate
-          ? `/partner/books/${data.book.id}?openCoverAi=1`
-          : `/partner/books/${data.book.id}`,
-      );
+      if (generateCoverAfterCreate) {
+        const q = new URLSearchParams({ openCoverAi: "1" });
+        if (includeCoverTitleText) q.set("coverIncludeTitle", "1");
+        if (includeCoverAuthorText) q.set("coverIncludeAuthor", "1");
+        router.push(`/partner/books/${data.book.id}?${q.toString()}`);
+      } else {
+        router.push(`/partner/books/${data.book.id}`);
+      }
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Create failed");
@@ -234,9 +258,6 @@ export function NewPartnerBookForm() {
         />
       </label>
       <div className="space-y-2 rounded-lg border border-border bg-bg-base/80 p-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-          Optional: Upload EPUB/TXT now
-        </p>
         <input
           ref={fileRef}
           type="file"
@@ -246,25 +267,26 @@ export function NewPartnerBookForm() {
             setIngestFile(e.target.files?.[0] ?? null);
           }}
         />
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           <button
             type="button"
             onClick={() => fileRef.current?.click()}
-            className="rounded-lg bg-bg-raised px-3 py-1.5 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised"
+            className="shrink-0 rounded-lg bg-bg-raised px-3 py-2 text-xs font-medium text-text-primary ring-1 ring-border transition hover:bg-bg-raised"
           >
-            {ingestFile ? "Change file" : "Choose file"}
+            Select EPUB
           </button>
-          <span className="text-xs text-text-secondary">
-            {ingestFile ? ingestFile.name : "No file selected"}
-          </span>
+          <EpubMetadataToggle
+            unlocked={applyEpubMetadata}
+            onChange={setApplyEpubMetadata}
+            disabled={extractingMetadata}
+            id="new-book-epub-metadata-toggle"
+            showLabel={false}
+            className="min-w-[12rem] flex-1"
+          />
         </div>
-        <EpubMetadataToggle
-          unlocked={applyEpubMetadata}
-          onChange={setApplyEpubMetadata}
-          disabled={extractingMetadata}
-          id="new-book-epub-metadata-toggle"
-        />
-        <p className="text-[11px] text-text-muted">Metadata from EPUB is ignored for plain .txt uploads.</p>
+        {ingestFile ? (
+          <p className="text-xs text-text-secondary">{ingestFile.name}</p>
+        ) : null}
         {extractingMetadata ? (
           <p className="text-xs text-text-secondary">
             Reading EPUB metadata...
@@ -308,17 +330,41 @@ export function NewPartnerBookForm() {
         </div>
       ) : null}
       {error ? <p className="text-sm text-error">{error}</p> : null}
-      <label className="flex items-start gap-3">
-        <input
-          type="checkbox"
-          checked={openCoverAiAfterCreate}
-          onChange={(e) => setOpenCoverAiAfterCreate(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-border bg-bg-surface text-accent focus:ring-accent/25"
-        />
-        <span className="text-sm text-text-secondary">
-          Open AI cover generator after creating this book
-        </span>
-      </label>
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+        <label className="flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            checked={generateCoverAfterCreate}
+            onChange={(e) => setGenerateCoverAfterCreate(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-bg-surface text-accent focus:ring-accent/25"
+          />
+          <span className="text-sm text-text-secondary">Generate AI Cover Image</span>
+        </label>
+        <label
+          className={`flex items-start gap-2 ${generateCoverAfterCreate ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+        >
+          <input
+            type="checkbox"
+            checked={includeCoverTitleText}
+            disabled={!generateCoverAfterCreate}
+            onChange={(e) => setIncludeCoverTitleText(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-bg-surface text-accent focus:ring-accent/25 disabled:cursor-not-allowed"
+          />
+          <span className="text-sm text-text-secondary">Include Title text</span>
+        </label>
+        <label
+          className={`flex items-start gap-2 ${generateCoverAfterCreate ? "cursor-pointer" : "cursor-not-allowed opacity-50"}`}
+        >
+          <input
+            type="checkbox"
+            checked={includeCoverAuthorText}
+            disabled={!generateCoverAfterCreate}
+            onChange={(e) => setIncludeCoverAuthorText(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-border bg-bg-surface text-accent focus:ring-accent/25 disabled:cursor-not-allowed"
+          />
+          <span className="text-sm text-text-secondary">Include Author text</span>
+        </label>
+      </div>
       <button
         type="submit"
         disabled={submitting || extractingMetadata || duplicateWarning !== null}

@@ -66,9 +66,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     deletedAt?: null;
     status?: BookStatus;
     coverGenAttemptsGranted?: number;
+    coverGenAttemptsConsumed?: number;
   } = {};
 
-  let grantQuotaTouched = false;
+  let coverQuotaAdminTouched = false;
 
   if ("title" in b) {
     if (typeof b.title !== "string") {
@@ -192,7 +193,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       const base = current?.coverGenAttemptsGranted ?? 0;
       const next = Math.max(0, base + d);
       data.coverGenAttemptsGranted = next;
-      grantQuotaTouched = true;
+      coverQuotaAdminTouched = true;
     } else if ("coverGenAttemptsGranted" in b) {
       const v = b.coverGenAttemptsGranted;
       if (typeof v !== "number" || !Number.isInteger(v) || v < 0) {
@@ -202,15 +203,29 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
       data.coverGenAttemptsGranted = v;
-      grantQuotaTouched = true;
+      coverQuotaAdminTouched = true;
     }
+  }
+
+  if ("resetCoverGenQuota" in b) {
+    if (user.role !== UserRole.admin) {
+      return NextResponse.json(
+        { error: "Only admins can reset cover generation allowance" },
+        { status: 403 },
+      );
+    }
+    if (b.resetCoverGenQuota !== true) {
+      return NextResponse.json({ error: "resetCoverGenQuota must be true" }, { status: 400 });
+    }
+    data.coverGenAttemptsConsumed = 0;
+    coverQuotaAdminTouched = true;
   }
 
   if (Object.keys(data).length === 0) {
     return NextResponse.json(
       {
         error:
-          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, internalNotes, ownerId, restoreDeleted, coverGenAttemptsGranted, coverGenAttemptsGrantedDelta",
+          "Provide at least one of: title, author, genre, publishedYear, description, openLibraryKey, gutenbergId, internalNotes, ownerId, restoreDeleted, coverGenAttemptsGranted, coverGenAttemptsGrantedDelta, resetCoverGenQuota",
       },
       { status: 400 },
     );
@@ -221,7 +236,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       where: { id },
       data,
     });
-    if (grantQuotaTouched) {
+    if (coverQuotaAdminTouched) {
       await prisma.coverAiQuotaRequest.updateMany({
         where: { bookId: id, handledAt: null },
         data: { handledAt: new Date() },

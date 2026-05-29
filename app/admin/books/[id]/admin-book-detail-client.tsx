@@ -19,7 +19,7 @@ import type {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "../../admin-mobile.css";
 import { CoverAiModal } from "@/components/cover-ai/cover-ai-modal";
 
@@ -178,37 +178,68 @@ export function AdminBookDetailClient({
   const [book, setBook] = useState(initial);
   const [coverAiOpen, setCoverAiOpen] = useState(false);
   const [coverAiPendingRequest, setCoverAiPendingRequest] = useState(false);
+  const [coverGenConsumed, setCoverGenConsumed] = useState<number | null>(null);
+  const [coverGenGranted, setCoverGenGranted] = useState<number | null>(null);
   const [coverAiRemainingAttempts, setCoverAiRemainingAttempts] = useState<number | null>(null);
+  const [coverGenResetBusy, setCoverGenResetBusy] = useState(false);
+  const [coverGenResetErr, setCoverGenResetErr] = useState<string | null>(null);
 
   useEffect(() => {
     setBook(initial);
   }, [initial]);
 
-  useEffect(() => {
-    // Fetch lightweight quota/pending state to show publishers’ “request more generations” signal.
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(`/api/books/${book.id}/cover-ai/config`);
-        const data = (await res.json().catch(() => ({}))) as {
-          hasPendingQuotaRequest?: boolean;
-          remainingAttempts?: number | null;
-        };
-        if (!res.ok) return;
-        if (cancelled) return;
-        setCoverAiPendingRequest(Boolean(data.hasPendingQuotaRequest));
-        setCoverAiRemainingAttempts(
-          typeof data.remainingAttempts === "number" ? data.remainingAttempts : null,
-        );
-      } catch {
-        // ignore
-      }
-    }
-    void load();
-    return () => {
-      cancelled = true;
+  const loadCoverGenQuota = useCallback(async () => {
+    const res = await fetch(`/api/books/${book.id}/cover-ai/config`);
+    const data = (await res.json().catch(() => ({}))) as {
+      hasPendingQuotaRequest?: boolean;
+      remainingAttempts?: number | null;
+      coverGenAttemptsConsumed?: number;
+      coverGenAttemptsGranted?: number;
     };
+    if (!res.ok) return;
+    setCoverAiPendingRequest(Boolean(data.hasPendingQuotaRequest));
+    setCoverGenConsumed(
+      typeof data.coverGenAttemptsConsumed === "number" ? data.coverGenAttemptsConsumed : null,
+    );
+    setCoverGenGranted(
+      typeof data.coverGenAttemptsGranted === "number" ? data.coverGenAttemptsGranted : null,
+    );
+    setCoverAiRemainingAttempts(
+      typeof data.remainingAttempts === "number" ? data.remainingAttempts : null,
+    );
   }, [book.id]);
+
+  useEffect(() => {
+    void loadCoverGenQuota().catch(() => {
+      /* ignore */
+    });
+  }, [loadCoverGenQuota]);
+
+  async function resetPublisherCoverGenQuota() {
+    if (
+      !window.confirm(
+        "Reset this book’s publisher cover AI allowance? Used generations go back to zero; any pending “request more” is cleared.",
+      )
+    ) {
+      return;
+    }
+    setCoverGenResetBusy(true);
+    setCoverGenResetErr(null);
+    try {
+      const res = await fetch(`/api/admin/books/${book.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resetCoverGenQuota: true }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      await loadCoverGenQuota();
+    } catch (e) {
+      setCoverGenResetErr(e instanceof Error ? e.message : "Could not reset allowance");
+    } finally {
+      setCoverGenResetBusy(false);
+    }
+  }
 
   const [metadataForm, setMetadataForm] = useState<MetadataFormState>(() =>
     metadataFormFromBook(initial),
@@ -946,11 +977,44 @@ export function AdminBookDetailClient({
                   >
                     Generate AI cover
                   </button>
-                  {coverAiPendingRequest ? (
-                    <p className="mt-2 text-xs text-text-secondary">
-                      A publisher has requested additional cover generations for this book.
-                      {typeof coverAiRemainingAttempts === "number" ? ` Remaining: ${coverAiRemainingAttempts}.` : null}
-                    </p>
+                  <p className="mt-2 text-xs text-text-muted">
+                    Unlimited generations for admins. Partner allowance is tracked separately below.
+                  </p>
+                  {book.ownerId &&
+                  typeof coverGenConsumed === "number" &&
+                  typeof coverGenGranted === "number" ? (
+                    <div className="mt-3 space-y-2 rounded-lg border border-border bg-bg-base/80 p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
+                        Publisher cover AI allowance
+                      </p>
+                      <p className="text-sm text-text-secondary">
+                        <strong className="text-text-primary">{coverGenConsumed}</strong> used of{" "}
+                        <strong className="text-text-primary">{coverGenGranted}</strong>
+                        {typeof coverAiRemainingAttempts === "number" ? (
+                          <>
+                            {" "}
+                            (<strong className="text-text-primary">{coverAiRemainingAttempts}</strong>{" "}
+                            remaining)
+                          </>
+                        ) : null}
+                      </p>
+                      {coverAiPendingRequest ? (
+                        <p className="text-xs text-warning">
+                          Publisher requested additional generations.
+                        </p>
+                      ) : null}
+                      <button
+                        type="button"
+                        disabled={metadataDisabled || coverGenResetBusy || coverGenConsumed === 0}
+                        onClick={() => void resetPublisherCoverGenQuota()}
+                        className="w-full rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition hover:bg-bg-raised disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {coverGenResetBusy ? "Resetting…" : "Reset publisher allowance"}
+                      </button>
+                      {coverGenResetErr ? (
+                        <p className="text-xs text-error">{coverGenResetErr}</p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
 
@@ -1380,7 +1444,7 @@ export function AdminBookDetailClient({
         bookId={book.id}
         open={coverAiOpen}
         onClose={() => setCoverAiOpen(false)}
-        quotaExempt={book.status === "pending_review" || book.status === "processing"}
+        quotaExempt
         onCommitted={(coverImageUrl) => {
           setBook((prev) => ({ ...prev, coverImageUrl }));
           setCoverFile(null);

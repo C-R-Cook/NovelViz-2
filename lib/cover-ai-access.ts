@@ -11,15 +11,9 @@ export function isCoverAiQuotaExemptEligible(book: {
   );
 }
 
-export function resolveCoverAiQuotaExempt(params: {
-  role: UserRole;
-  quotaExemptRequested: boolean;
-  book: { isPublicDomain: boolean; status: BookStatus };
-}): boolean {
-  if (params.role !== UserRole.admin || !params.quotaExemptRequested) {
-    return false;
-  }
-  return isCoverAiQuotaExemptEligible(params.book);
+/** Admins never consume a book's partner cover-generation allowance. */
+export function resolveCoverAiQuotaExempt(params: { role: UserRole }): boolean {
+  return params.role === UserRole.admin;
 }
 
 export function canAccessBookCoverAi(

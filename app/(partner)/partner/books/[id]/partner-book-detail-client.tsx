@@ -192,10 +192,14 @@ export function PartnerBookDetailClient({
   book: initial,
   publicImages: initialPublicImages,
   openCoverAiOnLoad = false,
+  coverIncludeTitleOnLoad = false,
+  coverIncludeAuthorOnLoad = false,
 }: {
   book: PartnerBookDetailModel;
   publicImages: PartnerPublicImageRow[];
   openCoverAiOnLoad?: boolean;
+  coverIncludeTitleOnLoad?: boolean;
+  coverIncludeAuthorOnLoad?: boolean;
 }) {
   const router = useRouter();
   const ingestFileRef = useRef<HTMLInputElement>(null);
@@ -231,14 +235,22 @@ export function PartnerBookDetailClient({
   const [publicImages, setPublicImages] = useState(initialPublicImages);
   const [featureRequestBusyId, setFeatureRequestBusyId] = useState<string | null>(null);
   const [coverAiOpen, setCoverAiOpen] = useState(openCoverAiOnLoad);
+  const createFlowOverlayIncludesRef = useRef(
+    openCoverAiOnLoad
+      ? { title: coverIncludeTitleOnLoad, author: coverIncludeAuthorOnLoad }
+      : null,
+  );
 
   useEffect(() => {
     setPublicImages(initialPublicImages);
   }, [initialPublicImages]);
 
   useEffect(() => {
-    if (openCoverAiOnLoad) setCoverAiOpen(true);
-  }, [openCoverAiOnLoad]);
+    if (openCoverAiOnLoad) {
+      setCoverAiOpen(true);
+      router.replace(`/partner/books/${initial.id}`, { scroll: false });
+    }
+  }, [openCoverAiOnLoad, initial.id, router]);
 
   async function submitFeatureRequest(imageId: string) {
     setFeatureRequestBusyId(imageId);
@@ -961,6 +973,7 @@ export function PartnerBookDetailClient({
         open={coverAiOpen}
         onClose={() => setCoverAiOpen(false)}
         quotaExempt={false}
+        overlayIncludes={createFlowOverlayIncludesRef.current ?? undefined}
         onCommitted={(coverImageUrl) => {
           setBook((prev) => ({ ...prev, coverImageUrl }));
           router.refresh();

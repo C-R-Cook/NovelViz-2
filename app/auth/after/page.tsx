@@ -1,17 +1,21 @@
-import { AuthAfterClient } from "@/app/auth/after/auth-after-client";
-import { getCurrentUser } from "@/lib/auth";
+import { AuthAfterProvisioning } from "@/app/auth/after/auth-after-provisioning";
+import { ensureCurrentUser } from "@/lib/auth";
 import { findDbProfileForSession, getPostAuthRedirectUrl } from "@/lib/session-profile";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-/** Post–Clerk sign-in: pick library vs onboarding and clear dev impersonation. */
+/** Post–Clerk sign-in: provision DB user if needed, then route to onboarding or library. */
 export default async function AuthAfterPage() {
-  const session = await getCurrentUser();
-  if (!session) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/login");
   }
 
-  const profile = await findDbProfileForSession(session);
-  const redirectTo = getPostAuthRedirectUrl(profile);
+  const session = await ensureCurrentUser();
+  if (!session) {
+    return <AuthAfterProvisioning />;
+  }
 
-  return <AuthAfterClient redirectTo={redirectTo} />;
+  const profile = await findDbProfileForSession(session);
+  redirect(getPostAuthRedirectUrl(profile));
 }

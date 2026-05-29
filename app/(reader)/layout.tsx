@@ -1,5 +1,5 @@
-import { Nav } from "@/components/nav";
-import { getCurrentUser } from "@/lib/auth";
+import { ensureCurrentUser } from "@/lib/auth";
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function ReaderLayout({
@@ -7,15 +7,19 @@ export default async function ReaderLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/sign-in");
+  }
+
+  const user = await ensureCurrentUser();
+  if (!user) {
+    redirect("/auth/after");
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-bg-base text-text-primary antialiased">
-      <Nav />
-      <main className="flex-1 pt-[calc(3.5rem+0.25rem)]">{children}</main>
+      {children}
     </div>
   );
 }

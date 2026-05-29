@@ -1,0 +1,299 @@
+.onboarding-plan {
+  --onboarding-shine-gradient: linear-gradient(
+    135deg,
+    var(--loader-shine-1, #ede0c8) 0%,
+    color-mix(in srgb, var(--accent) 55%, transparent) 40%,
+    var(--loader-shine-1, #ede0c8) 70%,
+    color-mix(in srgb, var(--highlight) 70%, transparent) 100%
+  );
+  max-width: 56rem;
+  margin: 0 auto;
+  animation: onboarding-plan-enter 0.8s ease forwards;
+}
+
+.onboarding-plan {
+  --loader-shine-1: #ede0c8;
+}
+
+@keyframes onboarding-plan-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-plan__wordmark {
+  display: block;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.onboarding-plan__eyebrow {
+  margin: 2rem 0 0;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.onboarding-plan__headline {
+  margin: 0.75rem 0 0;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  font-weight: 400;
+  line-height: 1.15;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--text-primary) 90%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 80%, transparent) 40%,
+    color-mix(in srgb, var(--text-primary) 90%, transparent) 70%,
+    color-mix(in srgb, var(--highlight) 75%, transparent) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: onboarding-plan-shimmer 8s linear infinite;
+}
+
+@keyframes onboarding-plan-shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.onboarding-plan__cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin-top: 2.5rem;
+}
+
+@media (max-width: 768px) {
+  .onboarding-plan__cards {
+    grid-template-columns: 1fr;
+    max-width: 20rem;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.onboarding-plan__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-default);
+  background: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+  text-align: left;
+  transition:
+    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.onboarding-plan__card--selectable {
+  cursor: pointer;
+}
+
+.onboarding-plan__card--selectable:hover {
+  transform: translateY(-4px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-default));
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--accent-glow) 25%, transparent);
+}
+
+.onboarding-plan__card--selectable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.onboarding-plan__card--dulled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.onboarding-plan__card-badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+}
+
+.onboarding-plan__card-tier {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.onboarding-plan__card-price {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.onboarding-plan__card-price--struck {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.onboarding-plan__card-beta {
+  font-size: 0.75rem;
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.onboarding-plan__card-features {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.onboarding-plan__card-features li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.onboarding-plan__card-features strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.onboarding-plan__divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 2.5rem 0 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.onboarding-plan__divider-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-default);
+}
+
+.onboarding-plan__partner {
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-default));
+  background: color-mix(in srgb, var(--accent-dim) 40%, transparent);
+}
+
+.onboarding-plan__partner-text {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.onboarding-plan__partner-cta {
+  margin-top: 1rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.375rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.onboarding-plan__partner-cta:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-dim) 50%, transparent);
+}
+
+.onboarding-plan__partner-cta:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.onboarding-plan__beta-note {
+  margin: 2rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.onboarding-plan__actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.onboarding-plan__primary {
+  padding: 0.875rem 2rem;
+  border-radius: 0.375rem;
+  border: none;
+  background: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-inverse);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.onboarding-plan__primary:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.onboarding-plan__error {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--error);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-plan {
+    animation: none;
+  }
+
+  .onboarding-plan__headline {
+    animation: none;
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+    color: var(--text-primary);
+  }
+
+  .onboarding-plan__card--selectable:hover {
+    transform: none;
+  }
+}

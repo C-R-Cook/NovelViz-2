@@ -142,6 +142,30 @@ async function getCurrentUserUncached(): Promise<CurrentUser | null> {
   return getClerkUser();
 }
 
+/**
+ * Resolve (or create) the DB user for the signed-in Clerk account.
+ * Retries when `currentUser()` is not ready immediately after sign-up.
+ */
+export async function ensureCurrentUser(maxAttempts = 8): Promise<CurrentUser | null> {
+  if (process.env.NODE_ENV !== "production") {
+    const dev = await getDevUserFromCookies();
+    if (dev) return dev;
+  }
+
+  const { userId } = await auth();
+  if (!userId) return null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const dbUser = await ensureDbUserForClerk(userId);
+    if (dbUser) return mapDbUserToCurrentUser(dbUser);
+    if (attempt < maxAttempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
+
+  return null;
+}
+
 /** Deduped per request — safe to call from layout and page in the same render. */
 export const getCurrentUser = cache(getCurrentUserUncached);
 

@@ -1,13 +1,15 @@
-import { OnboardingClient } from "./onboarding-client";
-import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
-import { findDbProfileForSession, profileNeedsOnboarding } from "@/lib/session-profile";
+import { getCurrentUser } from "@/lib/auth";
+import {
+  findDbProfileForSession,
+  getOnboardingRedirectUrl,
+  ONBOARDING_PLAN_COOKIE,
+  readPlanStepComplete,
+} from "@/lib/session-profile";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Welcome | NovelViz",
-};
-
-export default async function OnboardingPage() {
+/** Legacy /onboarding — redirect to the correct step. */
+export default async function OnboardingIndexPage() {
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
@@ -17,9 +19,10 @@ export default async function OnboardingPage() {
   if (!profile) {
     redirect("/sign-in");
   }
-  if (!profileNeedsOnboarding(profile)) {
-    redirect(getRoleHomeUrl());
-  }
 
-  return <OnboardingClient />;
+  const cookieStore = await cookies();
+  const planStepComplete = readPlanStepComplete(
+    cookieStore.get(ONBOARDING_PLAN_COOKIE)?.value,
+  );
+  redirect(getOnboardingRedirectUrl(profile, { planStepComplete }));
 }

@@ -980,7 +980,7 @@ export function AdminBookDetailClient({
                   <p className="mt-2 text-xs text-text-muted">
                     Unlimited generations for admins. Partner allowance is tracked separately below.
                   </p>
-                  {book.ownerId &&
+                  {book.ownerLabel &&
                   typeof coverGenConsumed === "number" &&
                   typeof coverGenGranted === "number" ? (
                     <div className="mt-3 space-y-2 rounded-lg border border-border bg-bg-base/80 p-3">

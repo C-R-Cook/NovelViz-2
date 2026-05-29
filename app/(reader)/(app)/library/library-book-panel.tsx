@@ -7,6 +7,7 @@ import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
+import { ImageGenerationLoader } from "@/components/ui/image-generation-loader";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { formatLimitReachedMessage } from "@/components/subscription/usage-period-panel";
@@ -511,14 +512,8 @@ export function LibraryBookPanel({
                       <p className="text-sm text-error">{imgError}</p>
                     ) : null}
                     {imgLoading ? (
-                      <div className="flex flex-col items-center gap-3 rounded-lg border border-border/80 bg-bg-base/50 py-8">
-                        <div
-                          className="h-9 w-9 animate-spin rounded-full border-2 border-border border-t-accent"
-                          aria-hidden
-                        />
-                        <p className="text-sm text-text-secondary">
-                          Generating your image...
-                        </p>
+                      <div className="rounded-lg border border-border/80 bg-bg-base/50 py-8">
+                        <ImageGenerationLoader />
                       </div>
                     ) : null}
                   </div>

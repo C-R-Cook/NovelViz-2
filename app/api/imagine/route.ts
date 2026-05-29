@@ -1,4 +1,4 @@
-import cloudinary from "@/lib/cloudinary";
+import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
 import fal from "@/lib/fal";
 import { getAnthropicTextResponse } from "@/lib/anthropic-text";
 import { getCurrentUser } from "@/lib/auth";
@@ -390,13 +390,13 @@ Reader's request: ${userPrompt}`;
   const generatedImageId = randomUUID();
   let finalImageUrl: string;
   try {
-    const cloudinaryResult = await cloudinary.uploader.upload(imageUrl, {
+    const uploaded = await uploadFalImageUrlToCloudinary({
+      imageUrl,
       folder: "novelviz/gallery",
-      public_id: generatedImageId,
-      resource_type: "image",
+      publicId: generatedImageId,
       overwrite: false,
     });
-    finalImageUrl = cloudinaryResult.secure_url;
+    finalImageUrl = uploaded.secureUrl;
   } catch (e) {
     console.error("[api/imagine POST] cloudinary upload", e);
     return NextResponse.json(

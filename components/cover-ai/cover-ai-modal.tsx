@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ImageGenerationLoader } from "@/components/ui/image-generation-loader";
 
 const CAROUSEL_MAX = 5;
 
@@ -486,18 +487,10 @@ export function CoverAiModal({
                     }}
                   >
                     {currentSlide?.kind === "loading" ? (
-                      <div
-                        className="flex h-full flex-col items-center justify-center gap-3 px-4"
-                        role="status"
-                        aria-live="polite"
-                        aria-label="Generating cover image"
-                      >
-                        <div
-                          className="h-10 w-10 animate-spin rounded-full border-2 border-border border-t-accent"
-                          aria-hidden
-                        />
-                        <p className="text-center text-sm text-text-muted">Generating cover…</p>
-                      </div>
+                      <ImageGenerationLoader
+                        className="h-full px-4"
+                        ariaLabel="Generating cover image"
+                      />
                     ) : currentSlide?.kind === "ready" ? (
                       <Image
                         src={currentSlide.imageUrl}

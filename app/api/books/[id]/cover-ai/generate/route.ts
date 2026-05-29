@@ -13,8 +13,7 @@ import {
   getCoverAiAdminSettings,
 } from "@/lib/cover-ai-settings";
 import fal from "@/lib/fal";
-import cloudinary from "@/lib/cloudinary";
-import { fetchAndPrepareFalImageForCloudinary } from "@/lib/prepare-fal-image-for-cloudinary";
+import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
 import { prisma } from "@/lib/prisma";
 import { resolveDbUserFromSession } from "@/lib/resolve-db-user-from-session";
 import { NextResponse } from "next/server";
@@ -31,16 +30,12 @@ async function uploadCoverDraftFromUrl(options: {
   draftLeaf: string;
   imageUrl: string;
 }): Promise<{ publicId: string; secureUrl: string }> {
-  // Seedream and other models can return multi‑MB PNGs; Cloudinary caps uploads at 10MB.
-  const jpegBuffer = await fetchAndPrepareFalImageForCloudinary(options.imageUrl);
-  const dataUri = `data:image/jpeg;base64,${jpegBuffer.toString("base64")}`;
-  const result = await cloudinary.uploader.upload(dataUri, {
+  return uploadFalImageUrlToCloudinary({
+    imageUrl: options.imageUrl,
     folder: `novelviz/cover-drafts/${options.bookId}`,
-    public_id: options.draftLeaf,
-    resource_type: "image",
+    publicId: options.draftLeaf,
     overwrite: false,
   });
-  return { publicId: result.public_id, secureUrl: result.secure_url };
 }
 
 export async function POST(request: Request, context: RouteContext) {

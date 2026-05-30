@@ -124,6 +124,13 @@
   outline-offset: 2px;
 }
 
+.onboarding-plan__card--selected {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent),
+    0 8px 28px color-mix(in srgb, var(--accent-glow) 30%, transparent);
+}
+
 .onboarding-plan__card--dulled {
   opacity: 0.45;
   pointer-events: none;

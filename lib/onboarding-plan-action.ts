@@ -1,12 +1,14 @@
 "use server";
 
-import { getCurrentUser } from "@/lib/auth";
+import { ensureCurrentUser } from "@/lib/auth";
+import { ONBOARDING_PLAN_COOKIE } from "@/lib/onboarding-cookies";
 import { prisma } from "@/lib/prisma";
 import {
   ONBOARDING_PARTNER_CATALOGUE_NOTE,
   ONBOARDING_PARTNER_PUBLISHER_NAME,
 } from "@/lib/partner-request-markers";
 import { SubscriptionTier } from "@db";
+import { cookies } from "next/headers";
 
 export type CompletePlanStepInput = {
   tier: "free" | "standard" | "premium";
@@ -20,9 +22,9 @@ export type CompletePlanStepResult =
 export async function completePlanStep(
   input: CompletePlanStepInput,
 ): Promise<CompletePlanStepResult> {
-  const session = await getCurrentUser();
+  const session = await ensureCurrentUser();
   if (!session) {
-    return { ok: false, error: "Unauthorized" };
+    return { ok: false, error: "Unauthorized — please refresh and try again." };
   }
 
   const tierValues: CompletePlanStepInput["tier"][] = ["free", "standard", "premium"];
@@ -66,6 +68,13 @@ export async function completePlanStep(
       });
     }
   }
+
+  const cookieStore = await cookies();
+  cookieStore.set(ONBOARDING_PLAN_COOKIE, "1", {
+    path: "/",
+    maxAge: 60 * 60 * 24,
+    sameSite: "lax",
+  });
 
   return { ok: true };
 }

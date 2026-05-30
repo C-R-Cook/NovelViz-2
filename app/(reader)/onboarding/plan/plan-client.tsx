@@ -1,9 +1,7 @@
 "use client";
 
-import { setPlanStepCompleteCookie } from "@/lib/onboarding-cookies";
 import { completePlanStep } from "@/lib/onboarding-plan-action";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import "./plan.css";
 
@@ -47,38 +45,50 @@ const PLANS = [
   },
 ] as const;
 
+type SelectedPlan = "standard" | null;
+
 export function PlanClient() {
-  const router = useRouter();
+  const [selected, setSelected] = useState<SelectedPlan>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const continueToPreferences = useCallback(
-    async (partnerInterest: boolean) => {
-      setError(null);
-      setBusy(true);
-      try {
-        const result = await completePlanStep({
-          tier: "standard",
-          partnerInterest,
-        });
-        if (!result.ok) {
-          setError(result.error);
-          return;
-        }
-        setPlanStepCompleteCookie();
-        router.push("/onboarding/preferences");
-        router.refresh();
-      } finally {
-        setBusy(false);
+  const submitPlan = useCallback(async (partnerInterest: boolean) => {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await completePlanStep({
+        tier: "standard",
+        partnerInterest,
+      });
+      if (!result?.ok) {
+        setError(result?.error ?? "Something went wrong. Please try again.");
+        return;
       }
-    },
-    [router],
-  );
+      window.location.assign("/onboarding/preferences");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const onGetStarted = useCallback(() => {
+    if (selected !== "standard") {
+      setError("Please select the Standard plan to continue.");
+      return;
+    }
+    void submitPlan(false);
+  }, [selected, submitPlan]);
 
   const onSelectStandard = useCallback(() => {
-    if (busy) return;
-    void continueToPreferences(false);
-  }, [busy, continueToPreferences]);
+    setError(null);
+    setSelected("standard");
+  }, []);
+
+  const onPartnerRequest = useCallback(() => {
+    setSelected("standard");
+    void submitPlan(true);
+  }, [submitPlan]);
 
   return (
     <div className="onboarding-plan px-4">
@@ -89,52 +99,56 @@ export function PlanClient() {
       <h1 className="onboarding-plan__headline">How would you like to read?</h1>
 
       <div className="onboarding-plan__cards" role="list">
-        {PLANS.map((plan) => (
-          <div
-            key={plan.id}
-            role="listitem"
-            className={`onboarding-plan__card ${
-              plan.selectable
-                ? "onboarding-plan__card--selectable"
-                : "onboarding-plan__card--dulled"
-            }`}
-            tabIndex={plan.selectable ? 0 : -1}
-            onClick={plan.selectable ? onSelectStandard : undefined}
-            onKeyDown={
-              plan.selectable
-                ? (e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      onSelectStandard();
+        {PLANS.map((plan) => {
+          const isSelected = plan.id === selected;
+          return (
+            <div
+              key={plan.id}
+              role="listitem"
+              aria-selected={plan.selectable ? isSelected : undefined}
+              className={`onboarding-plan__card ${
+                plan.selectable
+                  ? "onboarding-plan__card--selectable"
+                  : "onboarding-plan__card--dulled"
+              }${isSelected ? " onboarding-plan__card--selected" : ""}`}
+              tabIndex={plan.selectable ? 0 : -1}
+              onClick={plan.selectable ? onSelectStandard : undefined}
+              onKeyDown={
+                plan.selectable
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelectStandard();
+                      }
                     }
-                  }
-                : undefined
-            }
-          >
-            {plan.comingSoon ? (
-              <span className="onboarding-plan__card-badge">Coming Soon</span>
-            ) : null}
-            <span className="onboarding-plan__card-tier">{plan.name}</span>
-            {plan.id === "standard" ? (
-              <>
-                <span className="onboarding-plan__card-price onboarding-plan__card-price--struck">
-                  {plan.price}
-                </span>
-                <span className="onboarding-plan__card-beta">{plan.betaPrice}</span>
-              </>
-            ) : (
-              <span className="onboarding-plan__card-price">{plan.price}</span>
-            )}
-            <ul className="onboarding-plan__card-features">
-              {plan.features.map((f) => (
-                <li key={f.label}>
-                  <span>{f.label}</span>
-                  <strong>{f.value}</strong>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+                  : undefined
+              }
+            >
+              {plan.comingSoon ? (
+                <span className="onboarding-plan__card-badge">Coming Soon</span>
+              ) : null}
+              <span className="onboarding-plan__card-tier">{plan.name}</span>
+              {plan.id === "standard" ? (
+                <>
+                  <span className="onboarding-plan__card-price onboarding-plan__card-price--struck">
+                    {plan.price}
+                  </span>
+                  <span className="onboarding-plan__card-beta">{plan.betaPrice}</span>
+                </>
+              ) : (
+                <span className="onboarding-plan__card-price">{plan.price}</span>
+              )}
+              <ul className="onboarding-plan__card-features">
+                {plan.features.map((f) => (
+                  <li key={f.label}>
+                    <span>{f.label}</span>
+                    <strong>{f.value}</strong>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
       </div>
 
       <div className="onboarding-plan__divider" aria-hidden>
@@ -152,7 +166,7 @@ export function PlanClient() {
           type="button"
           className="onboarding-plan__partner-cta"
           disabled={busy}
-          onClick={() => void continueToPreferences(true)}
+          onClick={onPartnerRequest}
         >
           Request Partner Access
         </button>
@@ -167,8 +181,8 @@ export function PlanClient() {
         <button
           type="button"
           className="onboarding-plan__primary"
-          disabled={busy}
-          onClick={onSelectStandard}
+          disabled={busy || selected !== "standard"}
+          onClick={onGetStarted}
         >
           {busy ? "Continuing…" : "Get started"}
         </button>

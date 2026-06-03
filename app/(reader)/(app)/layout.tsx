@@ -7,6 +7,7 @@ import {
   profileNeedsOnboarding,
   readPlanStepComplete,
 } from "@/lib/session-profile";
+import { DEV_USERS_BY_ID } from "@/lib/dev-users";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -22,15 +23,28 @@ export default async function ReaderAppShellLayout({
   }
 
   const profile = await findDbProfileForSession(session);
-  if (!profile) {
+
+  // Dev users defined in DEV_USERS_BY_ID may not have real DB rows.
+  // In that case, synthesize a "complete" profile so they skip onboarding.
+  const resolvedProfile =
+    profile ??
+    (process.env.NODE_ENV !== "production" && DEV_USERS_BY_ID[session.id]
+      ? {
+          id: session.id,
+          username: session.username ?? session.id,
+          genrePreferences: ["fiction"],
+        }
+      : null);
+
+  if (!resolvedProfile) {
     redirect("/sign-in");
   }
   const cookieStore = await cookies();
   const planStepComplete = readPlanStepComplete(
     cookieStore.get(ONBOARDING_PLAN_COOKIE)?.value,
   );
-  if (profileNeedsOnboarding(profile, { planStepComplete })) {
-    redirect(getOnboardingRedirectUrl(profile, { planStepComplete }));
+  if (profileNeedsOnboarding(resolvedProfile, { planStepComplete })) {
+    redirect(getOnboardingRedirectUrl(resolvedProfile, { planStepComplete }));
   }
 
   return (

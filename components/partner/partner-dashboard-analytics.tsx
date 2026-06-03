@@ -71,9 +71,13 @@ export function PartnerDashboardAnalytics({ data }: { data: PartnerAnalyticsPayl
           Readers over time
         </h3>
         <p className="mt-1 text-xs text-text-secondary">Cumulative library adds across your books (last 12 months)</p>
-        <div className="mt-4 h-[280px] w-full min-w-0">
-          <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" />
-        </div>
+        {areaData.length === 0 ? (
+          <p className="mt-4 text-sm text-text-muted">No reader data yet — stats will appear once readers start adding your books.</p>
+        ) : (
+          <div className="mt-4 h-[200px] w-full min-w-0">
+            <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" />
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -82,7 +86,7 @@ export function PartnerDashboardAnalytics({ data }: { data: PartnerAnalyticsPayl
             Readers by age range
           </h3>
           <p className="mt-1 text-xs text-text-secondary">Users with at least one of your books in their library</p>
-          <div className="mt-4 min-h-[200px] w-full min-w-0">
+          <div className="mt-4 min-h-[160px] w-full min-w-0">
             {ageData.length === 0 ? (
               <p className="text-sm text-text-muted">Not enough age data yet.</p>
             ) : (
@@ -95,7 +99,7 @@ export function PartnerDashboardAnalytics({ data }: { data: PartnerAnalyticsPayl
             Readers by genre preference
           </h3>
           <p className="mt-1 text-xs text-text-secondary">From reader profile preferences</p>
-          <div className="mt-4 min-h-[200px] w-full min-w-0">
+          <div className="mt-4 min-h-[160px] w-full min-w-0">
             {genreData.length === 0 ? (
               <p className="text-sm text-text-muted">No genre preferences recorded yet.</p>
             ) : (

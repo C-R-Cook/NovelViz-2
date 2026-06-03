@@ -30,6 +30,7 @@ export type DashboardNavBadge =
 
 export type DashboardNavEntry =
   | { kind: "divider"; id: string }
+  | { kind: "group-label"; id: string; label: string }
   | { kind: "tab"; tab: DashboardTabSlug; icon: string; badge?: DashboardNavBadge }
   | { kind: "helpers"; id: string }
   | { kind: "link"; id: string; href: string; label: string; icon: string };
@@ -66,39 +67,50 @@ export function dashboardTabsForRole(role: DashboardUserRole): DashboardTabSlug[
   return [...allowedTabsForRole(role)];
 }
 
-/** Sidebar structure: tabs, hairline dividers, optional badges (resolved in UI from counts). */
+/** Sidebar structure: tabs, group labels, optional badges (resolved in UI from counts).
+ *  Reader nav is intentionally flat — the CTA button at the top handles partner-program navigation.
+ *  Partner and Admin navs use group-label entries as visual section dividers.
+ */
 export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[] {
   const base: DashboardNavEntry[] = [
-    { kind: "tab", tab: "overview", icon: "◈" },
+    { kind: "tab", tab: "overview", icon: "🏠" },
     { kind: "tab", tab: "reading", icon: "📖" },
-    { kind: "tab", tab: "images", icon: "◻" },
-    { kind: "tab", tab: "queries", icon: "?" },
+    { kind: "tab", tab: "images", icon: "🖼️" },
+    { kind: "tab", tab: "queries", icon: "💬" },
   ];
   if (role === "reader") {
+    // partner-program tab accessible via the sidebar CTA button; not listed here to keep reader nav clean.
     return [
       ...base,
-      { kind: "tab", tab: "partner-program", icon: "◇" },
-      { kind: "tab", tab: "account", icon: "○" },
+      { kind: "divider", id: "d-reader-account" },
+      { kind: "tab", tab: "account", icon: "👤" },
     ];
   }
   const partnerBlock: DashboardNavEntry[] = [
-    { kind: "divider", id: "d1" },
-    { kind: "tab", tab: "my-books", icon: "▤" },
-    { kind: "tab", tab: "stats", icon: "↗" },
-    { kind: "tab", tab: "feature-requests", icon: "★", badge: "partnerFeatReq" },
+    { kind: "group-label", id: "gl-publisher", label: "Publisher" },
+    { kind: "tab", tab: "my-books", icon: "📚" },
+    { kind: "tab", tab: "stats", icon: "📊" },
+    { kind: "tab", tab: "feature-requests", icon: "⭐", badge: "partnerFeatReq" },
   ];
   if (role === "partner") {
-    return [...base, ...partnerBlock, { kind: "divider", id: "d2" }, { kind: "tab", tab: "account", icon: "○" }];
+    return [
+      { kind: "group-label", id: "gl-reader", label: "Reader" },
+      ...base,
+      ...partnerBlock,
+      { kind: "divider", id: "d2" },
+      { kind: "tab", tab: "account", icon: "👤" },
+    ];
   }
   const adminBlock: DashboardNavEntry[] = [
-    { kind: "divider", id: "d2" },
-    { kind: "tab", tab: "for-review", icon: "✓", badge: "forReview" },
-    { kind: "tab", tab: "feature-approvals", icon: "☆", badge: "featureApprovals" },
-    { kind: "tab", tab: "spoiler-comments", icon: "⚠", badge: "spoilerComments" },
-    { kind: "tab", tab: "flagged-comments", icon: "!", badge: "flaggedComments" },
-    { kind: "tab", tab: "all-books", icon: "▤" },
-    { kind: "tab", tab: "all-users", icon: "◎" },
-    { kind: "tab", tab: "admin-stats", icon: "∑" },
+    { kind: "group-label", id: "gl-moderation", label: "Moderation" },
+    { kind: "tab", tab: "for-review", icon: "✅", badge: "forReview" },
+    { kind: "tab", tab: "feature-approvals", icon: "⭐", badge: "featureApprovals" },
+    { kind: "tab", tab: "spoiler-comments", icon: "⚠️", badge: "spoilerComments" },
+    { kind: "tab", tab: "flagged-comments", icon: "🚩", badge: "flaggedComments" },
+    { kind: "group-label", id: "gl-admin", label: "Administration" },
+    { kind: "tab", tab: "all-books", icon: "📋" },
+    { kind: "tab", tab: "all-users", icon: "👥" },
+    { kind: "tab", tab: "admin-stats", icon: "📈" },
     { kind: "divider", id: "d-helpers" },
     { kind: "helpers", id: "admin-helpers" },
     { kind: "divider", id: "d-gutenberg" },
@@ -110,9 +122,14 @@ export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[
       icon: link.icon,
     })),
     { kind: "divider", id: "d3" },
-    { kind: "tab", tab: "account", icon: "○" },
+    { kind: "tab", tab: "account", icon: "👤" },
   ];
-  return [...base, ...partnerBlock, ...adminBlock];
+  return [
+    { kind: "group-label", id: "gl-reader", label: "Reader" },
+    ...base,
+    ...partnerBlock,
+    ...adminBlock,
+  ];
 }
 
 export function defaultDashboardTab(role: DashboardUserRole): DashboardTabSlug {
@@ -148,7 +165,7 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
     case "queries":
       return "Q&A History";
     case "partner-program":
-      return "Become a Partner";
+      return "Publisher Program";
     case "account":
       return "Account";
     case "my-books":

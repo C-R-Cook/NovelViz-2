@@ -446,6 +446,9 @@ export function DashboardClient({
     if (entry.kind === "divider") {
       return <div key={entry.id} className="dashboard-nav-divider" />;
     }
+    if (entry.kind === "group-label") {
+      return <div key={entry.id} className="dashboard-nav-group-label">{entry.label}</div>;
+    }
     if (entry.kind === "helpers") {
       return <AdminHelpersNav key={entry.id} variant="sidebar" onNavigate={closeSidebar} />;
     }
@@ -560,8 +563,20 @@ export function DashboardClient({
 
   function overviewSection() {
     const first = reader.currentlyReading[0];
+
+    // Collect actionable admin queue items with non-zero counts
+    const actionItems: { count: number; label: string; tab: DashboardTabSlug; icon: string }[] = admin
+      ? [
+          { count: admin.pendingReviewCount, label: "For Review", tab: "for-review" as const, icon: "✅" },
+          { count: admin.featureRequestsPendingCount, label: "Feature Approvals", tab: "feature-approvals" as const, icon: "⭐" },
+          { count: admin.spoilerCommentsPendingCount, label: "Spoiler Comments", tab: "spoiler-comments" as const, icon: "⚠️" },
+          { count: admin.flaggedCommentsPendingCount, label: "Flagged Comments", tab: "flagged-comments" as const, icon: "🚩" },
+        ].filter((item) => item.count > 0)
+      : [];
+
     return (
       <div>
+        {/* Reader activity KPIs — 3 cards for reader/partner, 4 for admin (includes pending reviews) */}
         <div
           className={
             role === "admin" && admin
@@ -582,28 +597,37 @@ export function DashboardClient({
           ) : null}
         </div>
 
-        {role === "admin" && admin ? (
-          <div className="dashboard-kpi-grid dashboard-kpi-grid--5 mt-4">
-            <KpiCard label="Total users" value={admin.totalUsers} sub="Registered" delayMs={reducedMotion ? 0 : 80} />
-            <KpiCard
-              label="Live books"
-              value={admin.liveBooksCount}
-              sub="Published on Discover"
-              delayMs={reducedMotion ? 0 : 120}
+        {/* Publisher snapshot — compact 4-stat row for partners and admins */}
+        {partner ? (
+          <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
+            <KpiCard label="Your books" value={partner.stats.totalBooks} sub="In catalogue" delayMs={reducedMotion ? 0 : 80} />
+            <KpiCard label="Readers" value={partner.stats.totalReaders} sub="Across all titles" delayMs={reducedMotion ? 0 : 120} />
+            <KpiCard label="Q&A queries" value={partner.stats.totalQueries} sub="On your books" delayMs={reducedMotion ? 0 : 160} />
+            <KpiCard label="Images generated" value={partner.stats.totalImages} sub="By readers" delayMs={reducedMotion ? 0 : 200} />
+          </div>
+        ) : null}
+
+        {/* Pending action items — admin only, only shown when there are items to act on */}
+        {actionItems.length > 0 ? (
+          <div className="dashboard-action-items">
+            <SectionLabel
+              label="Pending action items"
+              right={`${actionItems.reduce((s, item) => s + item.count, 0)} total`}
             />
-            <KpiCard label="Total books" value={admin.totalBooks} sub="All non-deleted" delayMs={reducedMotion ? 0 : 160} />
-            <KpiCard
-              label="Book requests"
-              value={admin.bookRequests.totalCount}
-              sub="Recorded requests"
-              delayMs={reducedMotion ? 0 : 200}
-            />
-            <KpiCard
-              label="Feature approvals"
-              value={admin.featureRequestsPendingCount}
-              sub="Pending queue"
-              delayMs={reducedMotion ? 0 : 240}
-            />
+            <div className="dashboard-action-pills">
+              {actionItems.map((item) => (
+                <button
+                  key={item.tab}
+                  type="button"
+                  className="dashboard-action-pill"
+                  onClick={() => pushTab(item.tab)}
+                >
+                  <span className="dashboard-action-pill-icon" aria-hidden>{item.icon}</span>
+                  <span className="dashboard-action-pill-count">{item.count}</span>
+                  <span className="dashboard-action-pill-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
 
@@ -634,31 +658,6 @@ export function DashboardClient({
               </Link>
             </div>
           </div>
-        ) : null}
-
-        {role === "admin" && admin && (pendingBooks.length > 0 || admin.pendingReviewCount > 0) ? (
-          <>
-            <SectionLabel
-              label="For review"
-              right={`${admin.pendingReviewCount} pending`}
-            />
-            <div className="mb-6">
-              <ForReviewQueue
-                pendingBooks={pendingBooks}
-                pendingReviewCount={admin.pendingReviewCount}
-                actionId={actionId}
-                onModeration={(id, status) => void runModeration(id, status)}
-                onBookDeleted={handleForReviewBookDeleted}
-                hasMorePending={hasMorePendingBooks}
-                onLoadMorePending={() => void loadMorePendingBooks()}
-                loadingMorePending={loadingMorePending}
-                loadMorePendingErr={loadMorePendingErr}
-                returnTo="/dashboard?tab=for-review"
-                className="dashboard-for-review-wrap dashboard-admin-queue-wrap"
-              />
-            </div>
-            <GemDivider />
-          </>
         ) : null}
 
         <SectionLabel label="Currently reading" right={`${reader.currentlyReading.length} books`} />
@@ -815,15 +814,18 @@ export function DashboardClient({
     if (!partner) return null;
     return (
       <div>
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-          <SectionLabel label="Your published books" right={`${partner.stats.totalBooks} in catalogue`} />
-          <Link
-            href="/partner/books/new"
-            className="shrink-0 rounded border border-accent/30 bg-accent/10 px-4 py-2 font-mono text-[8px] uppercase tracking-widest text-accent transition hover:bg-accent/20"
-          >
-            + Upload new book
-          </Link>
-        </div>
+        {/* Prominent upload CTA — full-width dashed card, impossible to miss */}
+        <Link href="/partner/books/new" className="dashboard-upload-cta block no-underline mb-6">
+          <div className="dashboard-upload-cta-inner">
+            <span className="dashboard-upload-cta-icon" aria-hidden>📤</span>
+            <span className="dashboard-upload-cta-text">
+              <span className="dashboard-upload-cta-title">Upload a new book</span>
+              <span className="dashboard-upload-cta-sub">Publish an EPUB to the NovelViz catalogue</span>
+            </span>
+            <span className="dashboard-upload-cta-arrow" aria-hidden>→</span>
+          </div>
+        </Link>
+        <SectionLabel label="Your published books" right={`${partner.stats.totalBooks} in catalogue`} />
         <PartnerDashboardBooksClient
           initialBooks={partner.initialBooks}
           initialHasMore={partner.initialHasMore}
@@ -860,55 +862,7 @@ export function DashboardClient({
     if (!adminStats || !admin) return null;
     return (
       <div className="dashboard-adminstats-shell space-y-8">
-        <section aria-labelledby="dashboard-admin-tools">
-          <SectionLabel label="Tools" />
-          <ul className="space-y-2 text-sm text-text-secondary">
-            <li>
-              <Link
-                href="/admin/data-flows"
-                className="font-medium text-accent-text underline-offset-2 hover:underline"
-              >
-                Data flows
-              </Link>
-              <span className="text-text-muted">
-                {" "}
-                — flowcharts for book ingest, Imagine, and Q&amp;A / comments.
-              </span>
-            </li>
-            <li>
-              <Link
-                href="/admin/gutenberg-import"
-                className="font-medium text-accent-text underline-offset-2 hover:underline"
-              >
-                Gutenberg import
-              </Link>
-              <span className="text-text-muted"> — discovery queue and approvals.</span>
-            </li>
-            <li>
-              <Link
-                href="/admin/t2i-tester"
-                className="font-medium text-accent-text underline-offset-2 hover:underline"
-              >
-                T2I Tester
-              </Link>
-              <span className="text-text-muted">
-                {" "}
-                — fal.ai model comparison; saves JPEGs under t2i-output/ (not the gallery).
-              </span>
-            </li>
-          </ul>
-        </section>
-
-        <section aria-labelledby="dashboard-admin-quick-stats">
-          <SectionLabel label="Quick stats" />
-          <div className="dashboard-kpi-grid dashboard-kpi-grid--4">
-            <KpiCard label="Total users" value={admin.totalUsers} />
-            <KpiCard label="Live books" value={admin.liveBooksCount} sub="Published on Discover" />
-            <KpiCard label="Total books" value={admin.totalBooks} sub="All non-deleted" />
-            <KpiCard label="Pending review" value={admin.pendingReviewCount} />
-          </div>
-        </section>
-
+        {/* Book requests — unique to this tab, not shown elsewhere */}
         <section aria-labelledby="dashboard-admin-book-requests">
           <SectionLabel label="Book requests" />
           <p className="text-sm text-text-secondary">
@@ -930,6 +884,7 @@ export function DashboardClient({
           )}
         </section>
 
+        {/* Platform statistics with charts and vendor billing */}
         <AdminStatsClient initialData={adminStats} />
       </div>
     );
@@ -1053,6 +1008,26 @@ export function DashboardClient({
             <div className="dashboard-sidebar-user">
               <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
               <div className="dashboard-sidebar-name">{reader.displayName}</div>
+            </div>
+            {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a Publisher */}
+            <div className="dashboard-sidebar-cta-wrap">
+              {role === "reader" ? (
+                <button
+                  type="button"
+                  className="dashboard-sidebar-cta"
+                  onClick={() => { pushTab("partner-program"); closeSidebar(); }}
+                >
+                  ✦ Become a Publisher
+                </button>
+              ) : (
+                <Link
+                  href="/partner/books/new"
+                  className="dashboard-sidebar-cta no-underline"
+                  onClick={closeSidebar}
+                >
+                  ＋ Upload New Book
+                </Link>
+              )}
             </div>
             {navEntries.map(renderNavRow)}
           </aside>

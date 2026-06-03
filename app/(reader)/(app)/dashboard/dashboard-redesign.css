@@ -1304,3 +1304,214 @@
     transition: none;
   }
 }
+
+/* ── Sidebar nav group labels ─────────────────────────────────────────── */
+
+.dashboard-nav-group-label {
+  padding: 1rem 1.125rem 0.25rem;
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-muted) 60%, transparent);
+  pointer-events: none;
+  user-select: none;
+}
+
+/* First group-label in sidebar doesn't need extra top spacing */
+.dashboard-sidebar > .dashboard-nav-group-label:first-of-type {
+  padding-top: 0.375rem;
+}
+
+/* ── Sidebar dynamic CTA button ───────────────────────────────────────── */
+
+.dashboard-sidebar-cta-wrap {
+  padding: 0.75rem 0.875rem 1rem;
+}
+
+.dashboard-sidebar-cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.5625rem 1rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: color-mix(in srgb, var(--accent) 92%, var(--text-primary));
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dashboard-sidebar-cta:hover {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 18%, transparent);
+  transform: translateY(-1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-sidebar-cta:hover {
+    transform: none;
+  }
+}
+
+/* ── Admin overview: pending action items pills ───────────────────────── */
+
+.dashboard-action-items {
+  margin-bottom: 1.75rem;
+}
+
+.dashboard-action-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.dashboard-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5625rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border-subtle));
+  background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+
+.dashboard-action-pill:hover {
+  background: color-mix(in srgb, var(--accent) 13%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-action-pill:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.dashboard-action-pill-icon {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.dashboard-action-pill-count {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  color: color-mix(in srgb, var(--accent) 90%, var(--text-primary));
+}
+
+.dashboard-action-pill-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Partner My Books: prominent upload CTA card ──────────────────────── */
+
+.dashboard-upload-cta {
+  display: block;
+  border-radius: 10px;
+  border: 1.5px dashed color-mix(in srgb, var(--accent) 38%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 5%, var(--bg-surface));
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    border-style 0.15s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease;
+}
+
+.dashboard-upload-cta:hover {
+  background: color-mix(in srgb, var(--accent) 11%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  border-style: solid;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-upload-cta:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+
+.dashboard-upload-cta-inner {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  padding: 1.125rem 1.375rem;
+}
+
+.dashboard-upload-cta-icon {
+  font-size: 1.625rem;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.dashboard-upload-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-upload-cta-title {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.dashboard-upload-cta-sub {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.dashboard-upload-cta-arrow {
+  flex-shrink: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 1.25rem;
+  color: color-mix(in srgb, var(--accent) 65%, transparent);
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.dashboard-upload-cta:hover .dashboard-upload-cta-arrow {
+  transform: translateX(5px);
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-upload-cta:hover .dashboard-upload-cta-arrow {
+    transform: none;
+  }
+}
+

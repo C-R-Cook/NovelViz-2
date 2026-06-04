@@ -27,7 +27,7 @@
   font-size: 11px;
   letter-spacing: 0.35em;
   text-transform: uppercase;
-  color: rgba(180, 140, 100, 0.62);
+  color: var(--text-muted);
   margin-bottom: 1rem;
   transition:
     opacity 0.8s ease,
@@ -39,7 +39,7 @@
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 400;
   line-height: 1.1;
-  background: linear-gradient(135deg, #fff 0%, rgba(180, 140, 100, 0.92) 45%, #fff 100%);
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 45%, var(--text-primary) 100%);
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
@@ -79,7 +79,7 @@
 @media (prefers-reduced-motion: reduce) {
   .gallery-title {
     animation: none;
-    color: rgba(230, 210, 180, 0.95);
+    color: var(--text-primary);
     background: none;
     -webkit-background-clip: unset;
     background-clip: unset;

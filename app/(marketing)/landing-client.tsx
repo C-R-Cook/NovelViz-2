@@ -235,10 +235,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
         aria-label="Landing"
       >
         <Link href="/" className="landing-nav-brand">
-          <div className="landing-nav-logo" aria-hidden>
-            📖
-          </div>
-          <span className="landing-nav-wordmark">NOVELVIZ</span>
+          <span className="landing-nav-wordmark">NovelViz</span>
         </Link>
 
         <div className="landing-nav-links">

@@ -1,17 +1,19 @@
 /**
- * Inline before paint so saved `nv_theme` (or legacy `dev_palette`) matches SSR shell.
+ * Inline before-paint script so saved `nv_theme` (or legacy `dev_palette`) matches the SSR shell.
  * Keep in sync with `lib/theme-preference.ts` migration rules.
+ *
+ * Valid themes: candle-light (default), moonlight-silver.
+ * aged-parchment is a legacy value → normalises to candle-light.
  */
 export const THEME_HYDRATION_SCRIPT = `(function(){try{
 var SK="nv_theme";
 var LK="dev_palette";
-var V=["candle-light","aged-parchment"];
+var V=["candle-light","moonlight-silver"];
 function norm(p){
   if(!p)return"candle-light";
-  if(p==="aged-parchment")return"aged-parchment";
   if(p==="candle-light")return"candle-light";
-  var D=["moonlight-silver","deep-ocean","forest-dusk","antiquarian","midnight","moonlight","gothic","crimson","candlelight"];
-  if(D.indexOf(p)>=0)return"candle-light";
+  if(p==="moonlight-silver")return"moonlight-silver";
+  // aged-parchment removed; legacy dark themes all map to candle-light
   return"candle-light";
 }
 var id="candle-light";

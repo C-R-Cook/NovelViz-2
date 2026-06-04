@@ -9,6 +9,12 @@ type DiscoverParticleFieldProps = {
   className?: string;
 };
 
+/** Read the computed value of a CSS custom property from the document root. */
+function readCssVar(name: string): string {
+  if (typeof document === "undefined") return "rgb(180,140,100)";
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "rgb(180,140,100)";
+}
+
 /** Ambient particle + link lines (discover / landing). Respects reduced motion via parent hiding. */
 export function DiscoverParticleField({
   count = 60,
@@ -25,6 +31,16 @@ export function DiscoverParticleField({
     if (!ctx) return;
 
     let animId = 0;
+
+    // Read accent colour from the theme token so the particles adapt to theme switches.
+    let accentHex = readCssVar("--accent");
+
+    // Watch for theme changes and update the colour.
+    const observer = new MutationObserver(() => {
+      accentHex = readCssVar("--accent");
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
     const resize = () => {
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
@@ -52,8 +68,11 @@ export function DiscoverParticleField({
         if (p.y > canvas.height) p.y = 0;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180,140,100,${p.a * opacity})`;
+        // Use CSS color-mix or just set globalAlpha for opacity over the theme accent.
+        ctx.globalAlpha = p.a * opacity;
+        ctx.fillStyle = accentHex;
         ctx.fill();
+        ctx.globalAlpha = 1;
       });
       for (let i = 0; i < pts.length; i++) {
         for (let j = i + 1; j < pts.length; j++) {
@@ -64,9 +83,11 @@ export function DiscoverParticleField({
             ctx.beginPath();
             ctx.moveTo(pts[i].x, pts[i].y);
             ctx.lineTo(pts[j].x, pts[j].y);
-            ctx.strokeStyle = `rgba(180,140,100,${(1 - dist / linkDistance) * 0.08 * opacity})`;
+            ctx.globalAlpha = (1 - dist / linkDistance) * 0.08 * opacity;
+            ctx.strokeStyle = accentHex;
             ctx.lineWidth = 0.5;
             ctx.stroke();
+            ctx.globalAlpha = 1;
           }
         }
       }
@@ -77,6 +98,7 @@ export function DiscoverParticleField({
     return () => {
       cancelAnimationFrame(animId);
       window.removeEventListener("resize", resize);
+      observer.disconnect();
     };
   }, [count, linkDistance, opacity]);
 

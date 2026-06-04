@@ -98,7 +98,7 @@ function BookRow({
             {entry.reviewReasons.map((r) => (
               <span
                 key={r}
-                className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] uppercase text-[#C49A3C]"
+                className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] uppercase text-accent"
               >
                 {r}
               </span>
@@ -110,7 +110,7 @@ function BookRow({
         ) : null}
         {entry.manualUploadRequired || entry.skipAutoIngest ? (
           <span className="ml-2 inline-flex flex-wrap items-center gap-2">
-            <span className="rounded bg-[#8B4513]/20 px-1.5 py-0.5 text-[10px] uppercase text-[#E8A87C]">
+            <span className="rounded bg-accent-dim px-1.5 py-0.5 text-[10px] uppercase text-highlight">
               Manual EPUB
               {entry.epubSizeBytes ? ` · ${formatEpubSize(entry.epubSizeBytes)}` : ""}
             </span>
@@ -371,7 +371,7 @@ export function GutenbergImportClient() {
             {queue.totalSkippedDelta > 0 ? ` · ${queue.totalSkippedDelta} skipped (delta)` : ""}
             {state.deferred.entries.length > 0 ? ` · ${state.deferred.entries.length} deferred` : ""}
           </p>
-          <p className="text-[#C49A3C] border-t border-border/60 pt-2 mt-2">
+          <p className="text-accent border-t border-border/60 pt-2 mt-2">
             Ingested books are created as <strong>pending_review</strong>. They must be published via{" "}
             <Link href="/admin/books" className="underline text-text-primary">
               Books admin
@@ -386,7 +386,7 @@ export function GutenbergImportClient() {
       ) : null}
 
       {activeTab === "deferred" ? (
-        <section className="rounded-lg border border-[#8B4513]/40 bg-[#8B4513]/10 p-4">
+        <section className="rounded-lg border border-accent/40 bg-accent-dim p-4">
           <SectionHeader title="Deferred (manual / blocked)" count={state.deferred.entries.length} expanded />
           <p className="mt-2 text-xs text-text-secondary">
             Parked titles live in <code className="text-text-primary">scripts/gutenberg-queue-deferred.json</code>.

@@ -298,10 +298,10 @@ export function NewPartnerBookForm() {
       </div>
       {duplicateWarning ? (
         <div
-          className="rounded-lg border border-[#C49A3C]/40 bg-[#C49A3C]/10 p-4 space-y-3"
+          className="rounded-lg border border-accent/40 bg-accent-dim p-4 space-y-3"
           role="alert"
         >
-          <p className="text-sm text-[#C49A3C]">
+          <p className="text-sm text-accent">
             A book with this title and author already exists in the catalogue. Are you sure you
             want to add it?
           </p>
@@ -322,7 +322,7 @@ export function NewPartnerBookForm() {
               type="button"
               onClick={() => void submitBook(true)}
               disabled={submitting}
-              className="rounded-lg bg-[#C49A3C]/20 px-3 py-1.5 text-sm font-medium text-[#C49A3C] ring-1 ring-[#C49A3C]/40 transition hover:bg-[#C49A3C]/30 disabled:opacity-50"
+              className="rounded-lg bg-accent-dim px-3 py-1.5 text-sm font-medium text-accent ring-1 ring-accent/40 transition hover:bg-accent-muted/80 disabled:opacity-50"
             >
               Add anyway
             </button>

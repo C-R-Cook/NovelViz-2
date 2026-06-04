@@ -20,41 +20,43 @@
 
 /* -------------------------------------------------------------------------- */
 /* Themes — `data-theme` on `<html>`.                                         */
-/* - `candle-light` — default (dark)                                          */
-/* - `aged-parchment` — light                                                 */
-/* Persistence + future toggle: `lib/theme-preference.ts`, inline script in   */
-/* `lib/theme-hydration-script.ts`.                                           */
+/* - `candle-light` — warm gold on dark brown (default)                       */
+/* - `moonlight-silver` — cool blue on dark blue-grey                         */
+/* Persistence + toggle: `lib/theme-preference.ts`, inline script in          */
+/* `lib/theme-hydration-script.ts`. Toggle UI: `components/theme-switcher`.   */
 /* -------------------------------------------------------------------------- */
 html[data-theme="candle-light"] {
-  --bg-base: #0d0a06;
-  --bg-surface: #171208;
-  --bg-elevated: #201a0c;
-  --bg-hover: #2a2212;
+  --bg-base: #141208;
+  --bg-surface: #1e1a0e;
+  --bg-elevated: #282215;
+  --bg-hover: #342c1a;
 
-  --border-subtle: rgba(210, 170, 90, 0.08);
-  --border-default: rgba(210, 170, 90, 0.16);
-  --border-strong: rgba(210, 170, 90, 0.38);
+  /* Borders use rgba so they composite correctly over any surface */
+  --border-subtle: rgba(210, 170, 90, 0.12);
+  --border-default: rgba(210, 170, 90, 0.24);
+  --border-strong: rgba(210, 170, 90, 0.42);
 
-  --accent: #c49a3c;
-  --accent-dim: rgba(196, 154, 60, 0.18);
-  --accent-glow: rgba(196, 154, 60, 0.3);
+  --accent: #d4aa4a;
+  --accent-dim: rgba(212, 170, 74, 0.20);
+  --accent-glow: rgba(212, 170, 74, 0.32);
 
-  --highlight: #ddb96a;
-  --highlight-dim: rgba(221, 185, 106, 0.12);
+  --highlight: #e0ba5e;
+  --highlight-dim: rgba(224, 186, 94, 0.14);
 
-  --text-primary: #f0e6d0;
-  --text-secondary: rgba(230, 210, 170, 0.65);
-  --text-muted: rgba(210, 185, 140, 0.35);
-  --text-on-accent: #0d0a06;
+  /* Text tokens use solid hex for reliable WCAG contrast calculation */
+  --text-primary: #f5edda;
+  --text-secondary: #c4aa7e;
+  --text-muted: #8a7248;
+  --text-on-accent: #141208;
 
-  --badge-bg: rgba(196, 154, 60, 0.15);
-  --badge-text: #c49a3c;
+  --badge-bg: rgba(212, 170, 74, 0.16);
+  --badge-text: #d4aa4a;
 
   --shelf-shadow: rgba(20, 10, 0, 0.75);
-  --card-border-hover: rgba(196, 154, 60, 0.5);
+  --card-border-hover: rgba(212, 170, 74, 0.50);
 
   --glow-color: rgba(180, 130, 40, 0.12);
-  --logo-color: #ddb96a;
+  --logo-color: #e0ba5e;
 
   --border: var(--border-default);
   --accent-muted: var(--accent-dim);
@@ -65,36 +67,38 @@ html[data-theme="candle-light"] {
   --bg-overlay: rgba(0, 0, 0, 0.78);
 }
 
-html[data-theme="aged-parchment"] {
-  --bg-base: #f5edd8;
-  --bg-surface: #ede1c4;
-  --bg-elevated: #e4d5b0;
-  --bg-hover: #d8c89a;
+html[data-theme="moonlight-silver"] {
+  --bg-base: #12121a;
+  --bg-surface: #1a1a24;
+  --bg-elevated: #222230;
+  --bg-hover: #2e2e40;
 
-  --border-subtle: rgba(120, 80, 30, 0.1);
-  --border-default: rgba(120, 80, 30, 0.2);
-  --border-strong: rgba(120, 80, 30, 0.45);
+  /* Borders use rgba so they composite correctly over any surface */
+  --border-subtle: rgba(140, 160, 200, 0.10);
+  --border-default: rgba(140, 160, 200, 0.20);
+  --border-strong: rgba(140, 160, 200, 0.40);
 
-  --accent: #7b4f1e;
-  --accent-dim: rgba(123, 79, 30, 0.15);
-  --accent-glow: rgba(123, 79, 30, 0.25);
+  --accent: #8fb8d8;
+  --accent-dim: rgba(143, 184, 216, 0.18);
+  --accent-glow: rgba(143, 184, 216, 0.25);
 
-  --highlight: #a0622a;
-  --highlight-dim: rgba(160, 98, 42, 0.12);
+  --highlight: #aed2ec;
+  --highlight-dim: rgba(174, 210, 236, 0.12);
 
-  --text-primary: #2c1a0a;
-  --text-secondary: rgba(60, 35, 10, 0.7);
-  --text-muted: rgba(80, 50, 20, 0.4);
-  --text-on-accent: #f5edd8;
+  /* Text tokens use solid hex for reliable WCAG contrast calculation */
+  --text-primary: #f2efe8;
+  --text-secondary: #c4b99a;
+  --text-muted: #8a7d6a;
+  --text-on-accent: #12121a;
 
-  --badge-bg: rgba(123, 79, 30, 0.12);
-  --badge-text: #7b4f1e;
+  --badge-bg: rgba(143, 184, 216, 0.14);
+  --badge-text: #8fb8d8;
 
-  --shelf-shadow: rgba(50, 25, 0, 0.3);
-  --card-border-hover: rgba(123, 79, 30, 0.5);
+  --shelf-shadow: rgba(10, 12, 20, 0.80);
+  --card-border-hover: rgba(143, 184, 216, 0.50);
 
-  --glow-color: rgba(160, 100, 40, 0.08);
-  --logo-color: #7b4f1e;
+  --glow-color: rgba(100, 140, 190, 0.12);
+  --logo-color: #aed2ec;
 
   --border: var(--border-default);
   --accent-muted: var(--accent-dim);
@@ -102,7 +106,7 @@ html[data-theme="aged-parchment"] {
   --text-inverse: var(--text-on-accent);
   --accent-text: var(--accent);
   --accent-hover: var(--highlight);
-  --bg-overlay: rgba(44, 26, 10, 0.45);
+  --bg-overlay: rgba(0, 0, 0, 0.78);
 }
 
 html[data-theme] {
@@ -150,12 +154,9 @@ html[data-theme] {
   --font-mono: var(--font-geist-mono);
 }
 
-html[data-theme="candle-light"] {
+html[data-theme="candle-light"],
+html[data-theme="moonlight-silver"] {
   color-scheme: dark;
-}
-
-html[data-theme="aged-parchment"] {
-  color-scheme: light;
 }
 
 body {
@@ -290,5 +291,26 @@ html[data-theme="candle-light"]
   :is(button, a[href], [role="button"], summary).border-accent\/70.text-accent-text:not([data-active-tab]),
 html[data-theme="candle-light"]
   :is(button, a[href], [role="button"], summary).border-accent\/80.text-accent-text:not([data-active-tab]) {
+  color: var(--text-on-accent) !important;
+}
+
+/*
+ * MOONLIGHT SILVER — cool blue accent: primary buttons with bg-accent need dark foreground.
+ */
+html[data-theme="moonlight-silver"]
+  :is(button, input[type="button"], input[type="submit"], input[type="reset"], a[href], summary)[class~="bg-accent"],
+html[data-theme="moonlight-silver"] [role="button"][class~="bg-accent"] {
+  color: var(--text-on-accent) !important;
+}
+
+html[data-theme="moonlight-silver"]
+  :is(button, input[type="button"], input[type="submit"], input[type="reset"], a[href], summary):is(
+    [class~="bg-accent/95"],
+    [class~="bg-accent/90"],
+    [class~="bg-accent/85"],
+    [class~="bg-accent/80"]
+  ),
+html[data-theme="moonlight-silver"]
+  [role="button"]:is([class~="bg-accent/95"], [class~="bg-accent/90"], [class~="bg-accent/85"], [class~="bg-accent/80"]) {
   color: var(--text-on-accent) !important;
 }

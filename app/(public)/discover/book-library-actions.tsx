@@ -13,7 +13,7 @@ type Props = {
 };
 
 const discoverCtaBtn =
-  "rounded border px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)] disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded border px-6 py-2.5 text-xs font-bold uppercase tracking-[0.2em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 disabled:cursor-not-allowed disabled:opacity-60";
 
 export function BookLibraryActions({
   bookId,

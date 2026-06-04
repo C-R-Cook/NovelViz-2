@@ -242,7 +242,7 @@ function ShelfFeaturedCard({
         setHovered(false);
         onShelfHoverIndex(null);
       }}
-      className={`discover-shelf-card shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)] ${
+      className={`discover-shelf-card shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
         isSelected ? "discover-shelf-card--active" : ""
       } ${hovered && !isSelected && finePointer ? "discover-shelf-card--hover" : ""} ${reducedMotion ? "discover-shelf-card--reduced-motion" : ""} ${!reducedMotion ? "discover-shelf-card-enter" : ""}`}
       style={{
@@ -942,7 +942,7 @@ export function DiscoverCatalogueClient({
                       title={pill.label}
                       className={`discover-concept-vision-pill max-w-[11rem] truncate rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
                         active
-                          ? "border border-[rgba(180,140,100,0.45)] bg-[rgba(180,140,100,0.15)] text-[rgba(230,200,160,0.95)]"
+                          ? "border border-accent/45 bg-accent-dim text-text-primary"
                           : "border border-white/[0.08] bg-transparent text-white/35 hover:border-white/15 hover:text-white/50"
                       }`}
                     >
@@ -972,13 +972,13 @@ export function DiscoverCatalogueClient({
                           : undefined
                       }
                     >
-                      <Link href="/gallery" className="block outline-none focus-visible:ring-2 focus-visible:ring-[rgba(180,140,100,0.45)]">
+                      <Link href="/gallery" className="block outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={img.imageUrl} alt="" className="discover-concept-vision-img" />
                         <div className="discover-concept-vision-grad" />
                         <div className="discover-concept-vision-badge font-mono">CH. {img.chapterNumberAtTime}</div>
                         <div className="discover-concept-vision-bottom">
-                          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[rgba(180,140,100,0.9)]">
+                          <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-text">
                             {img.bookTitle}
                           </div>
                           <div className="mt-1 font-serif text-xs leading-snug text-white/85 line-clamp-2">
@@ -1001,7 +1001,7 @@ export function DiscoverCatalogueClient({
             <div className="mt-10 text-center">
               <Link
                 href="/gallery"
-                className="inline-block rounded border border-[rgba(180,140,100,0.28)] px-10 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-[rgba(180,140,100,0.75)] transition hover:border-[rgba(180,140,100,0.45)] hover:text-[rgba(230,200,160,0.95)]"
+                className="inline-block rounded border border-accent/28 px-10 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-accent/75 transition hover:border-accent/45 hover:text-text-primary"
               >
                 Explore all images
               </Link>
@@ -1010,12 +1010,12 @@ export function DiscoverCatalogueClient({
         ) : null}
 
         {!searchActive && showFeatured ? (
-          <section className="discover-concept-cta relative mb-14 overflow-hidden rounded-lg border border-[rgba(180,140,100,0.18)] px-6 py-10 sm:px-10 sm:py-12">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(180,140,100,0.06)] to-[rgba(139,26,26,0.05)]" />
+          <section className="discover-concept-cta relative mb-14 overflow-hidden rounded-lg border border-accent/18 px-6 py-10 sm:px-10 sm:py-12">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-dim to-transparent" />
             {!reducedMotion ? <DiscoverParticleField /> : null}
             <div className="relative z-[1] flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-[rgba(180,140,100,0.55)]">
+                <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-text-muted">
                   Begin your journey
                 </p>
                 <p className="mt-3 font-serif text-2xl text-white sm:text-3xl">Read without fear.</p>
@@ -1026,13 +1026,13 @@ export function DiscoverCatalogueClient({
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/sign-in"
-                  className="rounded border-0 bg-[rgba(180,140,100,0.9)] px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#0a0806] transition hover:brightness-110"
+                  className="rounded border-0 bg-accent px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-text-on-accent transition hover:brightness-110"
                 >
                   Join free →
                 </Link>
                 <Link
                   href="/books"
-                  className="rounded border border-[rgba(180,140,100,0.35)] bg-transparent px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-[rgba(180,140,100,0.75)] transition hover:border-[rgba(180,140,100,0.55)] hover:text-[rgba(230,200,160,0.95)]"
+                  className="rounded border border-accent/35 bg-transparent px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-accent/75 transition hover:border-accent/55 hover:text-text-primary"
                 >
                   Browse books
                 </Link>

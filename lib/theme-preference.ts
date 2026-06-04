@@ -1,13 +1,13 @@
 /**
  * App colour themes (maps to `data-theme` on `<html>`).
- * - `candle-light` — default “dark” experience
- * - `aged-parchment` — “light” experience
+ * - `candle-light` — warm gold on dark brown (default)
+ * - `moonlight-silver` — cool blue on dark blue-grey
  *
- * UI to toggle is not shipped yet; use `setAppColorScheme` / `persistTheme` + `applyTheme`
- * when you add a light/dark control.
+ * Toggle UI: `components/theme-switcher.tsx`
+ * Use `applyTheme` + `persistTheme` to change themes at runtime.
  */
 
-export const THEME_IDS = ["candle-light", "aged-parchment"] as const;
+export const THEME_IDS = ["candle-light", "moonlight-silver"] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
 
@@ -18,32 +18,41 @@ const STORAGE_KEY = "nv_theme";
 /** @deprecated read only for one-time migration */
 const LEGACY_DEV_PALETTE_KEY = "dev_palette";
 
-const LEGACY_DARK_THEME_IDS = new Set<string>([
-  "moonlight-silver",
+/**
+ * Legacy theme IDs that mapped to candle-light in the old 5-theme system.
+ * Keep these so any user with an old `nv_theme` value still gets a valid theme.
+ */
+const LEGACY_CANDLE_THEME_IDS = new Set<string>([
   "deep-ocean",
   "forest-dusk",
   "antiquarian",
   "midnight",
-  "moonlight",
   "gothic",
   "crimson",
   "candlelight",
 ]);
 
+/** Legacy IDs that map to aged-parchment → now normalise to candle-light since that theme is removed. */
+const LEGACY_AGED_PARCHMENT_IDS = new Set<string>(["aged-parchment"]);
+
 export function normalizeThemeId(raw: string | null | undefined): ThemeId {
   if (!raw) return "candle-light";
-  if (raw === "aged-parchment") return "aged-parchment";
   if (raw === "candle-light") return "candle-light";
-  if (LEGACY_DARK_THEME_IDS.has(raw)) return "candle-light";
+  if (raw === "moonlight-silver") return "moonlight-silver";
+  // aged-parchment was removed — fall back to candle-light
+  if (LEGACY_AGED_PARCHMENT_IDS.has(raw)) return "candle-light";
+  if (LEGACY_CANDLE_THEME_IDS.has(raw)) return "candle-light";
   return "candle-light";
 }
 
 export function colorSchemeToThemeId(scheme: ColorScheme): ThemeId {
-  return scheme === "light" ? "aged-parchment" : "candle-light";
+  // Both current themes are dark; light scheme falls back to candle-light
+  return "candle-light";
 }
 
 export function themeIdToColorScheme(id: ThemeId): ColorScheme {
-  return id === "aged-parchment" ? "light" : "dark";
+  // Both themes are dark — kept in case callers depend on this
+  return "dark";
 }
 
 export function applyTheme(id: ThemeId): void {

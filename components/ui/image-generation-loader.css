@@ -1,10 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500&display=swap");
 
-/* Landing hero title palette — landing-redesign.css .landing-hero-title */
+/*
+ * Image generation loader — shimmer + particle animation.
+ * All colours reference theme tokens so the loader works correctly on both
+ * candle-light and moonlight-silver without any changes.
+ */
 .image-generation-loader {
-  --loader-shine-1: #ede0c8;
-  --loader-shine-2: rgba(180, 140, 100, 0.95);
-  --loader-shine-3: rgba(220, 190, 140, 0.9);
+  --loader-shine-1: var(--text-primary);
+  --loader-shine-2: var(--accent);
+  --loader-shine-3: var(--highlight);
   --loader-shine-gradient: linear-gradient(
     135deg,
     var(--loader-shine-1) 0%,
@@ -12,8 +16,8 @@
     var(--loader-shine-1) 70%,
     var(--loader-shine-3) 100%
   );
-  --loader-glow: rgba(180, 140, 100, 0.45);
-  --loader-glow-soft: rgba(220, 190, 140, 0.25);
+  --loader-glow: var(--accent-glow);
+  --loader-glow-soft: var(--highlight-dim);
 
   display: flex;
   flex-direction: column;
@@ -40,7 +44,7 @@
 /* Layer 1 — dim latent track */
 .image-generation-loader__path-base {
   fill: none;
-  stroke: rgba(180, 140, 100, 0.55);
+  stroke: var(--accent-dim);
   stroke-width: 2.25;
   stroke-linecap: round;
   stroke-linejoin: round;

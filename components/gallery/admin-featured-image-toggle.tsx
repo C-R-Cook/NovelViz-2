@@ -78,7 +78,7 @@ export function AdminFeaturedImageToggle({
         }
         className={`${baseClass} ${
           featured
-            ? "border-[#C49A3C]/45 bg-[#C49A3C]/15 text-[#C49A3C]"
+            ? "border-accent/45 bg-accent-dim text-accent"
             : "border-border bg-bg-surface text-text-primary"
         } ${className ?? ""}`}
       >

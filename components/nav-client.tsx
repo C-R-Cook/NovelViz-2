@@ -1,6 +1,7 @@
 "use client";
 
 import { NotificationsBell } from "@/components/notifications-bell";
+import { ThemeSwitcher } from "@/components/theme-switcher";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
@@ -200,6 +201,7 @@ export function NavChrome({
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <ThemeSwitcher />
           {isLoggedIn && userRole ? (
             <>
               <NotificationsBell />

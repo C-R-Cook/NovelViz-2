@@ -162,6 +162,26 @@ const SECTIONS: FAQSection[] = [
     ],
   },
 
+  // ----- Plans & billing (placeholders — finalize before launch) -----
+  {
+    title: "Plans & billing",
+    id: "plans-billing",
+    items: [
+      {
+        q: "What happens when I upgrade mid-month?",
+        a: "[PLACEHOLDER — TO FINALIZE] When you upgrade to a higher tier, Stripe charges a prorated amount for the rest of your billing cycle. As a thank-you for upgrading, we reset your monthly image and Q&A counters so you receive the full allowance for your new tier right away. Your purchased credit balance is not affected.",
+      },
+      {
+        q: "What happens when I downgrade?",
+        a: "[PLACEHOLDER — TO FINALIZE] Downgrades take effect at the end of your current billing period — you keep your current tier's limits until then. We do not reset your usage counters when you downgrade. This prevents gaming the system by upgrading and downgrading repeatedly to farm extra allowance.",
+      },
+      {
+        q: "How do credit packs work?",
+        a: "[PLACEHOLDER — TO FINALIZE] Credit packs are one-time top-ups that never expire. Your monthly subscription allowance is always used first; credits are only spent after that monthly quota is exhausted. Images and questions can cost different amounts of credits. Upgrading your subscription tier can lower the per-credit price on future pack purchases.",
+      },
+    ],
+  },
+
   // ----- Account & Privacy -----
   {
     title: "Account & Privacy",

@@ -136,6 +136,13 @@ enum GrantSource {
   PURCHASE
 }
 
+enum CreditTransactionReason {
+  PURCHASE
+  SPEND_QUERY
+  SPEND_IMAGE
+  ADMIN_ADJUST
+}
+
 model Book {
   id                           String     @id @default(cuid())
   title                        String
@@ -257,10 +264,18 @@ model User {
   genrePreferences        String[]  @default([])
   /// When true (default), spoiler-style images are hidden until reading progress catches up unless overridden per book.
   globalSpoilerProtection Boolean            @default(true)
-  subscriptionTier        SubscriptionTier   @default(standard)
+  subscriptionTier        SubscriptionTier   @default(free)
   subscriptionStatus      SubscriptionStatus @default(active)
   stripeCustomerId        String?
+  stripeSubscriptionId    String?
   usagePeriodAnchor       Int                @default(1)
+  /// Authoritative billing period start for quota counting (Stripe period when subscribed).
+  usagePeriodStart        DateTime?
+  /// Grandfathered monthly limits — global tier decreases never reduce below these; increases still apply.
+  queriesLimitFloor       Int?
+  imagesLimitFloor        Int?
+  /// When true, queries remain unlimited regardless of lowered global tier config.
+  queriesUnlimitedFloor   Boolean            @default(false)
 
   userBooks       UserBook[]
   ownedBooks      Book[]    @relation("OwnedBooks")
@@ -278,9 +293,93 @@ model User {
   grants                 UserGrant[]
   badges                 UserBadge[]
   coverAiQuotaRequests   CoverAiQuotaRequest[]
+  creditTransactions     CreditTransaction[]
+  quotaOverrides         UserQuotaOverride[]
+  aiServiceFailures      AiServiceFailure[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// One row per subscription tier — admin-editable limits and credit settings.
+model TierLimitConfig {
+  tier                   SubscriptionTier @id
+  queriesPerMonth        Int?
+  imagesPerMonth         Int?
+  allowedModels          String[]         @default([])
+  creditPurchasesEnabled Boolean          @default(false)
+  creditCostQuery        Int              @default(1)
+  creditCostImage        Int              @default(3)
+  displayPriceMonthly    String?
+  stripePriceId          String?
+  updatedAt              DateTime         @updatedAt
+  updatedBy              String?
+}
+
+/// Admin-configurable one-time credit packs (tier-priced).
+model CreditPack {
+  id              String   @id @default(cuid())
+  name            String
+  credits         Int
+  active          Boolean  @default(true)
+  priceFree       Int      @default(0)
+  priceStandard   Int      @default(0)
+  pricePremium    Int      @default(0)
+  stripePriceId   String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  transactions CreditTransaction[]
+}
+
+/// Immutable credit ledger — balance is sum of amounts per user.
+model CreditTransaction {
+  id                    String                  @id @default(cuid())
+  userId                String
+  user                  User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount                Int
+  reason                CreditTransactionReason
+  bookId                String?
+  creditPackId          String?
+  creditPack            CreditPack?             @relation(fields: [creditPackId], references: [id], onDelete: SetNull)
+  stripePaymentIntentId String?
+  grantedBy             String?
+  note                  String?
+  createdAt             DateTime                @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([bookId])
+}
+
+/// Per-user quota limit override (takes precedence over tier defaults).
+model UserQuotaOverride {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  queriesLimit  Int?
+  imagesLimit   Int?
+  expiresAt     DateTime?
+  reason        String
+  grantedBy     String
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+}
+
+/// Logged when AI upstream fails — not deducted from quota.
+model AiServiceFailure {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route        String
+  bookId       String?
+  errorSummary String   @db.Text
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model UserGrant {

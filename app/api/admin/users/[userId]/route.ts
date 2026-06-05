@@ -1,7 +1,10 @@
 import { requireAdminApi } from "@/lib/admin-auth";
 import { BADGES, getBadgeDefinition } from "@/lib/badges";
 import { prisma } from "@/lib/prisma";
-import { checkUsageLimit, getEffectiveLimits, getUsagePeriodStart } from "@/lib/subscription";
+import { getCreditBalance, getCreditTransactions } from "@/lib/credits";
+import { establishLimitFloorsForTier } from "@/lib/limit-floors";
+import { checkUsageLimit, getEffectiveLimits, resolveBillingPeriod } from "@/lib/subscription";
+import { SubscriptionTier } from "@db";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -28,6 +31,9 @@ export async function GET(_request: Request, context: RouteContext) {
       subscriptionStatus: true,
       stripeCustomerId: true,
       usagePeriodAnchor: true,
+      queriesLimitFloor: true,
+      imagesLimitFloor: true,
+      queriesUnlimitedFloor: true,
       createdAt: true,
     },
   });
@@ -36,10 +42,10 @@ export async function GET(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  const periodStart = getUsagePeriodStart(user.usagePeriodAnchor);
+  const { periodStart, resetDate } = await resolveBillingPeriod(userId);
   const limitSnapshot = await checkUsageLimit(userId, "query");
 
-  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits] =
+  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits, creditBalance, creditTransactions, quotaOverrides, allTimeQueries, allTimeImages, ownedBooks] =
     await Promise.all([
       prisma.userGrant.findMany({
         where: {
@@ -53,6 +59,20 @@ export async function GET(_request: Request, context: RouteContext) {
       prisma.query.count({ where: { userId, createdAt: { gte: periodStart } } }),
       prisma.generatedImage.count({ where: { userId, createdAt: { gte: periodStart } } }),
       getEffectiveLimits(userId),
+      getCreditBalance(userId),
+      getCreditTransactions(userId, { limit: 50 }),
+      prisma.userQuotaOverride.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      }),
+      prisma.query.count({ where: { userId } }),
+      prisma.generatedImage.count({ where: { userId } }),
+      prisma.book.findMany({
+        where: { ownerId: userId, deletedAt: null },
+        select: { id: true, title: true, author: true, status: true },
+        orderBy: { title: "asc" },
+      }),
     ]);
 
   const badgeByKey = new Map(badgeRows.map((b) => [b.badgeKey, b]));
@@ -85,9 +105,76 @@ export async function GET(_request: Request, context: RouteContext) {
     usage: {
       queriesThisPeriod,
       imagesThisPeriod,
+      allTimeQueries,
+      allTimeImages,
       effectiveLimits,
+      limitFloors: {
+        queriesLimitFloor: user.queriesLimitFloor,
+        imagesLimitFloor: user.imagesLimitFloor,
+        queriesUnlimitedFloor: user.queriesUnlimitedFloor,
+      },
       periodStart: periodStart.toISOString(),
-      resetDate: limitSnapshot.resetDate.toISOString(),
+      resetDate: resetDate.toISOString(),
+      creditBalance,
+    },
+    creditTransactions: creditTransactions.map((t) => ({
+      ...t,
+      createdAt: t.createdAt.toISOString(),
+    })),
+    quotaOverrides: quotaOverrides.map((o) => ({
+      ...o,
+      expiresAt: o.expiresAt?.toISOString() ?? null,
+      createdAt: o.createdAt.toISOString(),
+    })),
+    ownedBooks,
+  });
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  const auth = await requireAdminApi();
+  if (!auth.ok) return auth.response;
+
+  const { userId } = await context.params;
+  let body: Record<string, unknown>;
+  try {
+    body = (await request.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const data: Record<string, unknown> = {};
+  if ("subscriptionTier" in body) {
+    const tier = body.subscriptionTier;
+    if (tier !== "free" && tier !== "standard" && tier !== "premium") {
+      return NextResponse.json({ error: "Invalid subscriptionTier" }, { status: 400 });
+    }
+    data.subscriptionTier = tier as SubscriptionTier;
+  }
+  if ("subscriptionStatus" in body) {
+    const status = body.subscriptionStatus;
+    if (status !== "active" && status !== "cancelled" && status !== "past_due" && status !== "trialing") {
+      return NextResponse.json({ error: "Invalid subscriptionStatus" }, { status: 400 });
+    }
+    data.subscriptionStatus = status;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: data as Parameters<typeof prisma.user.update>[0]["data"],
+    select: {
+      id: true,
+      subscriptionTier: true,
+      subscriptionStatus: true,
     },
   });
+
+  if ("subscriptionTier" in data && typeof data.subscriptionTier === "string") {
+    await establishLimitFloorsForTier(userId, data.subscriptionTier as SubscriptionTier);
+  }
+
+  return NextResponse.json({ user });
 }

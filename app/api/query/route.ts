@@ -2,7 +2,8 @@ import anthropic from "@/lib/anthropic";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
-import { checkUsageLimit, consumeTopUp } from "@/lib/subscription";
+import { aiFailureResponse } from "@/lib/ai-service-failure";
+import { checkUsageLimit, consumeUsageAfterSuccess, getEffectiveLimits } from "@/lib/subscription";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -73,7 +74,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limitCheck = await checkUsageLimit(dbUser.id, "query");
+  const [limitCheck, effectiveLimits] = await Promise.all([
+    checkUsageLimit(dbUser.id, "query"),
+    getEffectiveLimits(dbUser.id),
+  ]);
   if (!limitCheck.allowed) {
     return NextResponse.json(
       {
@@ -82,7 +86,10 @@ export async function POST(request: Request) {
         used: limitCheck.used,
         limit: limitCheck.limit,
         resetDate: limitCheck.resetDate,
-        topUpAvailable: limitCheck.topUpAvailable,
+        creditBalance: limitCheck.creditBalance,
+        creditCost: limitCheck.creditCost,
+        tier: effectiveLimits.tier,
+        creditPurchasesEnabled: effectiveLimits.creditPurchasesEnabled,
       },
       { status: 429 },
     );
@@ -136,13 +143,10 @@ export async function POST(request: Request) {
     embeddingVec = embeddings[0] ?? [];
   } catch (e) {
     console.error("[api/query POST] embed", e);
-    return NextResponse.json(
-      { error: "Failed to embed question. Check OPENAI_API_KEY." },
-      { status: 500 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/query", bookId, e);
   }
   if (embeddingVec.length === 0) {
-    return NextResponse.json({ error: "Failed to embed question" }, { status: 500 });
+    return aiFailureResponse(dbUser.id, "/api/query", bookId, new Error("Empty embedding"));
   }
 
   const vectorStr = `[${embeddingVec.join(",")}]`;
@@ -160,10 +164,7 @@ export async function POST(request: Request) {
     `;
   } catch (e) {
     console.error("[api/query POST] vector search", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Similarity search failed" },
-      { status: 500 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/query", bookId, e);
   }
 
   const excerptBlocks = chunks.map((row, i) => {
@@ -230,23 +231,11 @@ My question: ${questionText}`;
     }
   } catch (e) {
     console.error("[api/query POST] Anthropic error", e);
-    return NextResponse.json(
-      {
-        error:
-          "Failed to get model response. Configure a valid model with ANTHROPIC_MODEL if needed.",
-      },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/query", bookId, e);
   }
 
   if (responseText === "") {
-    return NextResponse.json(
-      {
-        error:
-          "Failed to get model response. Configure a valid model with ANTHROPIC_MODEL if needed.",
-      },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/query", bookId, new Error("Empty model response"));
   }
 
   await prisma.query.create({
@@ -263,9 +252,9 @@ My question: ${questionText}`;
   });
 
   try {
-    await consumeTopUp(dbUser.id, "query");
+    await consumeUsageAfterSuccess(dbUser.id, "query", bookId);
   } catch (err) {
-    console.error("[api/query POST] consumeTopUp error", err);
+    console.error("[api/query POST] consumeUsageAfterSuccess error", err);
   }
 
   return NextResponse.json({ questionText, responseText });

@@ -42,17 +42,48 @@ type DetailPayload = {
   };
   activeGrants: GrantRow[];
   allBadges: BadgeRow[];
-  usage: {
-    queriesThisPeriod: number;
-    imagesThisPeriod: number;
-    effectiveLimits: {
-      queriesPerMonth: number | null;
-      imagesPerMonth: number | null;
-      tier: string;
+    usage: {
+      queriesThisPeriod: number;
+      imagesThisPeriod: number;
+      allTimeQueries: number;
+      allTimeImages: number;
+      effectiveLimits: {
+        queriesPerMonth: number | null;
+        imagesPerMonth: number | null;
+        tier: string;
+      };
+      limitFloors: {
+        queriesLimitFloor: number | null;
+        imagesLimitFloor: number | null;
+        queriesUnlimitedFloor: boolean;
+      };
+      periodStart: string;
+      resetDate: string;
+      creditBalance: number;
     };
-    periodStart: string;
-    resetDate: string;
-  };
+  creditTransactions: Array<{
+    id: string;
+    amount: number;
+    reason: string;
+    bookId: string | null;
+    note: string | null;
+    createdAt: string;
+  }>;
+  quotaOverrides: Array<{
+    id: string;
+    queriesLimit: number | null;
+    imagesLimit: number | null;
+    expiresAt: string | null;
+    reason: string;
+    grantedBy: string;
+    createdAt: string;
+  }>;
+  ownedBooks: Array<{
+    id: string;
+    title: string;
+    author: string;
+    status: string;
+  }>;
 };
 
 type Tab = "account" | "subscription" | "badges";
@@ -136,6 +167,16 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
   const [badgeBusy, setBadgeBusy] = useState(false);
   const [badgeErr, setBadgeErr] = useState<string | null>(null);
 
+  const [editTier, setEditTier] = useState<"free" | "standard" | "premium">("free");
+  const [tierBusy, setTierBusy] = useState(false);
+  const [overrideQueries, setOverrideQueries] = useState("");
+  const [overrideImages, setOverrideImages] = useState("");
+  const [overrideReason, setOverrideReason] = useState("");
+  const [overrideBusy, setOverrideBusy] = useState(false);
+  const [creditAdjust, setCreditAdjust] = useState("");
+  const [creditNote, setCreditNote] = useState("");
+  const [creditBusy, setCreditBusy] = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -147,7 +188,11 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
         setData(null);
         return;
       }
-      setData((await res.json()) as DetailPayload);
+      const payload = (await res.json()) as DetailPayload;
+      setData(payload);
+      if (payload.user.subscriptionTier) {
+        setEditTier(payload.user.subscriptionTier as "free" | "standard" | "premium");
+      }
     } catch {
       setError("Failed to load user");
       setData(null);
@@ -432,6 +477,19 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
               })}
             </p>
 
+            <p className="mb-3 text-xs text-text-muted">
+              All-time: {data.usage.allTimeQueries} queries · {data.usage.allTimeImages} images ·{" "}
+              {data.usage.creditBalance} credits
+            </p>
+            <p className="mb-3 text-xs text-text-muted">
+              Grandfathered floors: Q&A{" "}
+              {data.usage.limitFloors.queriesUnlimitedFloor
+                ? "unlimited"
+                : (data.usage.limitFloors.queriesLimitFloor ?? "—")}
+              {" · "}images {data.usage.limitFloors.imagesLimitFloor ?? "—"} (global decreases never go below
+              these)
+            </p>
+
             <div className="space-y-5">
               <div>
                 <div className="flex items-baseline justify-between text-sm">
@@ -459,11 +517,205 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
               </div>
             </div>
           </section>
+
+          {data.user.role === "partner" || data.user.role === "admin" ? (
+            <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">
+              <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
+                Partner books
+              </h2>
+              {data.ownedBooks.length === 0 ? (
+                <p className="text-sm text-text-muted">No owned books.</p>
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {data.ownedBooks.map((b) => (
+                    <li key={b.id}>
+                      <Link
+                        href={`/admin/books/${b.id}`}
+                        className="text-accent-text hover:underline"
+                      >
+                        {b.title}
+                      </Link>
+                      <span className="text-text-muted"> · {b.author} · {b.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          ) : null}
         </div>
       ) : null}
 
       {data && tab === "subscription" ? (
         <div className="space-y-6">
+          <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">
+            <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
+              Subscription tier (admin override)
+            </h2>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="text-sm">
+                Tier
+                <select
+                  value={editTier}
+                  onChange={(e) => setEditTier(e.target.value as typeof editTier)}
+                  className="mt-1 block rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                >
+                  <option value="free">Free</option>
+                  <option value="standard">Standard</option>
+                  <option value="premium">Premium</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={tierBusy}
+                onClick={async () => {
+                  setTierBusy(true);
+                  try {
+                    await fetch(`/api/admin/users/${userId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ subscriptionTier: editTier }),
+                    });
+                    await load();
+                  } finally {
+                    setTierBusy(false);
+                  }
+                }}
+                className="rounded-md bg-accent px-3 py-2 text-sm text-bg-base"
+              >
+                Save tier
+              </button>
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">
+            <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
+              Quota override
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm">
+                Queries limit (blank = tier default)
+                <input
+                  className="mt-1 w-full rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                  value={overrideQueries}
+                  onChange={(e) => setOverrideQueries(e.target.value)}
+                />
+              </label>
+              <label className="text-sm">
+                Images limit (blank = tier default)
+                <input
+                  className="mt-1 w-full rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                  value={overrideImages}
+                  onChange={(e) => setOverrideImages(e.target.value)}
+                />
+              </label>
+              <label className="text-sm sm:col-span-2">
+                Reason
+                <input
+                  className="mt-1 w-full rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              disabled={overrideBusy}
+              className="mt-3 rounded-md border border-border px-3 py-2 text-sm"
+              onClick={async () => {
+                setOverrideBusy(true);
+                try {
+                  const q = overrideQueries.trim();
+                  const i = overrideImages.trim();
+                  await fetch(`/api/admin/users/${userId}/quota-overrides`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      queriesLimit: q === "" ? null : Number.parseInt(q, 10),
+                      imagesLimit: i === "" ? null : Number.parseInt(i, 10),
+                      reason: overrideReason.trim(),
+                    }),
+                  });
+                  setOverrideReason("");
+                  await load();
+                } finally {
+                  setOverrideBusy(false);
+                }
+              }}
+            >
+              Add override
+            </button>
+            {data.quotaOverrides.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-xs text-text-muted">
+                {data.quotaOverrides.map((o) => (
+                  <li key={o.id}>
+                    Q: {o.queriesLimit ?? "default"} · Img: {o.imagesLimit ?? "default"} — {o.reason}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
+          <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">
+            <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
+              Credits ({data.usage.creditBalance} balance)
+            </h2>
+            <div className="flex flex-wrap gap-3">
+              <input
+                type="number"
+                placeholder="Amount (+/-)"
+                value={creditAdjust}
+                onChange={(e) => setCreditAdjust(e.target.value)}
+                className="rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+              />
+              <input
+                placeholder="Note"
+                value={creditNote}
+                onChange={(e) => setCreditNote(e.target.value)}
+                className="min-w-[12rem] flex-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={creditBusy}
+                className="rounded-md bg-accent px-3 py-2 text-sm text-bg-base"
+                onClick={async () => {
+                  setCreditBusy(true);
+                  try {
+                    await fetch(`/api/admin/users/${userId}/credits`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        amount: Number.parseInt(creditAdjust, 10),
+                        note: creditNote.trim(),
+                      }),
+                    });
+                    setCreditAdjust("");
+                    setCreditNote("");
+                    await load();
+                  } finally {
+                    setCreditBusy(false);
+                  }
+                }}
+              >
+                Adjust credits
+              </button>
+            </div>
+            {data.creditTransactions.length > 0 ? (
+              <ul className="mt-4 max-h-48 overflow-y-auto text-xs text-text-muted">
+                {data.creditTransactions.map((t) => (
+                  <li key={t.id} className="flex justify-between py-1">
+                    <span>
+                      {t.reason} {t.note ? `— ${t.note}` : ""}
+                    </span>
+                    <span className={t.amount >= 0 ? "text-green-400" : ""}>
+                      {t.amount >= 0 ? "+" : ""}
+                      {t.amount}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </section>
+
           <section className="rounded-lg border border-border-subtle">
             <h2 className="border-b border-border-subtle bg-bg-surface px-4 py-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
               Active grants

@@ -25,6 +25,13 @@ export const ADMIN_HELPERS_NAV_LINKS: readonly AdminHelperNavLink[] = [
     hint: "Edit default prompts + allowed fal models",
   },
   {
+    id: "helper-subscription-settings",
+    href: "/admin/subscription-settings",
+    label: "Subscription & credits",
+    icon: "💳",
+    hint: "Tier limits, credit packs, and pricing",
+  },
+  {
     id: "helper-bulk-chapters",
     href: "/admin/chapters/bulk-delete",
     label: "Bulk chapter delete",

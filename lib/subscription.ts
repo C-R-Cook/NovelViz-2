@@ -1,34 +1,19 @@
+import { getCreditBalance } from "@/lib/credits";
+import { applyLimitFloors, ensureLimitFloorsInitialized } from "@/lib/limit-floors";
 import { prisma } from "@/lib/prisma";
-import { GrantSource, GrantType, SubscriptionTier } from "@db";
+import { getTierLimitConfig } from "@/lib/tier-limit-config";
+import { GrantSource, GrantType, SubscriptionTier, UserRole } from "@db";
 
 export const BETA_MODE: boolean = process.env.BETA_MODE === "true";
-
-const GROK_ENDPOINT = "xai/grok-imagine-image";
-const SEEDREAM_ENDPOINT = "fal-ai/bytedance/seedream/v4.5/text-to-image";
-
-export const TIER_CONFIG = {
-  free: {
-    queriesPerMonth: null as number | null,
-    imagesPerMonth: 5,
-    models: [GROK_ENDPOINT],
-  },
-  standard: {
-    queriesPerMonth: null as number | null,
-    imagesPerMonth: 50,
-    models: [GROK_ENDPOINT],
-  },
-  premium: {
-    queriesPerMonth: null as number | null,
-    imagesPerMonth: 150,
-    models: [GROK_ENDPOINT, SEEDREAM_ENDPOINT],
-  },
-} as const;
 
 export type EffectiveLimits = {
   queriesPerMonth: number | null;
   imagesPerMonth: number | null;
   models: string[];
   tier: SubscriptionTier;
+  creditCostQuery: number;
+  creditCostImage: number;
+  creditPurchasesEnabled: boolean;
 };
 
 export type UsageLimitResult = {
@@ -36,13 +21,15 @@ export type UsageLimitResult = {
   used: number;
   limit: number | null;
   resetDate: Date;
-  topUpAvailable: number;
+  creditBalance: number;
+  creditCost: number;
+  usesCredits: boolean;
 };
 
 export type UsageMeterSnapshot = {
   used: number;
   limit: number | null;
-  topUpAvailable: number;
+  creditBalance: number;
   percentUsed: number | null;
   unlimited: boolean;
 };
@@ -50,26 +37,37 @@ export type UsageMeterSnapshot = {
 /** Serializable usage summary for account / reader UI. */
 export type UserUsageSummary = {
   tier: SubscriptionTier;
+  tierDisplayName: string;
   subscriptionStatus: string;
   billingAnchorDay: number;
   periodStart: string;
   resetDate: string;
   daysUntilRenewal: number;
   betaMode: boolean;
+  creditBalance: number;
+  creditPurchasesEnabled: boolean;
   queries: UsageMeterSnapshot;
   images: UsageMeterSnapshot;
 };
 
-function meterSnapshot(used: number, limit: number | null, topUpAvailable: number): UsageMeterSnapshot {
+function meterSnapshot(
+  used: number,
+  limit: number | null,
+  creditBalance: number,
+): UsageMeterSnapshot {
   const unlimited = limit === null;
   const percentUsed =
-    unlimited || limit <= 0 ? null : Math.min(100, Math.round((used / limit) * 100));
-  return { used, limit, topUpAvailable, percentUsed, unlimited };
+    unlimited || limit === null || limit <= 0 ? null : Math.min(100, Math.round((used / limit) * 100));
+  return { used, limit, creditBalance, percentUsed, unlimited };
 }
 
 function daysUntil(date: Date): number {
   const ms = date.getTime() - Date.now();
   return Math.max(0, Math.ceil(ms / 86_400_000));
+}
+
+function tierDisplayName(tier: SubscriptionTier): string {
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
 /** Current billing period usage for display (progress bars, renewal countdown). */
@@ -84,9 +82,8 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
   });
   if (!user) return null;
 
-  const anchor = user.usagePeriodAnchor;
-  const periodStart = getUsagePeriodStart(anchor);
-  const resetDate = getResetDate(periodStart, anchor);
+  const { periodStart, resetDate } = await resolveBillingPeriod(userId);
+  const creditBalance = await getCreditBalance(userId);
 
   const [queryCheck, imageCheck, limits] = await Promise.all([
     checkUsageLimit(userId, "query"),
@@ -96,14 +93,17 @@ export async function getUserUsageSummary(userId: string): Promise<UserUsageSumm
 
   return {
     tier: limits.tier,
+    tierDisplayName: tierDisplayName(limits.tier),
     subscriptionStatus: user.subscriptionStatus,
-    billingAnchorDay: anchor,
+    billingAnchorDay: user.usagePeriodAnchor,
     periodStart: periodStart.toISOString(),
     resetDate: resetDate.toISOString(),
     daysUntilRenewal: daysUntil(resetDate),
     betaMode: BETA_MODE,
-    queries: meterSnapshot(queryCheck.used, queryCheck.limit, queryCheck.topUpAvailable),
-    images: meterSnapshot(imageCheck.used, imageCheck.limit, imageCheck.topUpAvailable),
+    creditBalance,
+    creditPurchasesEnabled: limits.creditPurchasesEnabled,
+    queries: meterSnapshot(queryCheck.used, queryCheck.limit, creditBalance),
+    images: meterSnapshot(imageCheck.used, imageCheck.limit, creditBalance),
   };
 }
 
@@ -153,6 +153,27 @@ function getResetDate(periodStart: Date, anchor: number): Date {
   );
 }
 
+export async function resolveBillingPeriod(userId: string): Promise<{
+  periodStart: Date;
+  resetDate: Date;
+}> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { usagePeriodStart: true, usagePeriodAnchor: true },
+  });
+  const anchor = user?.usagePeriodAnchor ?? 1;
+  const periodStart = user?.usagePeriodStart ?? getUsagePeriodStart(anchor);
+  const resetDate = user?.usagePeriodStart
+    ? addMonthsUtc(
+        periodStart.getUTCFullYear(),
+        periodStart.getUTCMonth() + 1,
+        periodStart.getUTCDate(),
+        1,
+      )
+    : getResetDate(periodStart, anchor);
+  return { periodStart, resetDate };
+}
+
 function activeGrantWhere(userId: string, now: Date) {
   return {
     userId,
@@ -161,26 +182,62 @@ function activeGrantWhere(userId: string, now: Date) {
   };
 }
 
+async function getActiveQuotaOverride(userId: string): Promise<{
+  queriesLimit: number | null;
+  imagesLimit: number | null;
+} | null> {
+  const now = new Date();
+  const override = await prisma.userQuotaOverride.findFirst({
+    where: {
+      userId,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: { queriesLimit: true, imagesLimit: true },
+  });
+  if (!override) return null;
+  return {
+    queriesLimit: override.queriesLimit,
+    imagesLimit: override.imagesLimit,
+  };
+}
+
 export async function getEffectiveLimits(userId: string): Promise<EffectiveLimits> {
   const now = new Date();
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { subscriptionTier: true },
+    select: {
+      subscriptionTier: true,
+      queriesLimitFloor: true,
+      imagesLimitFloor: true,
+      queriesUnlimitedFloor: true,
+    },
   });
   if (!user) {
-    const base = TIER_CONFIG.standard;
+    const base = await getTierLimitConfig(SubscriptionTier.standard);
     return {
-      queriesPerMonth: base.queriesPerMonth,
-      imagesPerMonth: base.imagesPerMonth,
-      models: [...base.models],
+      queriesPerMonth: base?.queriesPerMonth ?? null,
+      imagesPerMonth: base?.imagesPerMonth ?? 50,
+      models: base?.allowedModels ?? [],
       tier: SubscriptionTier.standard,
+      creditCostQuery: base?.creditCostQuery ?? 1,
+      creditCostImage: base?.creditCostImage ?? 3,
+      creditPurchasesEnabled: base?.creditPurchasesEnabled ?? false,
     };
   }
 
   let effectiveTier = user.subscriptionTier;
-  const base = TIER_CONFIG[effectiveTier];
-  let queriesPerMonth = base.queriesPerMonth;
-  let imagesPerMonth = base.imagesPerMonth;
+
+  await ensureLimitFloorsInitialized(userId, effectiveTier);
+
+  const floorsRow = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      queriesLimitFloor: true,
+      imagesLimitFloor: true,
+      queriesUnlimitedFloor: true,
+    },
+  });
 
   const grants = await prisma.userGrant.findMany({
     where: activeGrantWhere(userId, now),
@@ -193,19 +250,36 @@ export async function getEffectiveLimits(userId: string): Promise<EffectiveLimit
     }
   }
 
-  const tierConfig = TIER_CONFIG[effectiveTier];
-  queriesPerMonth = tierConfig.queriesPerMonth;
-  imagesPerMonth = tierConfig.imagesPerMonth;
+  const tierConfig = await getTierLimitConfig(effectiveTier);
+  const globalQueries = tierConfig?.queriesPerMonth ?? null;
+  const globalImages = tierConfig?.imagesPerMonth ?? null;
+  const floored = applyLimitFloors(globalQueries, globalImages, {
+    queriesLimitFloor: floorsRow?.queriesLimitFloor ?? user.queriesLimitFloor,
+    imagesLimitFloor: floorsRow?.imagesLimitFloor ?? user.imagesLimitFloor,
+    queriesUnlimitedFloor: floorsRow?.queriesUnlimitedFloor ?? user.queriesUnlimitedFloor,
+  });
+  let queriesPerMonth = floored.queriesPerMonth;
+  let imagesPerMonth = floored.imagesPerMonth;
+  const models = tierConfig?.allowedModels ?? [];
+  const creditCostQuery = tierConfig?.creditCostQuery ?? 1;
+  const creditCostImage = tierConfig?.creditCostImage ?? 3;
+  const creditPurchasesEnabled = tierConfig?.creditPurchasesEnabled ?? false;
 
-  for (const grant of grants) {
-    if (grant.grantType === GrantType.QUERY_BONUS && grant.bonusAmount != null) {
-      if (queriesPerMonth !== null) {
-        queriesPerMonth += grant.bonusAmount;
+  const override = await getActiveQuotaOverride(userId);
+  if (override) {
+    if (override.queriesLimit !== null) queriesPerMonth = override.queriesLimit;
+    if (override.imagesLimit !== null) imagesPerMonth = override.imagesLimit;
+  } else {
+    for (const grant of grants) {
+      if (grant.grantType === GrantType.QUERY_BONUS && grant.bonusAmount != null) {
+        if (queriesPerMonth !== null) {
+          queriesPerMonth += grant.bonusAmount;
+        }
       }
-    }
-    if (grant.grantType === GrantType.IMAGE_BONUS && grant.bonusAmount != null) {
-      if (imagesPerMonth !== null) {
-        imagesPerMonth += grant.bonusAmount;
+      if (grant.grantType === GrantType.IMAGE_BONUS && grant.bonusAmount != null) {
+        if (imagesPerMonth !== null) {
+          imagesPerMonth += grant.bonusAmount;
+        }
       }
     }
   }
@@ -213,8 +287,11 @@ export async function getEffectiveLimits(userId: string): Promise<EffectiveLimit
   return {
     queriesPerMonth,
     imagesPerMonth,
-    models: [...tierConfig.models],
+    models: [...models],
     tier: effectiveTier,
+    creditCostQuery,
+    creditCostImage,
+    creditPurchasesEnabled,
   };
 }
 
@@ -233,7 +310,8 @@ async function countMonthlyUsage(
   });
 }
 
-async function sumTopUpAvailable(
+/** Legacy PURCHASE grant top-up balance (migrated users / pre-ledger). */
+async function sumLegacyTopUpAvailable(
   userId: string,
   type: "query" | "image",
   now: Date,
@@ -259,34 +337,55 @@ export async function checkUsageLimit(
   userId: string,
   type: "query" | "image",
 ): Promise<UsageLimitResult> {
-  const limits = await getEffectiveLimits(userId);
-  const limit = type === "query" ? limits.queriesPerMonth : limits.imagesPerMonth;
-
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { usagePeriodAnchor: true },
+    select: { role: true },
   });
-  const anchor = user?.usagePeriodAnchor ?? 1;
-  const periodStart = getUsagePeriodStart(anchor);
-  const resetDate = getResetDate(periodStart, anchor);
-  const now = new Date();
+
+  if (user?.role === UserRole.admin) {
+    const { resetDate } = await resolveBillingPeriod(userId);
+    return {
+      allowed: true,
+      used: 0,
+      limit: null,
+      resetDate,
+      creditBalance: 0,
+      creditCost: 0,
+      usesCredits: false,
+    };
+  }
+
+  const limits = await getEffectiveLimits(userId);
+  const limit = type === "query" ? limits.queriesPerMonth : limits.imagesPerMonth;
+  const creditCost = type === "query" ? limits.creditCostQuery : limits.creditCostImage;
+
+  const { periodStart, resetDate } = await resolveBillingPeriod(userId);
 
   const monthlyUsed = await countMonthlyUsage(userId, type, periodStart);
-  const topUpAvailable = await sumTopUpAvailable(userId, type, now);
+  const creditBalance = await getCreditBalance(userId);
+  const now = new Date();
+  const legacyTopUp = await sumLegacyTopUpAvailable(userId, type, now);
 
   let allowed: boolean;
+  let usesCredits = false;
+
   if (limit === null) {
     allowed = true;
   } else if (monthlyUsed < limit) {
     allowed = true;
-  } else if (topUpAvailable > 0) {
+  } else if (creditBalance >= creditCost) {
     allowed = true;
+    usesCredits = true;
+  } else if (legacyTopUp > 0) {
+    allowed = true;
+    usesCredits = true;
   } else {
     allowed = false;
   }
 
   if (BETA_MODE) {
     allowed = true;
+    usesCredits = false;
   }
 
   return {
@@ -294,24 +393,37 @@ export async function checkUsageLimit(
     used: monthlyUsed,
     limit,
     resetDate,
-    topUpAvailable,
+    creditBalance,
+    creditCost,
+    usesCredits,
   };
 }
 
+/** @deprecated Use spendCreditsIfNeeded from lib/credits.ts */
 export async function consumeTopUp(userId: string, type: "query" | "image"): Promise<void> {
   try {
     const limits = await getEffectiveLimits(userId);
     const limit = type === "query" ? limits.queriesPerMonth : limits.imagesPerMonth;
+    const creditCost = type === "query" ? limits.creditCostQuery : limits.creditCostImage;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { usagePeriodAnchor: true },
-    });
-    const anchor = user?.usagePeriodAnchor ?? 1;
-    const periodStart = getUsagePeriodStart(anchor);
+    const { periodStart } = await resolveBillingPeriod(userId);
     const monthlyUsed = await countMonthlyUsage(userId, type, periodStart);
 
     if (limit === null || monthlyUsed <= limit) {
+      return;
+    }
+
+    const balance = await getCreditBalance(userId);
+    if (balance >= creditCost) {
+      const { spendCreditsIfNeeded } = await import("@/lib/credits");
+      await spendCreditsIfNeeded({
+        userId,
+        type,
+        bookId: "",
+        monthlyUsed,
+        monthlyLimit: limit,
+        creditCost,
+      });
       return;
     }
 
@@ -338,8 +450,40 @@ export async function consumeTopUp(userId: string, type: "query" | "image"): Pro
       }
     }
 
-    console.warn("[subscription] consumeTopUp: no PURCHASE grant balance", { userId, type });
+    console.warn("[subscription] consumeTopUp: no balance", { userId, type });
   } catch (err) {
     console.error("[subscription] consumeTopUp error", err);
   }
+}
+
+export async function consumeUsageAfterSuccess(
+  userId: string,
+  type: "query" | "image",
+  bookId: string,
+): Promise<void> {
+  const limits = await getEffectiveLimits(userId);
+  const limit = type === "query" ? limits.queriesPerMonth : limits.imagesPerMonth;
+  const creditCost = type === "query" ? limits.creditCostQuery : limits.creditCostImage;
+  const { periodStart } = await resolveBillingPeriod(userId);
+  const monthlyUsed = await countMonthlyUsage(userId, type, periodStart);
+
+  if (limit === null || monthlyUsed <= limit) {
+    return;
+  }
+
+  const balance = await getCreditBalance(userId);
+  if (balance >= creditCost) {
+    const { spendCreditsIfNeeded } = await import("@/lib/credits");
+    await spendCreditsIfNeeded({
+      userId,
+      type,
+      bookId,
+      monthlyUsed,
+      monthlyLimit: limit,
+      creditCost,
+    });
+    return;
+  }
+
+  await consumeTopUp(userId, type);
 }

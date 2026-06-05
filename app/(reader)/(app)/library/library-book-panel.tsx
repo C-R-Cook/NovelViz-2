@@ -10,7 +10,11 @@ import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-im
 import { ImageGenerationLoader } from "@/components/ui/image-generation-loader";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
-import { formatLimitReachedMessage } from "@/components/subscription/usage-period-panel";
+import { AiFailureNotice } from "@/components/subscription/ai-failure-notice";
+import {
+  QuotaExhaustedModal,
+  type QuotaExhaustedPayload,
+} from "@/components/subscription/quota-exhausted-modal";
 import { IMAGINE_FAL_DEFAULT_ADMIN_KEY, type ImagineFalModelKey } from "@/lib/imagine-fal-models";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
 
@@ -107,6 +111,9 @@ export function LibraryBookPanel({
   const [question, setQuestion] = useState("");
   const [qaLoading, setQaLoading] = useState(false);
   const [qaError, setQaError] = useState<string | null>(null);
+  const [quotaModal, setQuotaModal] = useState<QuotaExhaustedPayload | null>(null);
+  const [aiFailureOpen, setAiFailureOpen] = useState(false);
+  const [aiFailureMessage, setAiFailureMessage] = useState<string | undefined>();
   const [lastAnswer, setLastAnswer] = useState<string | null>(null);
 
   const [activeAiTab, setActiveAiTab] = useState<ReaderAiTab>("imagine");
@@ -172,18 +179,28 @@ export function LibraryBookPanel({
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        message?: string;
         responseText?: string;
         limitType?: string;
         used?: number;
         limit?: number | null;
         resetDate?: string;
+        creditBalance?: number;
+        creditCost?: number;
+        tier?: string;
+        creditPurchasesEnabled?: boolean;
       };
       if (!res.ok) {
-        setQaError(
-          data.error === "LIMIT_REACHED"
-            ? formatLimitReachedMessage(data)
-            : data.error || "Something went wrong",
-        );
+        if (data.error === "LIMIT_REACHED") {
+          setQuotaModal(data);
+          return;
+        }
+        if (data.error === "AI_FAILURE") {
+          setAiFailureMessage(data.message);
+          setAiFailureOpen(true);
+          return;
+        }
+        setQaError(data.error || "Something went wrong");
         return;
       }
       if (typeof data.responseText === "string") {
@@ -257,6 +274,7 @@ export function LibraryBookPanel({
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
+        message?: string;
         imageUrl?: string;
         fullPrompt?: string;
         image?: ImageHistoryItem;
@@ -264,13 +282,22 @@ export function LibraryBookPanel({
         used?: number;
         limit?: number | null;
         resetDate?: string;
+        creditBalance?: number;
+        creditCost?: number;
+        tier?: string;
+        creditPurchasesEnabled?: boolean;
       };
       if (!res.ok) {
-        setImgError(
-          data.error === "LIMIT_REACHED"
-            ? formatLimitReachedMessage(data)
-            : data.error || "Something went wrong",
-        );
+        if (data.error === "LIMIT_REACHED") {
+          setQuotaModal(data);
+          return;
+        }
+        if (data.error === "AI_FAILURE") {
+          setAiFailureMessage(data.message);
+          setAiFailureOpen(true);
+          return;
+        }
+        setImgError(data.error || "Something went wrong");
         return;
       }
       if (data.image && typeof data.image.id === "string") {
@@ -811,11 +838,30 @@ export function LibraryBookPanel({
         </div>
       ) : null;
 
+  const subscriptionModals = (
+    <>
+      <QuotaExhaustedModal
+        open={quotaModal !== null}
+        payload={quotaModal}
+        onClose={() => setQuotaModal(null)}
+      />
+      <AiFailureNotice
+        open={aiFailureOpen}
+        message={aiFailureMessage}
+        onClose={() => {
+          setAiFailureOpen(false);
+          setAiFailureMessage(undefined);
+        }}
+      />
+    </>
+  );
+
   if (children) {
     return (
       <>
         {children({ ai: aiSection, images: imagesSection })}
         {imageModal}
+        {subscriptionModals}
       </>
     );
   }
@@ -830,6 +876,7 @@ export function LibraryBookPanel({
         </section>
       ) : null}
       {imageModal}
+      {subscriptionModals}
     </div>
   );
 }

@@ -67,8 +67,8 @@ function UsageBar({
           />
         </div>
       )}
-      {meter.topUpAvailable > 0 ? (
-        <p className="text-xs text-text-muted">+{meter.topUpAvailable} bonus credits available</p>
+      {meter.creditBalance > 0 ? (
+        <p className="text-xs text-text-muted">{meter.creditBalance} credits available</p>
       ) : null}
     </div>
   );
@@ -168,7 +168,7 @@ export function bumpUsageMeter(
       : Math.min(100, Math.round((used / meter.limit) * 100));
   return {
     ...usage,
-    [key]: { ...meter, used, percentUsed },
+    [key]: { ...meter, used, percentUsed, creditBalance: meter.creditBalance },
   };
 }
 

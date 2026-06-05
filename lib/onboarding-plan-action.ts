@@ -1,6 +1,7 @@
 "use server";
 
 import { ensureCurrentUser } from "@/lib/auth";
+import { establishLimitFloorsForTier } from "@/lib/limit-floors";
 import { ONBOARDING_PLAN_COOKIE } from "@/lib/onboarding-cookies";
 import { prisma } from "@/lib/prisma";
 import {
@@ -44,6 +45,8 @@ export async function completePlanStep(
     where: { id: user.id },
     data: { subscriptionTier: input.tier as SubscriptionTier },
   });
+
+  await establishLimitFloorsForTier(user.id, input.tier as SubscriptionTier);
 
   if (input.partnerInterest) {
     const existing = await prisma.partnerRequest.findFirst({

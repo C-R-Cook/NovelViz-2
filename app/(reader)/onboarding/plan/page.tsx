@@ -1,5 +1,6 @@
 import { PlanClient } from "./plan-client";
 import { ensureCurrentUser, getRoleHomeUrl } from "@/lib/auth";
+import { getPublicTierPlans } from "@/lib/tier-limit-config";
 import {
   findDbProfileForSession,
   getOnboardingStage,
@@ -29,5 +30,6 @@ export default async function OnboardingPlanPage() {
     redirect("/onboarding/preferences");
   }
 
-  return <PlanClient />;
+  const initialPlans = await getPublicTierPlans();
+  return <PlanClient initialPlans={initialPlans} />;
 }

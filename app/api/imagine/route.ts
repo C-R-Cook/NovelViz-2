@@ -5,7 +5,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { resolveImagineFal } from "@/lib/imagine-fal";
 import { prisma } from "@/lib/prisma";
-import { checkUsageLimit, consumeTopUp, getEffectiveLimits } from "@/lib/subscription";
+import { aiFailureResponse } from "@/lib/ai-service-failure";
+import { checkUsageLimit, consumeUsageAfterSuccess, getEffectiveLimits } from "@/lib/subscription";
 import { UserRole } from "@db";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
@@ -106,7 +107,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const limitCheck = await checkUsageLimit(dbUser.id, "image");
+  const [limitCheck, effectiveLimits] = await Promise.all([
+    checkUsageLimit(dbUser.id, "image"),
+    getEffectiveLimits(dbUser.id),
+  ]);
   if (!limitCheck.allowed) {
     return NextResponse.json(
       {
@@ -115,7 +119,10 @@ export async function POST(request: Request) {
         used: limitCheck.used,
         limit: limitCheck.limit,
         resetDate: limitCheck.resetDate,
-        topUpAvailable: limitCheck.topUpAvailable,
+        creditBalance: limitCheck.creditBalance,
+        creditCost: limitCheck.creditCost,
+        tier: effectiveLimits.tier,
+        creditPurchasesEnabled: effectiveLimits.creditPurchasesEnabled,
       },
       { status: 429 },
     );
@@ -138,7 +145,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "userPrompt is required" }, { status: 400 });
   }
 
-  const effectiveLimits = await getEffectiveLimits(dbUser.id);
   if (dbUser.role !== UserRole.admin) {
     const { endpoint } = resolveImagineFal(dbUser.role, body.falImagineModel, "");
     if (!effectiveLimits.models.includes(endpoint)) {
@@ -202,13 +208,7 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
     subjectTokens = subjectMessage.promptTokens + subjectMessage.completionTokens;
   } catch (e) {
     console.error("[api/imagine POST] subject extraction", e);
-    return NextResponse.json(
-      {
-        error:
-          "Failed to extract primary subject. Configure a valid model with ANTHROPIC_MODEL if needed.",
-      },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
 
   const normalizedSubject = extractedSubject.trim();
@@ -237,13 +237,10 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
     subjectEmbeddingVec = embeddings[1] ?? [];
   } catch (e) {
     console.error("[api/imagine POST] embed", e);
-    return NextResponse.json(
-      { error: "Failed to embed prompt. Check OPENAI_API_KEY." },
-      { status: 500 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
   if (promptEmbeddingVec.length === 0 || subjectEmbeddingVec.length === 0) {
-    return NextResponse.json({ error: "Failed to embed prompt" }, { status: 500 });
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, new Error("Empty embedding"));
   }
 
   const promptVectorStr = `[${promptEmbeddingVec.join(",")}]`;
@@ -273,10 +270,7 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
     `;
   } catch (e) {
     console.error("[api/imagine POST] vector search", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Similarity search failed" },
-      { status: 500 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
 
   const mergedChunks: ChunkRow[] = [];
@@ -345,23 +339,11 @@ Reader's request: ${userPrompt}`;
     completionTokens = enrichMessage.completionTokens;
   } catch (e) {
     console.error("[api/imagine POST] Anthropic error", e);
-    return NextResponse.json(
-      {
-        error:
-          "Failed to enrich prompt. Configure a valid model with ANTHROPIC_MODEL if needed.",
-      },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
 
   if (!enrichedPrompt) {
-    return NextResponse.json(
-      {
-        error:
-          "Failed to enrich prompt. Configure a valid model with ANTHROPIC_MODEL if needed.",
-      },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, new Error("Empty enriched prompt"));
   }
 
   let imageUrl: string;
@@ -376,15 +358,12 @@ Reader's request: ${userPrompt}`;
       extractFalImageUrl((result as { data?: { data?: unknown } }).data?.data);
     if (!url) {
       console.error("[api/imagine POST] unexpected fal response", result);
-      return NextResponse.json({ error: "Image generation returned no URL" }, { status: 502 });
+      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, new Error("No image URL"));
     }
     imageUrl = url;
   } catch (e) {
     console.error("[api/imagine POST] fal error", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Image generation failed" },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
 
   const generatedImageId = randomUUID();
@@ -399,10 +378,7 @@ Reader's request: ${userPrompt}`;
     finalImageUrl = uploaded.secureUrl;
   } catch (e) {
     console.error("[api/imagine POST] cloudinary upload", e);
-    return NextResponse.json(
-      { error: "Failed to store generated image. Please try again." },
-      { status: 502 },
-    );
+    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
   }
 
   const created = await prisma.generatedImage.create({
@@ -434,9 +410,9 @@ Reader's request: ${userPrompt}`;
   });
 
   try {
-    await consumeTopUp(dbUser.id, "image");
+    await consumeUsageAfterSuccess(dbUser.id, "image", bookId);
   } catch (err) {
-    console.error("[api/imagine POST] consumeTopUp error", err);
+    console.error("[api/imagine POST] consumeUsageAfterSuccess error", err);
   }
 
   return NextResponse.json({

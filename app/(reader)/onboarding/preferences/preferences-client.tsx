@@ -1,9 +1,8 @@
 "use client";
 
-import { ONBOARDING_AGE_RANGE_OPTIONS } from "@/lib/age-range";
 import { clearPlanStepCompleteCookie } from "@/lib/onboarding-cookies";
-import { GENDER_OPTIONS } from "@/lib/gender";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
+import { GENDERS, ONBOARDING_AGE_RANGE_OPTIONS } from "@/lib/user-profile-options";
 import { isValidUsernameFormat } from "@/lib/username";
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -248,7 +247,7 @@ export function PreferencesClient({
             className="onboarding-preferences__input"
           >
             <option value="">Prefer not to say</option>
-            {GENDER_OPTIONS.map((o) => (
+            {GENDERS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>

@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import "@/app/admin/admin-mobile.css";
 import { CoverAiModal } from "@/components/cover-ai/cover-ai-modal";
+import { BookAudienceTargeting } from "@/components/partner/book-audience-targeting";
 
 export type PartnerBookDetailModel = {
   id: string;
@@ -24,6 +25,11 @@ export type PartnerBookDetailModel = {
   rejectionReason: string | null;
   listingPreferenceAfterReview: ListingPreferenceAfterReview | null;
   chapterCount: number;
+  isPublicDomain: boolean;
+  featuredTargetAgeRanges: string[];
+  featuredTargetGenders: string[];
+  featuredTargetCountries: string[];
+  featuredTargetGenres: string[];
 };
 
 export type PartnerPublicImageRow = {
@@ -946,6 +952,20 @@ export function PartnerBookDetailClient({
               </div>
             </form>
           </section>
+          {!book.isPublicDomain ? (
+            <div className="mt-6">
+              <BookAudienceTargeting
+                bookId={book.id}
+                bookGenre={book.genre}
+                initial={{
+                  featuredTargetAgeRanges: book.featuredTargetAgeRanges,
+                  featuredTargetGenders: book.featuredTargetGenders,
+                  featuredTargetCountries: book.featuredTargetCountries,
+                  featuredTargetGenres: book.featuredTargetGenres,
+                }}
+              />
+            </div>
+          ) : null}
           <section className="mt-6 rounded-xl border border-border bg-bg-surface/85 p-6">
             <ChapterManagerClient bookId={book.id} status={book.status} />
           </section>

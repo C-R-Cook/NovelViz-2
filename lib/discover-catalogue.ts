@@ -1,8 +1,16 @@
+import {
+  rankFeaturedBooks,
+  type FeaturedBookWithTargeting,
+} from "@/lib/featured-book-scoring";
+import { getScoringWeights } from "@/lib/featured-scoring-config";
+import { getUserScoringProfile } from "@/lib/discover-scoring-profile";
 import { prisma } from "@/lib/prisma";
 import type { BookGenre } from "@db";
 import type { Prisma } from "@db";
 
 export const DISCOVER_PAGE_SIZE = 24;
+const FEATURED_POOL_SIZE = 20;
+const FEATURED_DISPLAY_LIMIT = 5;
 
 export type DiscoverCatalogueBook = {
   id: string;
@@ -14,6 +22,56 @@ export type DiscoverCatalogueBook = {
   description?: string | null;
 };
 
+const featuredBookSelect = {
+  id: true,
+  title: true,
+  author: true,
+  description: true,
+  coverImageUrl: true,
+  genre: true,
+  isPublicDomain: true,
+  createdAt: true,
+  featuredTargetAgeRanges: true,
+  featuredTargetGenders: true,
+  featuredTargetCountries: true,
+  featuredTargetGenres: true,
+  _count: { select: { userBooks: true } },
+} as const;
+
+function toCatalogueBook(
+  book: FeaturedBookWithTargeting & { readerCount: number },
+): DiscoverCatalogueBook {
+  return {
+    id: book.id,
+    title: book.title,
+    author: book.author,
+    description: book.description,
+    genre: book.genre as BookGenre | null,
+    coverImageUrl: book.coverImageUrl,
+    readerCount: book.readerCount,
+  };
+}
+
+function rowToFeaturedBook(
+  row: Prisma.BookGetPayload<{ select: typeof featuredBookSelect }>,
+): FeaturedBookWithTargeting & { readerCount: number } {
+  return {
+    id: row.id,
+    title: row.title,
+    author: row.author,
+    description: row.description,
+    coverImageUrl: row.coverImageUrl!,
+    genre: row.genre,
+    readerCount: row._count.userBooks,
+    isPublicDomain: row.isPublicDomain,
+    createdAt: row.createdAt,
+    featuredTargetAgeRanges: row.featuredTargetAgeRanges,
+    featuredTargetGenders: row.featuredTargetGenders,
+    featuredTargetCountries: row.featuredTargetCountries,
+    featuredTargetGenres: row.featuredTargetGenres,
+  };
+}
+
 function catalogueFilters(genre?: BookGenre): Prisma.BookWhereInput {
   return {
     status: "published",
@@ -23,31 +81,28 @@ function catalogueFilters(genre?: BookGenre): Prisma.BookWhereInput {
   };
 }
 
-/** Top books by library adds — featured carousel (max 5, covers only). */
-export async function getDiscoverFeaturedBooks(): Promise<DiscoverCatalogueBook[]> {
+/** Featured carousel — personalised when userId is provided. */
+export async function getDiscoverFeaturedBooks(
+  userId: string | null = null,
+  limit: number = FEATURED_DISPLAY_LIMIT,
+): Promise<DiscoverCatalogueBook[]> {
   const rows = await prisma.book.findMany({
     where: catalogueFilters(),
     orderBy: { userBooks: { _count: "desc" } },
-    take: 5,
-    select: {
-      id: true,
-      title: true,
-      author: true,
-      description: true,
-      coverImageUrl: true,
-      genre: true,
-      _count: { select: { userBooks: true } },
-    },
+    take: FEATURED_POOL_SIZE,
+    select: featuredBookSelect,
   });
-  return rows.map((b) => ({
-    id: b.id,
-    title: b.title,
-    author: b.author,
-    description: b.description,
-    genre: b.genre,
-    coverImageUrl: b.coverImageUrl!,
-    readerCount: b._count.userBooks,
-  }));
+
+  const books = rows.map(rowToFeaturedBook);
+
+  if (!userId) {
+    return books.slice(0, limit).map(toCatalogueBook);
+  }
+
+  const weights = await getScoringWeights();
+  const profile = await getUserScoringProfile(userId, weights.libraryRecencyDays);
+  const ranked = rankFeaturedBooks(books, profile, limit, weights);
+  return ranked.map((s) => toCatalogueBook(s.book));
 }
 
 /** Cursor = id of last book on the previous page; order is title asc, id asc. */

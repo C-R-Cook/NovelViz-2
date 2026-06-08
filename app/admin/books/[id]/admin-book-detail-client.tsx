@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import "../../admin-mobile.css";
 import { CoverAiModal } from "@/components/cover-ai/cover-ai-modal";
+import { BookAudienceTargeting } from "@/components/partner/book-audience-targeting";
 
 export type AdminBookDetailModel = {
   id: string;
@@ -40,6 +41,10 @@ export type AdminBookDetailModel = {
   ownerLabel: string | null;
   chapterCount: number;
   createdAtLabel: string;
+  featuredTargetAgeRanges: string[];
+  featuredTargetGenders: string[];
+  featuredTargetCountries: string[];
+  featuredTargetGenres: string[];
 };
 
 export type AdminBookPublicImageRow = {
@@ -1187,6 +1192,20 @@ export function AdminBookDetailClient({
               </div>
             </div>
           </form>
+          <div className="mt-6">
+            <BookAudienceTargeting
+              bookId={book.id}
+              bookGenre={book.genre}
+              showPreview
+              editingLabel="Editing targeting"
+              initial={{
+                featuredTargetAgeRanges: book.featuredTargetAgeRanges,
+                featuredTargetGenders: book.featuredTargetGenders,
+                featuredTargetCountries: book.featuredTargetCountries,
+                featuredTargetGenres: book.featuredTargetGenres,
+              }}
+            />
+          </div>
           <div className="rounded-xl border border-border bg-bg-surface/85 p-6">
             <ChapterManagerClient
               bookId={book.id}

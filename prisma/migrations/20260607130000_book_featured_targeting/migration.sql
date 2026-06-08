@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "Book" ADD COLUMN "featuredTargetAgeRanges" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Book" ADD COLUMN "featuredTargetGenders" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Book" ADD COLUMN "featuredTargetCountries" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE "Book" ADD COLUMN "featuredTargetGenres" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];

@@ -32,6 +32,13 @@ export const ADMIN_HELPERS_NAV_LINKS: readonly AdminHelperNavLink[] = [
     hint: "Tier limits, credit packs, and pricing",
   },
   {
+    id: "helper-featured-scoring",
+    href: "/admin/featured-settings",
+    label: "Featured scoring",
+    icon: "◎",
+    hint: "Tune featured book ranking weights and preview matches",
+  },
+  {
     id: "helper-bulk-chapters",
     href: "/admin/chapters/bulk-delete",
     label: "Bulk chapter delete",

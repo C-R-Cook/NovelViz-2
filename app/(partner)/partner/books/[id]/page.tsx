@@ -72,6 +72,11 @@ export default async function PartnerBookDetailPage({ params, searchParams }: Pa
     rejectionReason: book.rejectionReason,
     listingPreferenceAfterReview: book.listingPreferenceAfterReview,
     chapterCount: book._count.chapters,
+    isPublicDomain: book.isPublicDomain,
+    featuredTargetAgeRanges: book.featuredTargetAgeRanges,
+    featuredTargetGenders: book.featuredTargetGenders,
+    featuredTargetCountries: book.featuredTargetCountries,
+    featuredTargetGenres: book.featuredTargetGenres,
   };
 
   return (

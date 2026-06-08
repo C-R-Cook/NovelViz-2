@@ -90,6 +90,10 @@ export default async function AdminBookDetailPage({ params, searchParams }: Page
     listingPreferenceAfterReview: row.listingPreferenceAfterReview ?? null,
     ownerLabel: row.owner ? (row.owner.name ?? row.owner.email) : null,
     chapterCount: row._count.chapters,
+    featuredTargetAgeRanges: row.featuredTargetAgeRanges,
+    featuredTargetGenders: row.featuredTargetGenders,
+    featuredTargetCountries: row.featuredTargetCountries,
+    featuredTargetGenres: row.featuredTargetGenres,
     createdAtLabel: new Intl.DateTimeFormat("en-US", {
       dateStyle: "medium",
       timeStyle: "short",

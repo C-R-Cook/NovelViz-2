@@ -170,6 +170,11 @@ model Book {
   /// Admin-editable allowance; partners cannot generate beyond granted minus consumed on quota path.
   coverGenAttemptsGranted  Int @default(5)
 
+  featuredTargetAgeRanges String[] @default([])
+  featuredTargetGenders   String[] @default([])
+  featuredTargetCountries String[] @default([])
+  featuredTargetGenres    String[] @default([])
+
   chapters        Chapter[]
   chunks          Chunk[]
   owner           User?        @relation("OwnedBooks", fields: [ownerId], references: [id])
@@ -314,6 +319,73 @@ model TierLimitConfig {
   stripePriceId          String?
   updatedAt              DateTime         @updatedAt
   updatedBy              String?
+}
+
+/// Singleton row (id "singleton"): admin-tunable featured book scoring weights.
+model FeaturedScoringConfig {
+  id        String   @id @default("singleton")
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  scoreGenrePrefMatch      Int @default(40)
+  scoreLibraryDeep         Int @default(25)
+  scoreLibraryStarted      Int @default(20)
+  scoreLibraryRecentUnread Int @default(5)
+  scoreLibraryStaleUnread  Int @default(2)
+  libraryMatchCap          Int @default(3)
+  libraryRecencyDays       Int @default(90)
+
+  scoreRecencyFresh  Int @default(30)
+  scoreRecencyRecent Int @default(15)
+  scoreRecencyWarm   Int @default(5)
+  recencyFreshDays   Int @default(7)
+  recencyRecentDays  Int @default(30)
+  recencyWarmDays    Int @default(90)
+
+  scoreGenderMatch  Int @default(15)
+  scoreAgeMatch     Int @default(12)
+  scoreCountryMatch Int @default(8)
+
+  penaltyGenderMismatch  Int @default(40)
+  penaltyAgeMismatch     Int @default(30)
+  penaltyCountryMismatch Int @default(15)
+
+  minCarouselSlots Int @default(3)
+}
+
+/// Immutable snapshot each time admin saves featured scoring weights.
+model FeaturedScoringHistory {
+  id          String   @id @default(cuid())
+  savedAt     DateTime @default(now())
+  savedBy     String
+  savedByName String
+
+  scoreGenrePrefMatch      Int
+  scoreLibraryDeep         Int
+  scoreLibraryStarted      Int
+  scoreLibraryRecentUnread Int
+  scoreLibraryStaleUnread  Int
+  libraryMatchCap          Int
+  libraryRecencyDays       Int
+
+  scoreRecencyFresh  Int
+  scoreRecencyRecent Int
+  scoreRecencyWarm   Int
+  recencyFreshDays   Int
+  recencyRecentDays  Int
+  recencyWarmDays    Int
+
+  scoreGenderMatch  Int
+  scoreAgeMatch     Int
+  scoreCountryMatch Int
+
+  penaltyGenderMismatch  Int
+  penaltyAgeMismatch     Int
+  penaltyCountryMismatch Int
+
+  minCarouselSlots Int
+
+  @@index([savedAt])
 }
 
 /// Admin-configurable one-time credit packs (tier-priced).

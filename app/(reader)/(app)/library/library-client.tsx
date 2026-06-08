@@ -179,7 +179,7 @@ export function LibraryClient({
           <div className="library-empty mt-10 text-center">
             <p className="text-sm text-text-secondary">Your library is empty.</p>
             <Link
-              href="/books"
+              href="/discover"
               className="mt-4 inline-flex rounded-md border border-accent/40 bg-accent/10 px-4 py-2 text-sm font-medium text-accent-text hover:bg-accent/20"
             >
               Browse Discover

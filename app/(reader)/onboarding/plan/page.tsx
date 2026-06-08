@@ -5,6 +5,7 @@ import {
   findDbProfileForSession,
   getOnboardingStage,
 } from "@/lib/session-profile";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
 export const metadata = {
@@ -30,6 +31,20 @@ export default async function OnboardingPlanPage() {
     redirect("/onboarding/preferences");
   }
 
-  const initialPlans = await getPublicTierPlans();
-  return <PlanClient initialPlans={initialPlans} />;
+  const [initialPlans, creditPackRow] = await Promise.all([
+    getPublicTierPlans(),
+    prisma.creditPack.findFirst({
+      where: { active: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      select: {
+        priceFree: true,
+        priceStandard: true,
+        pricePremium: true,
+      },
+    }),
+  ]);
+
+  return (
+    <PlanClient initialPlans={initialPlans} creditPack={creditPackRow} />
+  );
 }

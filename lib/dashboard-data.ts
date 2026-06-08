@@ -88,7 +88,7 @@ export type DashboardAdminData = {
   }[];
   totalUsers: number;
   totalBooks: number;
-  /** Published, non-deleted — visible on Discover (/books). */
+  /** Published, non-deleted — visible on Discover (/discover). */
   liveBooksCount: number;
   pendingReviewCount: number;
   bookRequests: { totalCount: number; topBooks: { bookTitle: string; count: number }[] };

@@ -42,19 +42,7 @@ type VisionImage = FeaturedImage & {
   bookGenre: BookGenre | null;
 };
 
-type VisionFilter = "all" | "selected-genre" | "selected-book";
-
 const GENRE_PILLS = [{ value: "all", label: "All" }, ...GENRE_OPTIONS];
-
-function SectionDivider() {
-  return (
-    <div className="discover-section-divider">
-      <div className="discover-divider-line" />
-      <span className="discover-divider-gem">✦</span>
-      <div className="discover-divider-line" />
-    </div>
-  );
-}
 
 function buildQuery(input: {
   genre: string;
@@ -374,7 +362,8 @@ export function DiscoverCatalogueClient({
 
   const [visionImages, setVisionImages] = useState<VisionImage[]>([]);
   const [visionsLoading, setVisionsLoading] = useState(false);
-  const [visionFilter, setVisionFilter] = useState<VisionFilter>("all");
+
+  const selectedBook = featured[selectedFeaturedIndex] ?? null;
 
   useEffect(() => {
     setSelectedFeaturedIndex((idx) =>
@@ -383,7 +372,7 @@ export function DiscoverCatalogueClient({
   }, [featured]);
 
   useEffect(() => {
-    if (featured.length === 0) {
+    if (!selectedBook) {
       setVisionImages([]);
       setVisionsLoading(false);
       return;
@@ -391,35 +380,38 @@ export function DiscoverCatalogueClient({
     let cancelled = false;
     setVisionsLoading(true);
     void (async () => {
-      const merged: VisionImage[] = [];
-      await Promise.all(
-        featured.map(async (b) => {
-          try {
-            const res = await fetch(`/api/gallery/book/${b.id}?featured=true&limit=8`);
-            if (!res.ok) return;
-            const data = (await res.json()) as { images?: FeaturedImage[] };
-            for (const img of data.images ?? []) {
-              merged.push({
-                ...img,
-                bookId: b.id,
-                bookTitle: b.title,
-                bookGenre: b.genre,
-              });
-            }
-          } catch {
-            /* ignore */
+      try {
+        const res = await fetch(`/api/gallery/book/${selectedBook.id}?featured=true&limit=8`);
+        if (!res.ok) {
+          if (!cancelled) {
+            setVisionImages([]);
+            setVisionsLoading(false);
           }
-        }),
-      );
-      if (!cancelled) {
-        setVisionImages(merged);
-        setVisionsLoading(false);
+          return;
+        }
+        const data = (await res.json()) as { images?: FeaturedImage[] };
+        if (!cancelled) {
+          setVisionImages(
+            (data.images ?? []).map((img) => ({
+              ...img,
+              bookId: selectedBook.id,
+              bookTitle: selectedBook.title,
+              bookGenre: selectedBook.genre,
+            })),
+          );
+          setVisionsLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setVisionImages([]);
+          setVisionsLoading(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [featured]);
+  }, [selectedBook]);
 
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(searchInput), 300);
@@ -658,33 +650,6 @@ export function DiscoverCatalogueClient({
     return () => clearTimeout(t);
   }, []);
 
-  const selectedBook = featured[selectedFeaturedIndex] ?? null;
-
-  const visionFilterPills = useMemo(() => {
-    if (!selectedBook) {
-      return [{ id: "all" as const, label: "All", disabled: false }];
-    }
-    return [
-      { id: "all" as const, label: "All", disabled: false },
-      {
-        id: "selected-genre" as const,
-        label: selectedBook.genre ? formatGenre(selectedBook.genre) : "Genre",
-        disabled: !selectedBook.genre,
-      },
-      { id: "selected-book" as const, label: selectedBook.title, disabled: false },
-    ];
-  }, [selectedBook]);
-
-  const filteredVisionImages = useMemo(() => {
-    if (visionFilter === "all") return visionImages;
-    if (!selectedBook) return visionImages;
-    if (visionFilter === "selected-genre") {
-      if (!selectedBook.genre) return [];
-      return visionImages.filter((v) => v.bookGenre === selectedBook.genre);
-    }
-    return visionImages.filter((v) => v.bookId === selectedBook.id);
-  }, [visionImages, visionFilter, selectedBook]);
-
   const selectedLibraryEntry = useMemo(() => {
     if (!selectedBook) return undefined;
     return featuredLibrary.find((x) => x.bookId === selectedBook.id);
@@ -723,7 +688,7 @@ export function DiscoverCatalogueClient({
         : 0;
     return (
       <Link
-        href={`/books/${book.id}`}
+        href={`/discover/${book.id}`}
         className={`group block outline-none ${size === "grid" ? "w-full" : ""} ${size === "carousel" ? "relative block min-h-[240px] w-[160px]" : ""} ${size === "carousel" && !isLast ? "mr-[-20px]" : ""} ${size === "carousel" && finePointer && !reducedMotion ? "hover:!z-[85] focus-within:!z-[85]" : ""}`}
         style={
           size === "carousel"
@@ -797,35 +762,15 @@ export function DiscoverCatalogueClient({
       className={`discover-root min-h-screen pb-20 pt-6 text-text-primary sm:pt-10 ${!searchActive && showFeatured ? "discover-root--concept" : ""}`}
     >
       <div className="discover-root-inner mx-auto max-w-7xl px-4 sm:px-6">
-        {!searchActive && showFeatured ? (
-          <header className="discover-concept-hero">
-            <p
-              className={`discover-concept-eyebrow ${headerVisible ? "discover-concept-hero-in" : "opacity-0 translate-y-2"}`}
-            >
-              AI companion for readers
-            </p>
+        {!searchActive ? (
+          <header className="discover-concept-hero discover-concept-hero--browse">
             <h1
-              className={`discover-concept-title ${headerVisible ? "discover-concept-hero-in discover-concept-hero-in--delay" : "opacity-0 translate-y-3"}`}
+              className={`discover-concept-title ${headerVisible ? "discover-concept-hero-in" : "opacity-0 translate-y-3"}`}
             >
-              Every Chapter, Alive.
+              Discover your next read
             </h1>
-            <p
-              className={`discover-concept-lede ${headerVisible ? "discover-concept-hero-in discover-concept-hero-in--delay2" : "opacity-0 translate-y-3"}`}
-            >
-              AI that knows only what you&apos;ve read — no spoilers, ever.
-            </p>
           </header>
-        ) : (
-          <header className="discover-header">
-            <p className="discover-eyebrow">Published library</p>
-            <h1 className="discover-title font-serif text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-              Discover
-            </h1>
-            <p className="discover-subtitle mt-2 max-w-xl text-sm leading-relaxed text-text-muted">
-              Browse published titles with covers. Add what you love to your library.
-            </p>
-          </header>
-        )}
+        ) : null}
 
         <section className="mb-10">
           <div className="relative">
@@ -895,7 +840,7 @@ export function DiscoverCatalogueClient({
             {selectedBook ? (
               <div
                 key={selectedBook.id}
-                className="discover-concept-detail mt-2 flex flex-col gap-6 px-2 sm:flex-row sm:items-center sm:px-4"
+                className="discover-concept-detail mt-2 flex flex-col gap-6 px-2 sm:flex-row sm:items-start sm:px-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="discover-concept-detail-genre font-mono text-[11px] uppercase tracking-[0.2em]">
@@ -903,6 +848,11 @@ export function DiscoverCatalogueClient({
                   </div>
                   <div className="mt-1 font-serif text-2xl text-white sm:text-3xl">{selectedBook.title}</div>
                   <div className="mt-1 text-sm italic text-white/50">by {selectedBook.author}</div>
+                  {selectedBook.description ? (
+                    <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/45 line-clamp-4">
+                      {selectedBook.description}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap items-center justify-end gap-5 sm:ml-auto sm:shrink-0">
                   <div className="discover-panel-readers" aria-label={`${selectedBook.readerCount.toLocaleString()} readers`}>
@@ -923,46 +873,23 @@ export function DiscoverCatalogueClient({
           </section>
         ) : null}
 
-        {!searchActive && showFeatured ? <SectionDivider /> : null}
-
         {!searchActive && showFeatured ? (
           <section className="mb-12 px-1 sm:px-0">
             <div className="discover-concept-visions-head mb-6 flex flex-wrap items-center gap-4">
               <h2 className="discover-concept-section-title m-0 shrink-0">Community visions</h2>
               <div className="discover-concept-section-line min-w-[4rem] flex-1" />
-              <div className="flex max-w-full flex-wrap gap-2">
-                {visionFilterPills.map((pill) => {
-                  const active = visionFilter === pill.id;
-                  return (
-                    <button
-                      key={pill.id}
-                      type="button"
-                      disabled={pill.disabled}
-                      onClick={() => setVisionFilter(pill.id)}
-                      title={pill.label}
-                      className={`discover-concept-vision-pill max-w-[11rem] truncate rounded-full px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                        active
-                          ? "border border-accent/45 bg-accent-dim text-text-primary"
-                          : "border border-white/[0.08] bg-transparent text-white/35 hover:border-white/15 hover:text-white/50"
-                      }`}
-                    >
-                      {pill.label}
-                    </button>
-                  );
-                })}
-              </div>
             </div>
             {visionsLoading ? (
               <p className="py-16 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
                 Loading community picks…
               </p>
-            ) : filteredVisionImages.length === 0 ? (
+            ) : visionImages.length === 0 ? (
               <p className="py-16 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-white/35">
-                No featured gallery images yet. Admins can mark public images as featured for each title.
+                No featured gallery images yet. Be the first
               </p>
             ) : (
               <div className="discover-concept-masonry">
-                {filteredVisionImages.map((img, i) => (
+                {visionImages.map((img, i) => (
                   <div key={`${img.bookId}-${img.id}`} className="discover-concept-masonry-item">
                     <div
                       className="discover-concept-vision-card group"
@@ -972,7 +899,10 @@ export function DiscoverCatalogueClient({
                           : undefined
                       }
                     >
-                      <Link href="/gallery" className="block outline-none focus-visible:ring-2 focus-visible:ring-accent/45">
+                      <Link
+                        href={`/gallery/${img.bookId}`}
+                        className="block outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={img.imageUrl} alt="" className="discover-concept-vision-img" />
                         <div className="discover-concept-vision-grad" />
@@ -998,82 +928,57 @@ export function DiscoverCatalogueClient({
                 ))}
               </div>
             )}
-            <div className="mt-10 text-center">
-              <Link
-                href="/gallery"
-                className="inline-block rounded border border-accent/28 px-10 py-3 font-mono text-[11px] uppercase tracking-[0.25em] text-accent/75 transition hover:border-accent/45 hover:text-text-primary"
-              >
-                Explore all images
-              </Link>
-            </div>
-          </section>
-        ) : null}
-
-        {!searchActive && showFeatured ? (
-          <section className="discover-concept-cta relative mb-14 overflow-hidden rounded-lg border border-accent/18 px-6 py-10 sm:px-10 sm:py-12">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-dim to-transparent" />
-            {!reducedMotion ? <DiscoverParticleField /> : null}
-            <div className="relative z-[1] flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-text-muted">
-                  Begin your journey
-                </p>
-                <p className="mt-3 font-serif text-2xl text-white sm:text-3xl">Read without fear.</p>
-                <p className="mt-2 max-w-md text-sm italic text-white/40">
-                  Your AI companion respects every page you haven&apos;t turned yet.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <Link
-                  href="/sign-in"
-                  className="rounded border-0 bg-accent px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-text-on-accent transition hover:brightness-110"
-                >
-                  Join free →
-                </Link>
-                <Link
-                  href="/books"
-                  className="rounded border border-accent/35 bg-transparent px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-accent/75 transition hover:border-accent/55 hover:text-text-primary"
-                >
-                  Browse books
-                </Link>
-              </div>
-            </div>
           </section>
         ) : null}
 
         {!searchActive ? (
-          <section className="mb-8">
-            <h2 className="sr-only">Filter by genre</h2>
-            <div
-              className={`discover-no-h-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 ${
-                !reducedMotion ? "discover-animate-in" : ""
-              }`}
-              style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
-            >
-              {genrePills.map((pill) => {
-                const active = genre === pill.value;
-                return (
-                  <button
-                    key={pill.value}
-                    type="button"
-                    onClick={() => selectGenre(pill.value)}
-                    className={`discover-genre-pill shrink-0 rounded-full px-4 py-2 text-xs font-medium outline-none sm:text-sm ${
-                      finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
-                    } ${
-                      active
-                        ? `discover-genre-pill-active ${!reducedMotion ? "discover-pill-pulse" : ""}`
-                        : "bg-bg-raised text-text-secondary"
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
-                );
-              })}
+          <>
+            <div className="discover-concept-visions-head mb-3 flex flex-wrap items-center gap-4">
+              <h2 className="discover-concept-section-title m-0 shrink-0">
+                Browse {selectedGenreName} Books
+              </h2>
+              <div className="discover-concept-section-line min-w-[4rem] flex-1" />
+              {filteredByGenre.length > 20 ? (
+                <button
+                  type="button"
+                  onClick={toggleExpanded}
+                  className="shrink-0 text-sm font-medium text-accent-text transition duration-200 hover:underline underline-offset-2"
+                >
+                  {expanded ? "Show Less ↑" : "View All →"}
+                </button>
+              ) : null}
             </div>
-          </section>
+            <section className="mb-3">
+              <h2 className="sr-only">Filter by genre</h2>
+              <div
+                className={`discover-no-h-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 ${
+                  !reducedMotion ? "discover-animate-in" : ""
+                }`}
+                style={!reducedMotion ? { animationDelay: `${genreEnterDelayMs}ms` } : undefined}
+              >
+                {genrePills.map((pill) => {
+                  const active = genre === pill.value;
+                  return (
+                    <button
+                      key={pill.value}
+                      type="button"
+                      onClick={() => selectGenre(pill.value)}
+                      className={`discover-genre-pill shrink-0 rounded-full px-4 py-2 text-xs font-medium outline-none sm:text-sm ${
+                        finePointer ? "hover:scale-105 hover:brightness-110" : "active:brightness-125"
+                      } ${
+                        active
+                          ? `discover-genre-pill-active ${!reducedMotion ? "discover-pill-pulse" : ""}`
+                          : "bg-bg-raised text-text-secondary"
+                      }`}
+                    >
+                      {pill.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </>
         ) : null}
-
-        {!searchActive ? <SectionDivider /> : null}
 
         {searchActive ? (
           <section className="mb-12">
@@ -1105,22 +1010,6 @@ export function DiscoverCatalogueClient({
         ) : (
           <>
             <section ref={browseSectionRef} className="mb-8">
-              <div className="discover-section-label-row mb-4 items-end justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-0">
-                  <h2 className="discover-section-label m-0">Browse {selectedGenreName} Books</h2>
-                  <div className="discover-section-label-line" />
-                </div>
-                {filteredByGenre.length > 20 ? (
-                  <button
-                    type="button"
-                    onClick={toggleExpanded}
-                    className="shrink-0 text-sm font-medium text-accent-text transition duration-200 hover:underline underline-offset-2"
-                  >
-                    {expanded ? "Show Less ↑" : "View All →"}
-                  </button>
-                ) : null}
-              </div>
-
               <div className="relative">
                 <div
                   ref={browseScrollerRef}
@@ -1238,6 +1127,38 @@ export function DiscoverCatalogueClient({
             Request a Book
           </button>
         </section>
+
+        {!searchActive && showFeatured ? (
+          <section className="discover-concept-cta relative mt-16 overflow-hidden rounded-lg border border-accent/18 px-6 py-10 sm:mt-20 sm:px-10 sm:py-12">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-dim to-transparent" />
+            {!reducedMotion ? <DiscoverParticleField /> : null}
+            <div className="relative z-[1] flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-text-muted">
+                  Begin your journey
+                </p>
+                <p className="mt-3 font-serif text-2xl text-white sm:text-3xl">Read without fear.</p>
+                <p className="mt-2 max-w-md text-sm italic text-white/40">
+                  Your AI companion respects every page you haven&apos;t turned yet.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Link
+                  href="/sign-in"
+                  className="rounded border-0 bg-accent px-6 py-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-text-on-accent transition hover:brightness-110"
+                >
+                  Join free →
+                </Link>
+                <Link
+                  href="/discover"
+                  className="rounded border border-accent/35 bg-transparent px-5 py-3 font-mono text-xs uppercase tracking-[0.2em] text-accent/75 transition hover:border-accent/55 hover:text-text-primary"
+                >
+                  Browse books
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <BookRequestModal open={bookRequestOpen} onClose={() => setBookRequestOpen(false)} />
       </div>

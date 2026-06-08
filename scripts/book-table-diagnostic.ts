@@ -92,9 +92,9 @@ ${publishedNullOwner > 0 ? "Yes — at least one row matches." : "No — none."}
 
 There is **no** \`DELETE\` handler under \`app/api/partner/books/[id]/route.ts\` in the surveyed file (partner updates use \`PATCH\` only). Other deletions in the codebase are **chapters**, **chunks**, or related rows during ingest — not whole-book delete except the admin route above.
 
-## 7. Public \`/books\` catalogue query
+## 7. Public \`/discover\` catalogue query
 
-**Server file:** \`app/(public)/books/page.tsx\`
+**Server file:** \`app/(public)/discover-catalogue-root.tsx\` (used by \`app/(public)/discover/page.tsx\`)
 
 **Prisma query:**
 

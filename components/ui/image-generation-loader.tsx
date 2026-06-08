@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import "./image-generation-loader.css";
 
 const INFINITY_PATH =
@@ -70,7 +70,6 @@ export function ImageGenerationLoader({
   const reducedMotion = usePrefersReducedMotion();
   const pathRef = useRef<SVGPathElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const symbolRef = useRef<HTMLDivElement>(null);
   const emitterRef = useRef<HTMLDivElement>(null);
   const particleRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
@@ -79,13 +78,12 @@ export function ImageGenerationLoader({
   const particlesRef = useRef<Particle[]>([]);
   const lastParticleSpawnRef = useRef(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (reducedMotion) return;
 
     const path = pathRef.current;
     const canvas = canvasRef.current;
-    const symbol = symbolRef.current;
-    if (!path || !canvas || !symbol) return;
+    if (!path || !canvas) return;
 
     const totalLen = path.getTotalLength();
     if (totalLen <= 0) return;
@@ -93,9 +91,9 @@ export function ImageGenerationLoader({
     lastLitRef.current = new Float32Array(PATH_SAMPLES).fill(0);
     particlesRef.current = [];
 
+    const cssW = VIEW_W;
+    const cssH = VIEW_H;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const cssW = symbol.clientWidth || VIEW_W;
-    const cssH = symbol.clientHeight || VIEW_H;
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
     canvas.style.width = `${cssW}px`;
@@ -105,8 +103,8 @@ export function ImageGenerationLoader({
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    const scaleX = cssW / VIEW_W;
-    const scaleY = cssH / VIEW_H;
+    const scaleX = 1;
+    const scaleY = 1;
     const toCanvas = (x: number, y: number) => ({
       x: x * scaleX,
       y: y * scaleY,
@@ -311,7 +309,6 @@ export function ImageGenerationLoader({
       aria-label={ariaLabel}
     >
       <div
-        ref={symbolRef}
         className={`image-generation-loader__symbol${reducedMotion ? " image-generation-loader__symbol--static" : ""}`}
       >
         <svg

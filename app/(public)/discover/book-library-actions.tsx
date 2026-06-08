@@ -39,29 +39,58 @@ export function BookLibraryActions({
     );
   }
 
-  async function handleClick() {
+  async function handleAddToLibrary() {
     setError(null);
     setPending(true);
     try {
-      const method = inLibrary ? "DELETE" : "POST";
-      const res = await fetch(`/api/library/${bookId}`, { method });
+      const res = await fetch(`/api/library/${bookId}`, { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(typeof body.error === "string" ? body.error : "Something went wrong");
         return;
       }
-      setInLibrary(!inLibrary);
+      setInLibrary(true);
       router.refresh();
     } finally {
       setPending(false);
     }
   }
 
+  async function handleRemoveFromLibrary() {
+    setError(null);
+    setPending(true);
+    try {
+      const res = await fetch(`/api/library/${bookId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(typeof body.error === "string" ? body.error : "Something went wrong");
+        return;
+      }
+      setInLibrary(false);
+      router.refresh();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (inLibrary && variant === "discoverGold") {
+    return (
+      <div>
+        <Link
+          href={`/library?book=${encodeURIComponent(bookId)}`}
+          className={`${discoverCtaBtn} discover-cta-in-library`}
+        >
+          In library ✓
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div>
       <button
         type="button"
-        onClick={handleClick}
+        onClick={inLibrary ? handleRemoveFromLibrary : handleAddToLibrary}
         disabled={pending}
         className={
           variant === "discoverGold"
@@ -72,9 +101,7 @@ export function BookLibraryActions({
         {pending
           ? "…"
           : inLibrary
-            ? variant === "discoverGold"
-              ? "In library ✓"
-              : "Remove from Library"
+            ? "Remove from Library"
             : variant === "discoverGold"
               ? "Add to library →"
               : "Add to Library"}

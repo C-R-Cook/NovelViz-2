@@ -133,8 +133,8 @@ export function NavChrome({
   const links = (
     <>
       <Link
-        href="/books"
-        className={navLinkClass(isActive(pathname, "/books"))}
+        href="/discover"
+        className={navLinkClass(isActive(pathname, "/discover"))}
         onClick={() => setMenuOpen(false)}
       >
         Discover

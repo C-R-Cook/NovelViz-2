@@ -37,7 +37,7 @@ Most catalogue books arrive either from **Gutenberg bulk import** or from **part
             if cover present       partner choice       internal notes updated
 ```
 
-**Discover** (`/books`) shows only **`published`** books with a **cover image**.
+**Discover** (`/discover`) shows only **`published`** books with a **cover image**.
 
 ---
 

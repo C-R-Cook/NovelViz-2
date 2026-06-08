@@ -18,13 +18,18 @@ type CheckState = "idle" | "checking" | "available" | "taken" | "invalid";
 type Props = {
   initialUsername: string;
   legacyGenresOnly: boolean;
+  previewMode?: boolean;
 };
 
 const COUNTRY_OPTIONS = Object.entries(countries.getNames("en", { select: "official" }))
   .map(([code, name]) => ({ code, name }))
   .sort((a, b) => a.name.localeCompare(b.name));
 
-export function PreferencesClient({ initialUsername, legacyGenresOnly }: Props) {
+export function PreferencesClient({
+  initialUsername,
+  legacyGenresOnly,
+  previewMode = false,
+}: Props) {
   const router = useRouter();
   const [username, setUsername] = useState(initialUsername);
   const [checkState, setCheckState] = useState<CheckState>(
@@ -105,6 +110,7 @@ export function PreferencesClient({ initialUsername, legacyGenresOnly }: Props) 
       return;
     }
     if (!canSubmit) return;
+    if (previewMode) return;
     setSubmitErr(null);
     setGenreError(null);
     setSubmitting(true);
@@ -138,11 +144,7 @@ export function PreferencesClient({ initialUsername, legacyGenresOnly }: Props) 
   return (
     <div className="onboarding-preferences px-4">
       <header className="onboarding-preferences__header">
-        <h1 className="onboarding-preferences__title">Welcome to NovelViz</h1>
-        <p className="onboarding-preferences__lede">
-          Before you start, let&apos;s set up your profile
-        </p>
-        <p className="onboarding-preferences__step">Step 2 of 2</p>
+        <h1 className="onboarding-preferences__headline">Setup your Profile</h1>
       </header>
 
       <form
@@ -315,6 +317,11 @@ export function PreferencesClient({ initialUsername, legacyGenresOnly }: Props) 
         <button type="submit" disabled={!canSubmit} className="onboarding-preferences__submit">
           {submitting ? "Saving…" : "Get Started"}
         </button>
+        {previewMode ? (
+          <p className="text-center text-xs text-text-muted">
+            Preview — use the toolbar above to continue; form won&apos;t save.
+          </p>
+        ) : null}
       </form>
     </div>
   );

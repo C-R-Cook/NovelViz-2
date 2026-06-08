@@ -288,7 +288,7 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           <Link href={startHref} className="landing-btn-primary">
             {isLoggedIn ? "Go to My Library →" : "Start Reading Free →"}
           </Link>
-          <Link href="/books" className="landing-btn-secondary">
+          <Link href="/discover" className="landing-btn-secondary">
             Browse Books
           </Link>
           {!isLoggedIn ? (

@@ -12,6 +12,7 @@ function shouldShowPublicFooter(pathname: string): boolean {
   if (pathname.startsWith("/dashboard")) return false;
   if (pathname.startsWith("/read")) return false;
   if (pathname.startsWith("/onboarding")) return false;
+  if (pathname.startsWith("/dev")) return false;
   return true;
 }
 

@@ -2,62 +2,267 @@
 
 import { completePlanStep } from "@/lib/onboarding-plan-action";
 import type { PublicTierPlan } from "@/lib/tier-limit-config";
-import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import "./plan.css";
 
-type PlanCard = {
-  id: "free" | "standard" | "premium";
+type PlanId = "free" | "standard" | "premium" | "partner";
+
+type CtaStyle = "ghost" | "outline" | "disabled";
+
+type PlanCardModel = {
+  id: PlanId;
   name: string;
-  price: string;
-  betaPrice?: string;
-  features: { label: string; value: string }[];
-  selectable: boolean;
-  comingSoon: boolean;
+  priceDisplay: string | null;
+  priceSubtext: string | null;
+  features: { label: string; value: string; muted?: boolean }[];
+  cta: string;
+  ctaStyle: CtaStyle;
+  ribbon: string | null;
+  disabled: boolean;
+  isPartner?: boolean;
+};
+
+export type CreditPackPriceSummary = {
+  priceFree: number;
+  priceStandard: number;
+  pricePremium: number;
 };
 
 function formatLimit(n: number | null): string {
-  return n === null ? "Unlimited" : `${n}/month`;
+  return n === null ? "Unlimited" : `${n} / month`;
 }
 
-function buildPlanCards(plans: PublicTierPlan[]): PlanCard[] {
-  return plans.map((p) => ({
-    id: p.tier as PlanCard["id"],
-    name: p.name,
-    price: p.displayPriceMonthly ?? "—",
-    betaPrice: p.tier === "standard" ? "Free during beta" : undefined,
-    features: [
-      { label: "Q&A", value: formatLimit(p.queriesPerMonth) },
-      { label: "Images", value: formatLimit(p.imagesPerMonth) },
-      {
-        label: "Models",
-        value:
-          p.allowedModels.length > 1
-            ? "All models + early access"
-            : "Default only",
-      },
-    ],
-    selectable: p.tier === "free" || p.tier === "standard",
-    comingSoon: p.tier === "premium",
-  }));
+function formatMonthlyPrice(price: string | null): string | null {
+  if (!price) return null;
+  if (/\//.test(price)) return price;
+  return `${price} / mo`;
 }
 
-type SelectedPlan = "free" | "standard" | "premium" | null;
+function formatExtraTokens(
+  tier: "free" | "standard" | "premium",
+  creditPurchasesEnabled: boolean,
+  creditPack: CreditPackPriceSummary | null,
+): string {
+  if (!creditPurchasesEnabled) return "N/A";
+  if (!creditPack) return "Available";
+  const cents =
+    tier === "premium"
+      ? creditPack.pricePremium
+      : tier === "standard"
+        ? creditPack.priceStandard
+        : creditPack.priceFree;
+  if (cents <= 0) return "Available";
+  return `$${(cents / 100).toFixed(2)} / pack`;
+}
+
+function buildReaderPlanCards(
+  plans: PublicTierPlan[],
+  creditPack: CreditPackPriceSummary | null,
+): PlanCardModel[] {
+  return plans.map((p) => {
+    const tier = p.tier as "free" | "standard" | "premium";
+    const isPremium = tier === "premium";
+    const monthly = formatMonthlyPrice(p.displayPriceMonthly);
+
+    return {
+      id: tier,
+      name: p.name,
+      priceDisplay:
+        tier === "free" ? "Free" : monthly,
+      priceSubtext: tier === "standard" ? "Free during beta" : null,
+      features: [
+        { label: "Q&A", value: formatLimit(p.queriesPerMonth) },
+        { label: "Images", value: formatLimit(p.imagesPerMonth) },
+        {
+          label: "Models",
+          value:
+            p.allowedModels.length > 1 ? "All + early access" : "Default only",
+        },
+        {
+          label: "Extra tokens",
+          value: formatExtraTokens(tier, p.creditPurchasesEnabled, creditPack),
+          muted: !p.creditPurchasesEnabled,
+        },
+      ],
+      cta: isPremium ? "Coming Soon" : tier === "free" ? "Start for free" : "Choose Standard",
+      ctaStyle: isPremium ? "disabled" : "ghost",
+      ribbon: isPremium ? "COMING SOON" : null,
+      disabled: isPremium,
+    };
+  });
+}
+
+const PARTNER_PLAN: PlanCardModel = {
+  id: "partner",
+  name: "Partner",
+  priceDisplay: "By application",
+  priceSubtext: "Includes Standard reader account",
+  features: [
+    { label: "Book uploads", value: "Unlimited" },
+    { label: "Reader analytics", value: "Included" },
+    { label: "Affiliate links", value: "Included" },
+    { label: "Reader account", value: "Standard tier" },
+  ],
+  cta: "Request access",
+  ctaStyle: "outline",
+  ribbon: null,
+  disabled: false,
+  isPartner: true,
+};
 
 type Props = {
   initialPlans: PublicTierPlan[];
+  creditPack?: CreditPackPriceSummary | null;
+  previewMode?: boolean;
 };
 
-export function PlanClient({ initialPlans }: Props) {
-  const plans = buildPlanCards(initialPlans);
-  const [selected, setSelected] = useState<SelectedPlan>(null);
+type PlanCardProps = {
+  plan: PlanCardModel;
+  isSelected: boolean;
+  busy: boolean;
+  onSelect: () => void;
+  onCta: () => void;
+};
+
+function PlanCard({ plan, isSelected, busy, onSelect, onCta }: PlanCardProps) {
+  return (
+    <div
+      role="listitem"
+      aria-selected={!plan.disabled ? isSelected : undefined}
+      className={[
+        "onboarding-plan__card",
+        isSelected ? "onboarding-plan__card--selected" : "",
+        plan.isPartner ? "onboarding-plan__card--partner" : "",
+        plan.disabled ? "onboarding-plan__card--disabled" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      tabIndex={plan.disabled ? -1 : 0}
+      onClick={plan.disabled ? undefined : onSelect}
+      onKeyDown={
+        plan.disabled
+          ? undefined
+          : (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect();
+              }
+            }
+      }
+    >
+      {plan.ribbon ? (
+        <div className="onboarding-plan__ribbon onboarding-plan__ribbon--muted">
+          <span className="onboarding-plan__ribbon-text">{plan.ribbon}</span>
+        </div>
+      ) : null}
+
+      {isSelected ? <div className="onboarding-plan__selected-glow" aria-hidden /> : null}
+
+      <div className="onboarding-plan__plan-name-row">
+        <span
+          className={[
+            "onboarding-plan__plan-name",
+            plan.isPartner ? "onboarding-plan__plan-name--partner" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {plan.name}
+        </span>
+        {plan.isPartner ? (
+          <span className="onboarding-plan__partner-badge">Authors &amp; publishers</span>
+        ) : null}
+      </div>
+
+      <div className="onboarding-plan__price-row">
+        {plan.id === "free" ? (
+          <span className="onboarding-plan__price-free">{plan.priceDisplay}</span>
+        ) : null}
+        {plan.id !== "free" && plan.id !== "partner" && plan.priceDisplay ? (
+          <span className="onboarding-plan__price-struck">{plan.priceDisplay}</span>
+        ) : null}
+        {plan.isPartner && plan.priceDisplay ? (
+          <span className="onboarding-plan__price-by-app">{plan.priceDisplay}</span>
+        ) : null}
+        {plan.priceSubtext ? (
+          <span
+            className={[
+              "onboarding-plan__price-subtext",
+              plan.id === "standard" ? "onboarding-plan__price-subtext--gold" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {plan.priceSubtext}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="onboarding-plan__divider" aria-hidden />
+
+      <div className="onboarding-plan__features">
+        {plan.features.map((feature) => (
+          <div key={feature.label} className="onboarding-plan__feature-row">
+            <span className="onboarding-plan__feature-label">{feature.label}</span>
+            <span
+              className={[
+                "onboarding-plan__feature-value",
+                feature.muted ? "onboarding-plan__feature-value--muted" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              {feature.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {plan.isPartner ? (
+        <p className="onboarding-plan__partner-note">
+          Upgrade your reader account anytime after approval.
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        className={[
+          "onboarding-plan__cta",
+          plan.ctaStyle === "ghost" ? "onboarding-plan__cta--ghost" : "",
+          plan.ctaStyle === "outline" ? "onboarding-plan__cta--outline" : "",
+          plan.ctaStyle === "disabled" ? "onboarding-plan__cta--disabled" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        disabled={plan.disabled || busy}
+        onClick={(e) => {
+          e.stopPropagation();
+          onCta();
+        }}
+      >
+        {busy && !plan.disabled ? "Continuing…" : plan.cta}
+      </button>
+    </div>
+  );
+}
+
+export function PlanClient({
+  initialPlans,
+  creditPack = null,
+  previewMode = false,
+}: Props) {
+  const plans = useMemo(
+    () => [...buildReaderPlanCards(initialPlans, creditPack), PARTNER_PLAN],
+    [initialPlans, creditPack],
+  );
+  const [selected, setSelected] = useState<PlanId>("standard");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const submitPlan = useCallback(
-    async (tier: SelectedPlan, partnerInterest: boolean) => {
-      if (!tier) return;
+    async (tier: "free" | "standard" | "premium", partnerInterest: boolean) => {
       setError(null);
+      if (previewMode) return;
       setBusy(true);
       try {
         const result = await completePlanStep({ tier, partnerInterest });
@@ -72,128 +277,63 @@ export function PlanClient({ initialPlans }: Props) {
         setBusy(false);
       }
     },
-    [],
+    [previewMode],
   );
 
-  const onGetStarted = useCallback(() => {
-    if (!selected || selected === "premium") {
-      setError("Please select a plan to continue.");
-      return;
-    }
-    void submitPlan(selected, false);
-  }, [selected, submitPlan]);
+  const handleCta = useCallback(
+    (id: PlanId) => {
+      if (id === "premium") return;
+      if (id === "partner") {
+        setSelected("partner");
+        void submitPlan("standard", true);
+        return;
+      }
+      setSelected(id);
+      void submitPlan(id, false);
+    },
+    [submitPlan],
+  );
 
-  const onSelectPlan = useCallback((id: PlanCard["id"]) => {
+  const handleSelect = useCallback((id: PlanId) => {
+    const plan = plans.find((p) => p.id === id);
+    if (!plan || plan.disabled) return;
     setError(null);
     setSelected(id);
-  }, []);
-
-  const onPartnerRequest = useCallback(() => {
-    setSelected("standard");
-    void submitPlan("standard", true);
-  }, [submitPlan]);
+  }, [plans]);
 
   return (
-    <div className="onboarding-plan px-4">
-      <Link href="/" className="onboarding-plan__wordmark">
-        NovelViz
-      </Link>
-      <p className="onboarding-plan__eyebrow">Choose your plan</p>
-      <h1 className="onboarding-plan__headline">How would you like to read?</h1>
+    <div className="onboarding-plan">
+      <header className="onboarding-plan__header">
+        <span className="onboarding-plan__eyebrow">Choose your plan</span>
+        <h1 className="onboarding-plan__headline">How would you like to read?</h1>
+      </header>
 
       <div className="onboarding-plan__cards" role="list">
-        {plans.map((plan) => {
-          const isSelected = plan.id === selected;
-          return (
-            <div
-              key={plan.id}
-              role="listitem"
-              aria-selected={plan.selectable ? isSelected : undefined}
-              className={`onboarding-plan__card ${
-                plan.selectable
-                  ? "onboarding-plan__card--selectable"
-                  : "onboarding-plan__card--dulled"
-              }${isSelected ? " onboarding-plan__card--selected" : ""}`}
-              tabIndex={plan.selectable ? 0 : -1}
-              onClick={plan.selectable ? () => onSelectPlan(plan.id) : undefined}
-              onKeyDown={
-                plan.selectable
-                  ? (e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onSelectPlan(plan.id);
-                      }
-                    }
-                  : undefined
-              }
-            >
-              {plan.comingSoon ? (
-                <span className="onboarding-plan__card-badge">Coming Soon</span>
-              ) : null}
-              <span className="onboarding-plan__card-tier">{plan.name}</span>
-              {plan.id === "standard" && plan.betaPrice ? (
-                <>
-                  <span className="onboarding-plan__card-price onboarding-plan__card-price--struck">
-                    {plan.price}
-                  </span>
-                  <span className="onboarding-plan__card-beta">{plan.betaPrice}</span>
-                </>
-              ) : (
-                <span className="onboarding-plan__card-price">{plan.price}</span>
-              )}
-              <ul className="onboarding-plan__card-features">
-                {plan.features.map((f) => (
-                  <li key={f.label}>
-                    <span>{f.label}</span>
-                    <strong>{f.value}</strong>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          );
-        })}
+        {plans.map((plan) => (
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            isSelected={selected === plan.id}
+            busy={busy}
+            onSelect={() => handleSelect(plan.id)}
+            onCta={() => handleCta(plan.id)}
+          />
+        ))}
       </div>
 
-      <div className="onboarding-plan__divider" aria-hidden>
-        <span className="onboarding-plan__divider-line" />
-        <span>✦</span>
-        <span className="onboarding-plan__divider-line" />
-      </div>
-
-      <div className="onboarding-plan__partner">
-        <p className="onboarding-plan__partner-text">
-          Want to list your books on NovelViz? Partner accounts are for authors and publishers.
-          Request access and we&apos;ll be in touch.
-        </p>
-        <button
-          type="button"
-          className="onboarding-plan__partner-cta"
-          disabled={busy}
-          onClick={onPartnerRequest}
-        >
-          Request Partner Access
-        </button>
-      </div>
-
-      <p className="onboarding-plan__beta-note">
-        During beta all accounts can use Standard features at no charge. After beta, accounts return to
-        their selected tier and you can upgrade anytime.
+      <p className="onboarding-plan__footer-note">
+        During beta all accounts access Standard features at no charge. After beta, accounts revert
+        to the Free tier — you can upgrade anytime.
       </p>
-
-      <div className="onboarding-plan__actions">
-        <button
-          type="button"
-          className="onboarding-plan__primary"
-          disabled={busy || !selected || selected === "premium"}
-          onClick={onGetStarted}
-        >
-          {busy ? "Continuing…" : "Get started"}
-        </button>
-      </div>
 
       {error ? (
         <p className="onboarding-plan__error" role="alert">
           {error}
+        </p>
+      ) : null}
+      {previewMode ? (
+        <p className="onboarding-plan__preview-note">
+          Preview — use the toolbar above to continue to the next step.
         </p>
       ) : null}
     </div>

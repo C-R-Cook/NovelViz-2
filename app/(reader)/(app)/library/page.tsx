@@ -64,6 +64,33 @@ export default async function LibraryPage({ searchParams }: LibraryPageProps) {
   const viewerRole =
     dbUser.role === "partner" ? "partner" : dbUser.role === "admin" ? "admin" : "reader";
 
+  if (requestedBookId) {
+    const publishedBook = await prisma.book.findFirst({
+      where: {
+        id: requestedBookId,
+        status: "published",
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+
+    if (publishedBook) {
+      await prisma.userBook.upsert({
+        where: {
+          userId_bookId: { userId: session.id, bookId: requestedBookId },
+        },
+        create: {
+          userId: session.id,
+          bookId: requestedBookId,
+          isActive: true,
+        },
+        update: {
+          isActive: true,
+        },
+      });
+    }
+  }
+
   const userBooks = await prisma.userBook.findMany({
     where: {
       userId: session.id,

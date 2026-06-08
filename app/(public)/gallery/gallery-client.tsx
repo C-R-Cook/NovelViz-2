@@ -1275,10 +1275,10 @@ export function GalleryClient(props: GalleryClientProps) {
               </p>
             </div>
             <div className="gallery-cta-actions">
-              <Link href="/books" className="gallery-cta-primary">
+              <Link href="/discover" className="gallery-cta-primary">
                 START READING →
               </Link>
-              <Link href="/books" className="gallery-cta-secondary">
+              <Link href="/discover" className="gallery-cta-secondary">
                 BROWSE BOOKS
               </Link>
             </div>

@@ -27,7 +27,7 @@ We provide the intelligence layer on top of that.
 
 novelviz/
 ├── app/
-│   ├── (public)/              # Marketing, catalogue (/books), discover, gallery, legal
+│   ├── (public)/              # Marketing, discover (catalogue), gallery, legal
 │   ├── (reader)/              # Auth-aware reader shell + onboarding
 │   │   └── (app)/             # Library, dashboard, reader, account (nested authenticated app)
 │   ├── (partner)/             # Partner (publisher) dashboard, books CRUD, per-book stats
@@ -206,7 +206,7 @@ Dashboard and `/partner/books/[id]/stats` load aggregated metrics from **`lib/pa
 
 - Next.js 16 app, Prisma + Neon + pgvector, Tailwind
 - Clerk integration (`@clerk/nextjs`, webhook), dev role override via **`dev_role`** cookie + seeded **`DEV_USERS`** in **`lib/auth.ts`** for local work
-- **Public:** homepage, **`/books`**, **`/discover`** (paginated catalogue), **`/gallery`**, **`/faq`**, **`/contact`**, terms/privacy
+- **Public:** homepage, **`/discover`** (paginated catalogue; `/books` redirects here), **`/gallery`**, **`/faq`**, **`/contact`**, terms/privacy
 - **Reader:** onboarding, **`/library`**, **`/dashboard`** (includes partner analytics tab when role is partner), **`/reader/[bookId]`** (Ask / Imagine / progress), **`/account`**
 - **Partner:** **`/partner/dashboard`**, create book, book detail, **`/partner/books/[id]/stats`** (charts + KPIs); partner APIs for books / EPUB metadata
 - **Admin:** books list/detail, ingestion, chapters (incl. merge), cover upload, status, requests, stats page

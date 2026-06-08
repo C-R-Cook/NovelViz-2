@@ -109,7 +109,7 @@ export function LibraryShelf({
           </button>
         );
       })}
-      <Link href="/books" className="library-shelf-add" aria-label="Add book">
+      <Link href="/discover" className="library-shelf-add" aria-label="Add book">
         <span className="library-shelf-add-plus">+</span>
         <span className="library-shelf-add-label">ADD BOOK</span>
       </Link>

@@ -80,7 +80,7 @@ Cover art is loaded via **Cloudinary remote fetch** from `covers.openlibrary.org
   2. Review (browser)    →  approved: true on queue entries
   3. Ingest (CLI)        →  EPUB + OL metadata + cover + embeddings
        │                      (blocked titles → deferred file)
-  4. Publish (admin UI)  →  Discover (/books)
+  4. Publish (admin UI)  →  Discover (/discover)
 ```
 
 **You do not need a separate enrich step** for new imports. Ingest calls Open Library once per book and writes `openLibraryKey`, `description`, `publishedYear`, and `coverImageUrl` before chapter processing.
@@ -285,7 +285,7 @@ npm run gutenberg-enrich -- --refresh-covers
 2. Confirm chapters, cover, and metadata
 3. Set status to **published**
 
-Discover (**/books**) requires **published** status and a **cover image**.
+Discover (**/discover**) requires **published** status and a **cover image**.
 
 ---
 
@@ -296,7 +296,7 @@ Discover (**/books**) requires **published** status and a **cover image**.
 | Active queue, approvals | `/admin/gutenberg-import` |
 | Deferred / blocked titles | `/admin/gutenberg-import` → **Deferred** |
 | Ingested / pending books | `/admin/books` → `/admin/books/[id]` |
-| Public catalogue | `/books` (after publish) |
+| Public catalogue | `/discover` (after publish) |
 
 ---
 

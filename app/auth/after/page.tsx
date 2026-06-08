@@ -13,7 +13,7 @@ export default async function AuthAfterPage() {
 
   const session = await ensureCurrentUser();
   if (!session) {
-    return <AuthAfterProvisioning />;
+    return <AuthAfterProvisioning fullPage />;
   }
 
   const profile = await findDbProfileForSession(session);

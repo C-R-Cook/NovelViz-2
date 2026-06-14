@@ -397,7 +397,56 @@
   border-radius: 10px;
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
-  padding: 0 0.875rem;
+  padding: 0.75rem 0.875rem 0;
+}
+
+.library-shelf-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-height: 7.5rem;
+}
+
+.library-shelf-current {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 1.15rem;
+  padding-right: 1rem;
+  margin-right: 0.25rem;
+  border-right: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-subtle));
+}
+
+.library-shelf-current-label,
+.library-shelf-slot-label {
+  display: block;
+  width: 4rem;
+  min-height: 0.65rem;
+  margin: 0;
+}
+
+.library-shelf-current-label {
+  text-align: center;
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.library-shelf-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1.15rem 0 1rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  cursor: grab;
+  touch-action: pan-x;
 }
 
 /* Active book bar (inside .library-reading-wrap) */
@@ -536,18 +585,6 @@
   padding: 0;
 }
 
-.library-shelf-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 0.75rem;
-  min-height: 120px;
-  padding: 0.75rem 0 1rem;
-  overflow-x: auto;
-  overflow-y: hidden;
-  cursor: grab;
-  touch-action: pan-x;
-}
-
 .library-shelf-row--dragging {
   cursor: grabbing;
   user-select: none;
@@ -571,15 +608,24 @@
 }
 
 .library-shelf-card:hover {
-  transform: translateY(-6px) scale(1.02);
-}
-
-.library-shelf-card--active {
-  transform: translateY(-10px) scale(1.04);
+  transform: translateY(-4px);
 }
 
 .library-shelf-card--active:hover {
-  transform: translateY(-10px) scale(1.04);
+  transform: translateY(-4px);
+}
+
+.library-shelf-card--current {
+  cursor: default;
+}
+
+.library-shelf-card--current:hover {
+  transform: none;
+}
+
+.library-shelf-card--current .library-shelf-card-cover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .library-shelf-card-gem {
@@ -637,16 +683,33 @@
 }
 
 .library-shelf-card-title {
-  max-width: 4.5rem;
+  width: 4rem;
+  min-height: 1.25rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 9px;
+  line-height: 1.25rem;
+  text-align: center;
   color: var(--text-muted);
 }
 
 .library-shelf-add {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 4rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.library-shelf-add-inner {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -656,18 +719,19 @@
   aspect-ratio: 2 / 3;
   border-radius: 6px;
   border: 1px dashed var(--border-subtle);
-  color: var(--text-muted);
-  text-decoration: none;
-  transition:
-    border-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .library-shelf-add:hover {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
   color: var(--accent);
   transform: translateY(-4px);
+}
+
+.library-shelf-add:hover .library-shelf-add-inner {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+}
+
+.library-shelf-add-caption {
+  color: inherit;
 }
 
 .library-shelf-add-plus {
@@ -811,7 +875,8 @@
   }
 
   .library-shelf-card:hover,
-  .library-shelf-card--active {
+  .library-shelf-card--active,
+  .library-shelf-add:hover {
     transform: none;
   }
 

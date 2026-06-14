@@ -12,6 +12,7 @@ import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-im
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
+import { GallerySpoilerSelect } from "@/components/gallery/gallery-spoiler-select";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
 import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
@@ -405,12 +406,16 @@ function GallerySquareCard({
   );
 }
 
+const GALLERY_CARD_DRAG_IGNORE =
+  "[data-gallery-card], .gallery-image-card-wrap, article[role='button']";
+
 type GalleryCardStripSharedProps = {
   images: GalleryImageCard[];
   badgeMode: "off" | "featured" | "library";
   viewerUserId: string | null;
   isAdmin: boolean;
   globalSpoilerProtection: boolean;
+  /** Lock overlay copy (chapter vs unstarted); may differ from `image.lockKind` when using session-only gallery reveal. */
   overlayLockKind: (image: GalleryImageCard) => GalleryLockKind;
   canLike: boolean;
   likingIds: Record<string, boolean>;
@@ -418,6 +423,8 @@ type GalleryCardStripSharedProps = {
   openModal: (carouselIds: string[], index: number) => void;
   isImageLocked: (image: GalleryImageCard) => boolean;
   reducedMotion: boolean;
+  /** When set, modal swipes across this full id list (e.g. library + featured combined). */
+  modalCarouselIds?: string[];
 };
 
 type CarouselRowProps = GalleryCardStripSharedProps & {
@@ -440,17 +447,22 @@ function GalleryLibraryMasonry({
   openModal,
   isImageLocked,
   reducedMotion,
+  modalCarouselIds,
 }: GalleryCardStripSharedProps) {
-  const carouselIds = images.map((i) => i.id);
+  const carouselIds = modalCarouselIds ?? images.map((i) => i.id);
 
   return (
     <div className="gallery-library-masonry">
-      {images.map((image, idx) => (
+      {images.map((image, idx) => {
+        const modalIndex = carouselIds.indexOf(image.id);
+        const index = modalIndex >= 0 ? modalIndex : idx;
+
+        return (
         <div key={image.id} className="gallery-library-masonry-cell">
           <GallerySquareCard
             image={image}
             carouselIds={carouselIds}
-            index={idx}
+            index={index}
             badgeMode={badgeMode}
             viewerUserId={viewerUserId}
             isAdmin={isAdmin}
@@ -466,7 +478,8 @@ function GalleryLibraryMasonry({
             staggerIndex={idx}
           />
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -488,6 +501,7 @@ function CarouselRow({
   enableDragScroll = false,
   finePointer = false,
   onCarouselPointerDragMoved,
+  modalCarouselIds,
 }: CarouselRowProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
@@ -504,6 +518,8 @@ function CarouselRow({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!enableDragScroll || !finePointer || reducedMotion) return;
       if (e.button !== 0) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest(GALLERY_CARD_DRAG_IGNORE)) return;
       const el = scrollRef.current;
       if (!el) return;
       dragRef.current = {
@@ -590,7 +606,7 @@ function CarouselRow({
     el.scrollBy({ left: dir * step * 3, behavior: "smooth" });
   }
 
-  const carouselIds = images.map((i) => i.id);
+  const carouselIds = modalCarouselIds ?? images.map((i) => i.id);
 
   const scrollBehaviorClass =
     enableDragScroll && finePointer && !reducedMotion ? "scroll-auto" : "scroll-smooth";
@@ -618,12 +634,16 @@ function CarouselRow({
           if (dragRef.current.pointerId === e.pointerId) endDrag(e);
         }}
       >
-        {images.map((image, idx) => (
+        {images.map((image, idx) => {
+          const modalIndex = carouselIds.indexOf(image.id);
+          const index = modalIndex >= 0 ? modalIndex : idx;
+
+          return (
           <GallerySquareCard
             key={image.id}
             image={image}
             carouselIds={carouselIds}
-            index={idx}
+            index={index}
             badgeMode={badgeMode}
             viewerUserId={viewerUserId}
             isAdmin={isAdmin}
@@ -638,7 +658,8 @@ function CarouselRow({
             reducedMotion={reducedMotion}
             staggerIndex={idx}
           />
-        ))}
+          );
+        })}
       </div>
 
       <div className="pointer-events-none absolute inset-y-0 left-0 hidden md:flex items-center">
@@ -709,8 +730,17 @@ export function GalleryClient(props: GalleryClientProps) {
   const [spoilerSettingsByBookId, setSpoilerSettingsByBookId] = useState<Record<string, SpoilerProtection>>(
     props.layout === "member" ? props.spoilerSettingsByBookId : {},
   );
-  /** Session-only: gallery defaults to chapter gates on for INHERIT books; does not change account settings. */
+  /** Page-only: defaults to hiding spoilers; never persisted across navigation. */
   const [gallerySessionRevealAll, setGallerySessionRevealAll] = useState(false);
+
+  useEffect(() => {
+    setGallerySessionRevealAll(false);
+    try {
+      sessionStorage.removeItem("novelviz_session_unlocks");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   useEffect(() => {
     if (reducedMotion) {
@@ -777,6 +807,23 @@ export function GalleryClient(props: GalleryClientProps) {
   const fromLibraryResolved =
     props.layout === "member" && props.library.kind === "images" ? resolveList(props.library.images) : [];
   const featuredResolved = props.layout === "member" ? resolveList(props.featured) : [];
+
+  const memberModalCarouselIds = useMemo(() => {
+    if (props.layout !== "member") return [];
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const image of fromLibraryResolved) {
+      if (seen.has(image.id)) continue;
+      seen.add(image.id);
+      ids.push(image.id);
+    }
+    for (const image of featuredResolved) {
+      if (seen.has(image.id)) continue;
+      seen.add(image.id);
+      ids.push(image.id);
+    }
+    return ids;
+  }, [props.layout, fromLibraryResolved, featuredResolved]);
 
   async function likeImage(imageId: string) {
     if (!canLike) return;
@@ -1035,26 +1082,19 @@ export function GalleryClient(props: GalleryClientProps) {
     openModal,
     isImageLocked,
     reducedMotion,
+    modalCarouselIds: props.layout === "member" ? memberModalCarouselIds : undefined,
     onCarouselPointerDragMoved: scheduleModalOpenBlockAfterDrag,
   } satisfies Omit<CarouselRowProps, "title" | "images" | "badgeMode" | "enableDragScroll" | "finePointer">;
 
-  function GlobalSpoilerPill() {
+  function GlobalSpoilerSelect() {
     if (props.layout !== "member") return null;
-    const hidden = !gallerySessionRevealAll;
+
     return (
-      <button
-        type="button"
-        onClick={() => setGallerySessionRevealAll((v) => !v)}
-        className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold transition hover:brightness-110 active:scale-95 ${
-          hidden
-            ? "border-error/35 bg-error/10 text-error"
-            : "border-success/35 bg-success/10 text-success"
-        }`}
-        aria-pressed={gallerySessionRevealAll}
-        title="This visit only. Change your default under My Account → Reading preferences."
-      >
-        {hidden ? "Show everything" : "Hide spoilers"}
-      </button>
+      <GallerySpoilerSelect
+        value={gallerySessionRevealAll ? "show" : "hide"}
+        onChange={(value) => setGallerySessionRevealAll(value === "show")}
+        className="w-fit"
+      />
     );
   }
 
@@ -1152,7 +1192,7 @@ export function GalleryClient(props: GalleryClientProps) {
             {props.layout === "member" ? (
               <div className="flex shrink-0 items-center gap-2 pt-0.5">
                 <BadgeLegend />
-                <GlobalSpoilerPill />
+                <GlobalSpoilerSelect />
               </div>
             ) : null}
           </header>
@@ -1252,16 +1292,23 @@ export function GalleryClient(props: GalleryClientProps) {
                 <GallerySectionLabel
                   label="FEATURED"
                   sub="Beloved images from across the catalogue"
-                  right={finePointer && !reducedMotion ? "← drag to explore →" : undefined}
+                  right={
+                    props.layout === "member" && featuredResolved.length > 0
+                      ? `${featuredResolved.length} images`
+                      : undefined
+                  }
                 />
-                <CarouselRow
-                  {...carouselRowProps}
-                  badgeMode="featured"
-                  title="Featured"
-                  images={featuredResolved}
-                  finePointer={finePointer}
-                  enableDragScroll
-                />
+                {featuredResolved.length === 0 ? (
+                  <p className="gallery-empty-state text-sm text-text-secondary">
+                    No featured images yet. Check back soon.
+                  </p>
+                ) : (
+                  <GalleryLibraryMasonry
+                    {...carouselRowProps}
+                    badgeMode="featured"
+                    images={featuredResolved}
+                  />
+                )}
               </section>
             </div>
           )}

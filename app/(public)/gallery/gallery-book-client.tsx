@@ -6,18 +6,19 @@ import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
-import { SpoilerToggle } from "@/components/gallery/spoiler-toggle";
+import { GallerySpoilerSelect } from "@/components/gallery/gallery-spoiler-select";
 import { resolveLibraryPadlockBadge } from "@/lib/gallery-card-spoiler-badge";
-import { effectiveChapterGateMode } from "@/lib/gallery-spoiler";
 import { isTextEntryFocused } from "@/lib/is-text-entry-focused";
 import Image from "next/image";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { SpoilerProtection } from "@db";
+import { BookLibraryActions } from "../discover/book-library-actions";
 
-const SESSION_UNLOCK_KEY = "novelviz_session_unlocks";
+/** Legacy key — cleared on mount so spoiler reveal is never persisted across visits. */
+const LEGACY_SESSION_UNLOCK_KEY = "novelviz_session_unlocks";
 
 /** Match main gallery modal — same height as share controls */
 const modalViewGalleryButtonClass =
@@ -97,24 +98,6 @@ function HeartIcon({ className, filled }: { className?: string; filled?: boolean
   );
 }
 
-function readSessionUnlockMap(): Record<string, boolean> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = sessionStorage.getItem(SESSION_UNLOCK_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Record<string, boolean>;
-  } catch {
-    return {};
-  }
-}
-
-function writeSessionUnlockBook(bookId: string, on: boolean) {
-  const map = readSessionUnlockMap();
-  if (on) map[bookId] = true;
-  else delete map[bookId];
-  sessionStorage.setItem(SESSION_UNLOCK_KEY, JSON.stringify(map));
-}
-
 function formatCardDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
@@ -140,7 +123,7 @@ export function GalleryBookClient({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [spoilerSetting, setSpoilerSetting] = useState<SpoilerProtection>(userBookSpoiler ?? "INHERIT");
-  const [sessionUnlock, setSessionUnlock] = useState(false);
+  const [sessionReveal, setSessionReveal] = useState(false);
   const [likingIds, setLikingIds] = useState<Record<string, boolean>>({});
   const [modalIndex, setModalIndex] = useState<number | null>(null);
   const [modalSlideDir, setModalSlideDir] = useState<-1 | 0 | 1>(0);
@@ -148,22 +131,19 @@ export function GalleryBookClient({
   const [modalCtaError, setModalCtaError] = useState<string | null>(null);
   const [modalUnlockPending, setModalUnlockPending] = useState(false);
   const [addLibraryPending, setAddLibraryPending] = useState(false);
-  const [permanentSettingsOpen, setPermanentSettingsOpen] = useState(false);
   const [shareUpdatingIds, setShareUpdatingIds] = useState<Record<string, boolean>>({});
-
-  const gateModeForSession = useMemo(
-    () => effectiveChapterGateMode(userBookSpoiler !== null ? spoilerSetting : undefined, globalSpoilerProtection),
-    [userBookSpoiler, spoilerSetting, globalSpoilerProtection],
-  );
-
-  const showSessionButton = isLoggedIn && !isAdmin && gateModeForSession === "gate_chapters";
 
   useEffect(() => {
     if (userBookSpoiler) setSpoilerSetting(userBookSpoiler);
   }, [userBookSpoiler]);
 
   useEffect(() => {
-    setSessionUnlock(!!readSessionUnlockMap()[bookId]);
+    setSessionReveal(false);
+    try {
+      sessionStorage.removeItem(LEGACY_SESSION_UNLOCK_KEY);
+    } catch {
+      /* ignore */
+    }
   }, [bookId]);
 
   const fetchImages = useCallback(
@@ -203,18 +183,12 @@ export function GalleryBookClient({
   );
 
   useEffect(() => {
-    void fetchImages(sessionUnlock);
-  }, [fetchImages, sessionUnlock]);
-
-  function toggleSessionUnlock() {
-    const next = !sessionUnlock;
-    writeSessionUnlockBook(bookId, next);
-    setSessionUnlock(next);
-  }
+    void fetchImages(sessionReveal);
+  }, [fetchImages, sessionReveal]);
 
   function displayLocked(image: ApiImage): boolean {
     if (isAdmin) return false;
-    if (sessionUnlock) return false;
+    if (sessionReveal) return false;
     if (viewerUserId !== null && image.userId === viewerUserId) return false;
     return image.isLocked;
   }
@@ -242,7 +216,7 @@ export function GalleryBookClient({
       ),
     );
     try {
-      const body = sessionUnlock
+      const body = sessionReveal
         ? JSON.stringify({ sessionBrowsingUnlockedBookIds: [bookId] })
         : JSON.stringify({});
       const res = await fetch(`/api/gallery/${imageId}/like`, {
@@ -326,6 +300,13 @@ export function GalleryBookClient({
   );
 
   const bookInLibrary = isLoggedIn && userBookSpoiler !== null;
+
+  function handleSpoilerVisibilityChange(next: "show" | "hide") {
+    const wantsShow = next === "show";
+    if (wantsShow === sessionReveal) return;
+    setSessionReveal(wantsShow);
+  }
+
   const from = searchParams.get("from");
   const backHref = from === "reader" || from === "library" ? `/library?book=${bookId}` : "/gallery";
   const backLabel = from === "reader" ? "Back to your book" : "Back to gallery";
@@ -349,7 +330,7 @@ export function GalleryBookClient({
       if (res.ok) {
         dismissModalImage();
         router.refresh();
-        await fetchImages(sessionUnlock);
+        await fetchImages(sessionReveal);
         return;
       }
 
@@ -363,7 +344,7 @@ export function GalleryBookClient({
         if (create.ok) {
           dismissModalImage();
           router.refresh();
-          await fetchImages(sessionUnlock);
+          await fetchImages(sessionReveal);
           return;
         }
         const rawCreateErr = (payload as { error?: string }).error;
@@ -454,138 +435,79 @@ export function GalleryBookClient({
   }, [modalIndex, modalSwipeBusy, bumpModalIndex]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-9">
-      <nav className="mb-6 text-sm text-text-muted" aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-2">
-          <li>
-            <Link href={backHref} className="font-medium text-accent-text underline-offset-2 hover:underline">
-              ← {backLabel}
-            </Link>
-          </li>
-        </ol>
-      </nav>
+    <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 sm:py-5">
+      <header className="border-b border-border/80 pb-3">
+        <Link
+          href={backHref}
+          className="mb-2 inline-block text-xs font-medium text-accent-text underline-offset-2 hover:underline"
+        >
+          ← {backLabel}
+        </Link>
 
-      <header className="flex flex-col gap-6 border-b border-border/80 pb-8 sm:flex-row sm:items-start">
-        <div className="relative aspect-[2/3] w-[6.75rem] shrink-0 overflow-hidden rounded-lg border border-border bg-bg-base shadow-sm sm:w-36">
-          {coverImageUrl ? (
-            <Image src={coverImageUrl} alt="" fill className="object-cover object-top" sizes="(max-width:640px) 108px, 144px" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-[10px] text-text-muted">No cover</div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1 space-y-3">
-          <div>
-            <h1 className="font-serif text-2xl font-semibold tracking-tight text-text-primary sm:text-3xl">{bookTitle}</h1>
-            <p className="mt-1 text-sm text-text-secondary">{bookAuthor}</p>
-            <p className="mt-2 text-sm text-text-muted">
-              {imageCount} public {imageCount === 1 ? "image" : "images"}
-              {loading ? " · Loading…" : null}
-            </p>
+        <div className="flex items-start gap-3">
+          <div className="relative h-14 w-[2.35rem] shrink-0 overflow-hidden rounded border border-border bg-bg-base">
+            {coverImageUrl ? (
+              <Image
+                src={coverImageUrl}
+                alt=""
+                fill
+                className="object-cover object-top"
+                sizes="42px"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-[8px] text-text-muted">
+                No cover
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col gap-3">
-            {isLoggedIn && userBookSpoiler !== null ? (
-              showSessionButton ? (
-                sessionUnlock ? null : (
-                  <div className="flex flex-col gap-2 sm:max-w-xl">
-                    <button
-                      type="button"
-                      onClick={() => toggleSessionUnlock()}
-                      className="inline-flex w-fit items-center rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
-                    >
-                      Show everything this session
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPermanentSettingsOpen((o) => !o)}
-                      className="w-fit text-left text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
-                    >
-                      Change permanent setting →
-                    </button>
-                    {permanentSettingsOpen ? (
-                      <SpoilerToggle
-                        bookId={bookId}
-                        currentSetting={spoilerSetting}
-                        globalSetting={globalSpoilerProtection}
-                        onUpdate={(next) => {
-                          setSpoilerSetting(next);
-                          router.refresh();
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                )
-              ) : (
-                <SpoilerToggle
-                  bookId={bookId}
-                  currentSetting={spoilerSetting}
-                  globalSetting={globalSpoilerProtection}
-                  onUpdate={(next) => {
-                    setSpoilerSetting(next);
-                    router.refresh();
-                  }}
-                />
-              )
-            ) : isLoggedIn ? (
-              <p className="max-w-xl text-sm text-text-secondary">
-                Add this book to your library to adjust spoiler settings for this gallery.{" "}
-                <Link href="/discover" className="font-medium text-accent-text underline-offset-2 hover:underline">
-                  Discover books
-                </Link>
+          <div className="flex min-h-14 min-w-0 flex-1 flex-col justify-between gap-2">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+              <h1 className="max-w-full truncate font-serif text-base font-semibold leading-tight text-text-primary sm:text-lg">
+                {bookTitle}
+              </h1>
+              <span className="text-text-muted/70" aria-hidden>
+                ·
+              </span>
+              <p className="truncate text-xs text-text-secondary">{bookAuthor}</p>
+              <span className="text-text-muted/70" aria-hidden>
+                ·
+              </span>
+              <p className="shrink-0 text-xs text-text-muted">
+                {imageCount} public {imageCount === 1 ? "image" : "images"}
+                {loading ? " · …" : null}
               </p>
+            </div>
+
+            {isLoggedIn && bookInLibrary && !isAdmin ? (
+              <GallerySpoilerSelect
+                className="w-fit"
+                value={sessionReveal ? "show" : "hide"}
+                onChange={(value) => handleSpoilerVisibilityChange(value)}
+              />
+            ) : null}
+
+            {isLoggedIn && !bookInLibrary ? (
+              <BookLibraryActions
+                bookId={bookId}
+                initialInLibrary={false}
+                isLoggedIn
+              />
             ) : null}
           </div>
         </div>
       </header>
 
-      {sessionUnlock && showSessionButton ? (
-        <div className="mt-6 space-y-4">
-          <div
-            className="rounded-lg border border-warning/45 bg-warning/10 px-4 py-3 text-sm text-text-primary"
-            role="status"
-          >
-            Showing all images this session — your protection setting is unchanged
-          </div>
-          <div className="flex flex-col gap-2 sm:max-w-xl">
-            <button
-              type="button"
-              onClick={() => toggleSessionUnlock()}
-              className="inline-flex w-fit items-center rounded-md border border-border bg-bg-surface px-3 py-1.5 text-sm font-medium text-text-primary transition hover:bg-bg-raised"
-            >
-              Re-enable protection
-            </button>
-            <button
-              type="button"
-              onClick={() => setPermanentSettingsOpen((o) => !o)}
-              className="w-fit text-left text-sm font-medium text-accent-text underline-offset-2 transition hover:underline"
-            >
-              Change permanent setting →
-            </button>
-            {permanentSettingsOpen ? (
-              <SpoilerToggle
-                bookId={bookId}
-                currentSetting={spoilerSetting}
-                globalSetting={globalSpoilerProtection}
-                onUpdate={(next) => {
-                  setSpoilerSetting(next);
-                  router.refresh();
-                }}
-              />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {loadError ? <p className="mt-3 text-sm text-error">{loadError}</p> : null}
 
-      {loadError ? <p className="mt-6 text-sm text-error">{loadError}</p> : null}
-
-      <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
         {images.map((image, index) => {
           const locked = displayLocked(image);
           const username = image.username?.trim() || "Anonymous reader";
           const alreadyLiked = image.likedByViewer;
           const likeDisabled = !canLike || !!likingIds[image.id] || alreadyLiked || locked;
           const isOwnImage = viewerUserId !== null && viewerUserId === image.userId;
-          const padlockVariant = sessionUnlock
+          const padlockVariant = sessionReveal
             ? (viewerUserId !== null && image.userId === viewerUserId ? "aqua" : null)
             : resolveLibraryPadlockBadge({
                 viewerUserId,
@@ -934,7 +856,7 @@ export function GalleryBookClient({
                       layout="sidebar"
                       className="h-full min-h-0"
                       imageId={modalImage.id}
-                      sessionCommentsUnlocked={sessionUnlock}
+                      sessionCommentsUnlocked={sessionReveal}
                       isLoggedIn={isLoggedIn}
                       canInteract={!modalLocked}
                       viewerDisplayName={viewerDisplayName}

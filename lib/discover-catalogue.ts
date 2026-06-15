@@ -81,13 +81,27 @@ function catalogueFilters(genre?: BookGenre): Prisma.BookWhereInput {
   };
 }
 
+function featuredPoolFilters(userId: string | null): Prisma.BookWhereInput {
+  if (!userId) return catalogueFilters();
+
+  return {
+    ...catalogueFilters(),
+    userBooks: {
+      none: {
+        userId,
+        isActive: true,
+      },
+    },
+  };
+}
+
 /** Featured carousel — personalised when userId is provided. */
 export async function getDiscoverFeaturedBooks(
   userId: string | null = null,
   limit: number = FEATURED_DISPLAY_LIMIT,
 ): Promise<DiscoverCatalogueBook[]> {
   const rows = await prisma.book.findMany({
-    where: catalogueFilters(),
+    where: featuredPoolFilters(userId),
     orderBy: { userBooks: { _count: "desc" } },
     take: FEATURED_POOL_SIZE,
     select: featuredBookSelect,

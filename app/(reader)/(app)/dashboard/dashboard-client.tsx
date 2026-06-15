@@ -2,11 +2,13 @@
 
 import { AccountPageClient, type AccountPageClientProps } from "@/app/(reader)/(app)/account/account-client";
 import { DashboardPartnerSection } from "@/app/(reader)/(app)/dashboard/dashboard-partner-section";
-import { FeatureRequestsQueue } from "@/app/(reader)/(app)/dashboard/feature-requests-queue";
+import { FeatureImagesAdmin } from "@/app/(reader)/(app)/dashboard/feature-images-admin";
+import { PartnerFeatureImages } from "@/app/(reader)/(app)/dashboard/partner-feature-images";
 import {
   ForReviewQueue,
   toForReviewBook,
 } from "@/app/(reader)/(app)/dashboard/for-review-queue";
+import type { AdminFeatureImageRow } from "@/lib/admin-feature-images";
 import { FOR_REVIEW_QUEUE_PAGE_SIZE, type AdminBookRow } from "@/lib/admin-books-shared";
 import { FlaggedCommentsQueue } from "@/app/(reader)/(app)/dashboard/flagged-comments-queue";
 import { SpoilerCommentsQueue } from "@/app/(reader)/(app)/dashboard/spoiler-comments-queue";
@@ -35,12 +37,33 @@ import {
 import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import type { PartnerDashboardBookRow } from "@/lib/partner-books-list";
+import type { PartnerFeatureImageRow } from "@/lib/partner-feature-images";
+import type { FeatureRequestStatus } from "@db";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import "./dashboard-redesign.css";
+
+const DASHBOARD_SIDEBAR_COLLAPSED_KEY = "dashboard_sidebar_collapsed";
+
+function readSidebarCollapsedPreference(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeSidebarCollapsedPreference(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 const REJECT_REASON =
   "This book has been rejected during admin moderation review. The publisher may revise and resubmit after addressing the feedback provided.";
@@ -91,7 +114,7 @@ export type DashboardClientProps = {
     pageSize: number;
     ownFeatureRequests: {
       id: string;
-      status: string;
+      status: FeatureRequestStatus;
       createdAtMs: number;
       bookTitle: string;
       chapterNumberAtTime: number;
@@ -99,6 +122,9 @@ export type DashboardClientProps = {
       imageUrl: string;
     }[];
     ownFeatureRequestsPendingCount: number;
+    initialPartnerFeatureImages: PartnerFeatureImageRow[];
+    initialPartnerFeatureImagesHasMore: boolean;
+    partnerFeatureImagesPageSize: number;
   } | null;
   admin: {
     pendingBooks: {
@@ -138,6 +164,11 @@ export type DashboardClientProps = {
     pageSize: number;
   } | null;
   adminStats: AdminStatsPayload | null;
+  adminFeatureImages: {
+    featured: AdminFeatureImageRow[];
+    featuredHasMore: boolean;
+    pageSize: number;
+  } | null;
   account: Pick<
     AccountPageClientProps,
     "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction"
@@ -255,6 +286,7 @@ export function DashboardClient({
   admin,
   adminBooksAll,
   adminStats,
+  adminFeatureImages,
   account,
 }: DashboardClientProps) {
   const router = useRouter();
@@ -272,11 +304,30 @@ export function DashboardClient({
   const [loadingMorePending, setLoadingMorePending] = useState(false);
   const [loadMorePendingErr, setLoadMorePendingErr] = useState<string | null>(null);
   const [featureRequestQueue, setFeatureRequestQueue] = useState(admin?.featureRequestsQueue ?? []);
+
+  useEffect(() => {
+    if (admin?.featureRequestsQueue) {
+      setFeatureRequestQueue(admin.featureRequestsQueue);
+    }
+  }, [admin?.featureRequestsQueue]);
   const [actionId, setActionId] = useState<string | null>(null);
   const [featureActionId, setFeatureActionId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
+  useEffect(() => {
+    setSidebarCollapsed(readSidebarCollapsedPreference());
+  }, []);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      writeSidebarCollapsedPreference(next);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const server = admin?.pendingBooks ?? [];
@@ -494,6 +545,18 @@ export function DashboardClient({
     );
   }
 
+  function SidebarCollapseIcon({ collapsed }: { collapsed: boolean }) {
+    return (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.25} stroke="currentColor" aria-hidden>
+        {collapsed ? (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        )}
+      </svg>
+    );
+  }
+
   function SidebarToggleIcon({ open }: { open: boolean }) {
     if (open) {
       return (
@@ -568,7 +631,7 @@ export function DashboardClient({
     const actionItems: { count: number; label: string; tab: DashboardTabSlug; icon: string }[] = admin
       ? [
           { count: admin.pendingReviewCount, label: "For Review", tab: "for-review" as const, icon: "✅" },
-          { count: admin.featureRequestsPendingCount, label: "Feature Approvals", tab: "feature-approvals" as const, icon: "⭐" },
+          { count: admin.featureRequestsPendingCount, label: "Featured image requests", tab: "feature-approvals" as const, icon: "⭐" },
           { count: admin.spoilerCommentsPendingCount, label: "Spoiler Comments", tab: "spoiler-comments" as const, icon: "⚠️" },
           { count: admin.flaggedCommentsPendingCount, label: "Flagged Comments", tab: "flagged-comments" as const, icon: "🚩" },
         ].filter((item) => item.count > 0)
@@ -764,52 +827,6 @@ export function DashboardClient({
     );
   }
 
-  function partnerFeatureStatusClass(s: string) {
-    if (s === "PENDING") return "border-warning/50 bg-warning/15 text-warning";
-    if (s === "APPROVED") return "border-success/45 bg-success/15 text-success";
-    if (s === "REJECTED") return "border-error/40 bg-error/10 text-error";
-    return "border-border text-text-muted";
-  }
-
-  function partnerOwnFeatureRequestsSection() {
-    if (!partner) return null;
-    return (
-      <div>
-        <SectionLabel label="Your feature requests" right={`${partner.ownFeatureRequests.length} shown`} />
-        {partner.ownFeatureRequests.length === 0 ? (
-          <p className="text-sm text-text-secondary">No feature requests yet.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {partner.ownFeatureRequests.map((fr, i) => (
-              <div
-                key={fr.id}
-                className="dashboard-stagger-item flex items-center gap-3.5 rounded-lg border border-border-subtle bg-bg-surface/35 px-4 py-3"
-                style={reducedMotion ? undefined : { animationDelay: `${i * 65}ms` }}
-              >
-                <div className="relative h-12 w-[38px] shrink-0 overflow-hidden rounded border border-border-subtle">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fr.imageUrl} alt="" className="h-full w-full object-cover" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-0.5 font-mono text-[8px] uppercase tracking-widest text-accent/60">
-                    {fr.bookTitle} · Ch. {fr.chapterNumberAtTime}
-                  </div>
-                  <p className="truncate font-serif text-sm italic text-text-primary/80">&ldquo;{truncate(fr.userPrompt, 120)}&rdquo;</p>
-                  <ActivityTimestamp ms={fr.createdAtMs} />
-                </div>
-                <span
-                  className={`shrink-0 rounded-full border px-2.5 py-1 font-mono text-[8px] uppercase tracking-wide ${partnerFeatureStatusClass(fr.status)}`}
-                >
-                  {fr.status === "PENDING" ? "Pending" : fr.status === "APPROVED" ? "Featured" : fr.status === "REJECTED" ? "Rejected" : fr.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   function myBooksSection() {
     if (!partner) return null;
     return (
@@ -866,6 +883,14 @@ export function DashboardClient({
         <section aria-labelledby="dashboard-admin-book-requests">
           <SectionLabel label="Book requests" />
           <p className="text-sm text-text-secondary">
+            <Link
+              href="/admin/requests"
+              className="font-medium text-accent-text underline-offset-2 hover:underline"
+            >
+              View all book requests →
+            </Link>
+          </p>
+          <p className="mt-3 text-sm text-text-secondary">
             Total requests recorded:{" "}
             <span className="font-semibold text-text-primary">{admin.bookRequests.totalCount}</span>
           </p>
@@ -926,7 +951,15 @@ export function DashboardClient({
       case "stats":
         return analyticsSection();
       case "feature-requests":
-        return partnerOwnFeatureRequestsSection();
+        return partner ? (
+          <PartnerFeatureImages
+            ownFeatureRequests={partner.ownFeatureRequests}
+            initialImages={partner.initialPartnerFeatureImages}
+            initialHasMore={partner.initialPartnerFeatureImagesHasMore}
+            pageSize={partner.partnerFeatureImagesPageSize}
+            className="dashboard-partner-feature-wrap"
+          />
+        ) : null;
       case "for-review":
         return admin ? (
           <ForReviewQueue
@@ -944,9 +977,12 @@ export function DashboardClient({
           />
         ) : null;
       case "feature-approvals":
-        return admin ? (
-          <FeatureRequestsQueue
-            items={featureRequestQueue}
+        return admin && adminFeatureImages ? (
+          <FeatureImagesAdmin
+            featureRequests={featureRequestQueue}
+            initialFeatured={adminFeatureImages.featured}
+            initialFeaturedHasMore={adminFeatureImages.featuredHasMore}
+            pageSize={adminFeatureImages.pageSize}
             actionRequestId={featureActionId}
             onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
             className="dashboard-feature-queue-wrap dashboard-admin-queue-wrap"
@@ -1000,37 +1036,53 @@ export function DashboardClient({
               onClick={closeSidebar}
             />
           ) : null}
-          <aside
-            id="dashboard-sidebar"
-            className="dashboard-sidebar"
-            data-open={sidebarOpen ? "true" : "false"}
+          <div
+            className="dashboard-sidebar-shell"
+            data-collapsed={sidebarCollapsed ? "true" : "false"}
           >
-            <div className="dashboard-sidebar-user">
-              <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
-              <div className="dashboard-sidebar-name">{reader.displayName}</div>
-            </div>
-            {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a Publisher */}
-            <div className="dashboard-sidebar-cta-wrap">
-              {role === "reader" ? (
-                <button
-                  type="button"
-                  className="dashboard-sidebar-cta"
-                  onClick={() => { pushTab("partner-program"); closeSidebar(); }}
-                >
-                  ✦ Become a Publisher
-                </button>
-              ) : (
-                <Link
-                  href="/partner/books/new"
-                  className="dashboard-sidebar-cta no-underline"
-                  onClick={closeSidebar}
-                >
-                  ＋ Upload New Book
-                </Link>
-              )}
-            </div>
-            {navEntries.map(renderNavRow)}
-          </aside>
+            <aside
+              id="dashboard-sidebar"
+              className="dashboard-sidebar"
+              data-open={sidebarOpen ? "true" : "false"}
+            >
+              <div className="dashboard-sidebar-user">
+                <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
+                <div className="dashboard-sidebar-name">{reader.displayName}</div>
+              </div>
+              {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a Publisher */}
+              <div className="dashboard-sidebar-cta-wrap">
+                {role === "reader" ? (
+                  <button
+                    type="button"
+                    className="dashboard-sidebar-cta"
+                    onClick={() => { pushTab("partner-program"); closeSidebar(); }}
+                  >
+                    ✦ Become a Publisher
+                  </button>
+                ) : (
+                  <Link
+                    href="/partner/books/new"
+                    className="dashboard-sidebar-cta no-underline"
+                    onClick={closeSidebar}
+                  >
+                    ＋ Upload New Book
+                  </Link>
+                )}
+              </div>
+              {navEntries.map(renderNavRow)}
+            </aside>
+            <button
+              type="button"
+              className="dashboard-sidebar-collapse-btn"
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="dashboard-sidebar"
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              onClick={toggleSidebarCollapsed}
+            >
+              <SidebarCollapseIcon collapsed={sidebarCollapsed} />
+            </button>
+          </div>
 
           <main className="dashboard-main">
             <div key={tab} className="dashboard-section-head dashboard-section-head--animate">

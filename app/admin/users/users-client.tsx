@@ -14,6 +14,8 @@ type UserRow = {
   subscriptionStatus: string;
   createdAt: string;
   hasOgBadge: boolean;
+  imageCount: number;
+  queryCount: number;
 };
 
 type SortField = "createdAt" | "email" | "username" | "subscriptionTier" | "name";
@@ -187,6 +189,14 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
                     })}
                   </dd>
                 </div>
+                <div>
+                  <dt className="text-text-muted">Images</dt>
+                  <dd className="tabular-nums text-text-primary">{u.imageCount.toLocaleString()}</dd>
+                </div>
+                <div>
+                  <dt className="text-text-muted">Q&apos;s</dt>
+                  <dd className="tabular-nums text-text-primary">{u.queryCount.toLocaleString()}</dd>
+                </div>
               </dl>
             </li>
           ))}
@@ -194,7 +204,7 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
       )}
 
       <div className="hidden overflow-x-auto rounded-lg border border-border-subtle md:block">
-        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+        <table className="w-full min-w-[840px] border-collapse text-left text-sm">
           <thead>
             <tr className="border-b border-border-subtle font-mono text-[10px] uppercase tracking-widest text-text-muted">
               <th className="px-3 py-2">
@@ -218,6 +228,8 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
                 </button>
               </th>
               <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2 text-right">Images</th>
+              <th className="px-3 py-2 text-right">Q&apos;s</th>
               <th className="px-3 py-2">
                 <button type="button" onClick={() => toggleSort("createdAt")} className="hover:text-text-primary">
                   Joined{sortIndicator("createdAt")}
@@ -228,13 +240,13 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-text-muted">
+                <td colSpan={8} className="px-3 py-8 text-center text-text-muted">
                   Loading…
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-text-muted">
+                <td colSpan={8} className="px-3 py-8 text-center text-text-muted">
                   No users found.
                 </td>
               </tr>
@@ -273,6 +285,8 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
                   <td className={`px-3 py-2.5 text-xs capitalize ${statusBadgeClass(u.subscriptionStatus)}`}>
                     {u.subscriptionStatus.replace("_", " ")}
                   </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-text-primary">{u.imageCount.toLocaleString()}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-text-primary">{u.queryCount.toLocaleString()}</td>
                   <td className="px-3 py-2.5 text-xs text-text-muted">
                     {new Date(u.createdAt).toLocaleDateString(undefined, {
                       year: "numeric",

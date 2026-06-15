@@ -1,5 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 import { DEV_USER_COOKIE, hasDevIdentityCookie } from "@/lib/dev-users";
+import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 
 /** Next.js 16 Clerk middleware entry (this file replaces the legacy `middleware.ts` name). */
 
@@ -23,6 +25,10 @@ function hasDevSession(req: { cookies: { get: (name: string) => { value?: string
 
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedAppRoute(req)) {
+    const guestPreview = hasDevGuestMode(req.cookies.get(DEV_GUEST_COOKIE)?.value);
+    if (guestPreview) {
+      return NextResponse.redirect(new URL("/discover", req.url));
+    }
     if (hasDevSession(req)) return;
     await auth.protect();
   }

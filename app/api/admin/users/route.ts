@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         subscriptionStatus: true,
         createdAt: true,
         badges: { where: { badgeKey: "OG_BETA" }, select: { id: true }, take: 1 },
+        _count: { select: { generatedImages: true, queries: true } },
       },
     }),
   ]);
@@ -65,6 +66,8 @@ export async function GET(request: Request) {
       subscriptionStatus: u.subscriptionStatus,
       createdAt: u.createdAt.toISOString(),
       hasOgBadge: u.badges.length > 0,
+      imageCount: u._count.generatedImages,
+      queryCount: u._count.queries,
     })),
     total,
     page,

@@ -613,6 +613,7 @@ model GeneratedImage {
 
   @@index([userId, bookId])
   @@index([isPublic])
+  @@index([isFeatured, isPublic])
 }
 
 model Comment {

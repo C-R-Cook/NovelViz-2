@@ -1,7 +1,9 @@
 "use client";
 
 import { DiscoverParticleField } from "@/components/discover-particle-field";
+import type { FeaturedImageCard } from "@/lib/featured-image-selection";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 const MARQUEE_TITLES = [
@@ -15,45 +17,6 @@ const MARQUEE_TITLES = [
   "Wuthering Heights",
   "The Wizard of Oz",
   "Treasure Island",
-];
-
-const GALLERY = [
-  {
-    src: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&h=650&fit=crop",
-    book: "Dracula",
-    chapter: 7,
-    prompt: "Count Dracula descending the moonlit staircase",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=500&h=380&fit=crop",
-    book: "Jane Eyre",
-    chapter: 14,
-    prompt: "Thornfield Hall shrouded in winter mist",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=500&h=600&fit=crop",
-    book: "Alice in Wonderland",
-    chapter: 4,
-    prompt: "Alice tumbling through the endless rabbit hole",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=500&h=420&fit=crop",
-    book: "Frankenstein",
-    chapter: 12,
-    prompt: "The creature silhouetted in a storm",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1566127992631-137a642a90f4?w=500&h=560&fit=crop",
-    book: "Pride & Prejudice",
-    chapter: 5,
-    prompt: "Pemberley estate at golden hour",
-  },
-  {
-    src: "https://images.unsplash.com/photo-1519638399535-1b036603ac77?w=500&h=340&fit=crop",
-    book: "Dracula",
-    chapter: 3,
-    prompt: "Mina writing in her journal by candlelight",
-  },
 ];
 
 const PRIMARY_FEATURES = [
@@ -172,11 +135,23 @@ function GemDivider() {
   );
 }
 
+const GALLERY_LAYOUT_THRESHOLD = 5;
+
 type LandingClientProps = {
   isLoggedIn: boolean;
+  featuredImages: FeaturedImageCard[];
 };
 
-export function LandingClient({ isLoggedIn }: LandingClientProps) {
+function landingGalleryLayoutClass(count: number): string {
+  if (count <= 0) return "landing-gallery-masonry--empty";
+  if (count === 1) return "landing-gallery-masonry--count-1";
+  if (count === 2) return "landing-gallery-masonry--count-2";
+  if (count < GALLERY_LAYOUT_THRESHOLD) return "landing-gallery-masonry--count-3";
+  return "";
+}
+
+export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps) {
+  const router = useRouter();
   const reducedMotion = useReducedMotion();
   const [heroIn, setHeroIn] = useState(reducedMotion);
   const [email, setEmail] = useState("");
@@ -225,6 +200,15 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
   const startHref = isLoggedIn ? "/library" : "/register";
   const joinBetaHref = isLoggedIn ? "/library" : "/register";
   const marqueeItems = [...MARQUEE_TITLES, ...MARQUEE_TITLES];
+
+  const exploreGallery = useCallback(() => {
+    try {
+      sessionStorage.setItem("novelviz:gallery-scroll-top", "1");
+    } catch {
+      /* ignore */
+    }
+    router.push("/gallery");
+  }, [router]);
 
   return (
     <div className="landing-root">
@@ -428,30 +412,38 @@ export function LandingClient({ isLoggedIn }: LandingClientProps) {
           </p>
         </div>
 
-        <div className="landing-gallery-masonry">
-          {GALLERY.map((item, i) => (
-            <div
-              key={`${item.book}-${item.chapter}`}
-              className={`landing-gallery-item${galleryVisible ? " landing-gallery-item--visible" : ""}`}
-              style={galleryVisible ? { transitionDelay: `${i * 70}ms` } : undefined}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={item.src} alt={item.prompt} loading="lazy" />
-              <div className="landing-gallery-overlay" aria-hidden />
-              <div className="landing-gallery-caption">
-                <div className="landing-gallery-meta">
-                  {item.book} · Ch. {item.chapter}
+        <div
+          className={`landing-gallery-masonry ${landingGalleryLayoutClass(featuredImages.length)}`.trim()}
+        >
+          {featuredImages.length === 0 ? (
+            <p className="landing-gallery-empty text-sm text-text-secondary">
+              Featured community images will appear here as readers create and curators highlight them.
+            </p>
+          ) : (
+            featuredImages.map((item, i) => (
+              <div
+                key={item.id}
+                className={`landing-gallery-item${galleryVisible ? " landing-gallery-item--visible" : ""}`}
+                style={galleryVisible ? { transitionDelay: `${i * 70}ms` } : undefined}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={item.imageUrl} alt={item.userPrompt} loading="lazy" />
+                <div className="landing-gallery-overlay" aria-hidden />
+                <div className="landing-gallery-caption">
+                  <div className="landing-gallery-meta">
+                    {item.bookTitle} · Ch. {item.chapterNumberAtTime}
+                  </div>
+                  <div className="landing-gallery-prompt">{item.userPrompt}</div>
                 </div>
-                <div className="landing-gallery-prompt">{item.prompt}</div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         <div className="landing-gallery-cta-wrap">
-          <Link href="/gallery" className="landing-btn-secondary">
+          <button type="button" onClick={exploreGallery} className="landing-btn-secondary">
             Explore All Images →
-          </Link>
+          </button>
         </div>
       </section>
 

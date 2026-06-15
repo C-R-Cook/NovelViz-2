@@ -1,5 +1,9 @@
 import { GalleryClient, type GalleryImageCard, type GalleryLockKind } from "./gallery-client";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  FEATURED_IMAGE_GALLERY_LIMIT,
+  getFeaturedImageIdsForDisplay,
+} from "@/lib/featured-image-selection";
 import { viewerVisibleCommentCountByImageIds } from "@/lib/gallery-comment-counts";
 import type { CommentVisibilityViewer } from "@/lib/comment-visibility";
 import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
@@ -156,18 +160,21 @@ async function viewerLikedIdSet(userId: string, imageIds: string[]) {
   return new Set(rows.map((r) => r.imageId));
 }
 
-const featuredImagesQuery = () =>
-  prisma.generatedImage.findMany({
-    where: { isPublic: true },
-    orderBy: [{ likeCount: "desc" }, { createdAt: "desc" }],
-    take: 20,
+async function featuredImagesForViewer(userId: string | null) {
+  const ids = await getFeaturedImageIdsForDisplay(userId, FEATURED_IMAGE_GALLERY_LIMIT);
+  if (ids.length === 0) return [];
+  const rows = await prisma.generatedImage.findMany({
+    where: { id: { in: ids } },
     select: baseSelect,
   });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return ids.map((id) => byId.get(id)).filter((row): row is GeneratedImageForGallery => row != null);
+}
 
 export default async function GalleryPage() {
   const session = await getCurrentUser();
 
-  const guestLatestFeatured = featuredImagesQuery();
+  const guestLatestFeatured = featuredImagesForViewer(null);
   const guestLibraryBlur = prisma.generatedImage.findMany({
     where: { isPublic: true },
     orderBy: { createdAt: "desc" },
@@ -209,7 +216,7 @@ export default async function GalleryPage() {
       where: { userId: session.id },
       select: { bookId: true, currentChapterNumber: true },
     }),
-    featuredImagesQuery(),
+    featuredImagesForViewer(session.id),
   ]);
 
   const globalSpoilerProtection = dbUser?.globalSpoilerProtection ?? true;

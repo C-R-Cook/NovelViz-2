@@ -1,4 +1,10 @@
 import {
+  ADMIN_FEATURE_IMAGES_PAGE_SIZE,
+  queryAdminFeatureImagesPage,
+  type AdminFeatureImageRow,
+} from "@/lib/admin-feature-images";
+import { queryTopBookRequestsByTitle } from "@/lib/admin-book-requests";
+import {
   countPendingFlaggedComments,
   queryAdminFlaggedCommentsQueue,
   type AdminFlaggedCommentRow,
@@ -24,6 +30,11 @@ import {
   queryPartnerBooksPage,
   type PartnerDashboardBookRow,
 } from "@/lib/partner-books-list";
+import {
+  PARTNER_FEATURE_IMAGES_PAGE_SIZE,
+  queryPartnerFeatureImagesPage,
+  type PartnerFeatureImageRow,
+} from "@/lib/partner-feature-images";
 import { prisma } from "@/lib/prisma";
 import { FeatureRequestStatus } from "@db";
 
@@ -76,6 +87,15 @@ export type DashboardPartnerData = {
     imageUrl: string;
   }[];
   ownFeatureRequestsPendingCount: number;
+  initialPartnerFeatureImages: PartnerFeatureImageRow[];
+  initialPartnerFeatureImagesHasMore: boolean;
+  partnerFeatureImagesPageSize: number;
+};
+
+export type DashboardAdminFeatureImagesInitial = {
+  featured: AdminFeatureImageRow[];
+  featuredHasMore: boolean;
+  pageSize: number;
 };
 
 export type DashboardAdminData = {
@@ -117,17 +137,6 @@ export type DashboardAdminBooksAll = {
   initialHasMore: boolean;
   pageSize: number;
 };
-
-async function loadTopBookRequests(): Promise<{ bookTitle: string; count: number }[]> {
-  const grouped = await prisma.bookRequest.groupBy({
-    by: ["bookTitle"],
-    _count: { _all: true },
-  });
-  return grouped
-    .map((g) => ({ bookTitle: g.bookTitle, count: g._count._all }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
-}
 
 function mapFeatureRequestRows(
   rows: Awaited<
@@ -278,7 +287,7 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
 }
 
 export async function loadPartnerDashboardData(userId: string): Promise<DashboardPartnerData> {
-  const [stats, analytics, page0, ownFrRows, ownFrPending] = await Promise.all([
+  const [stats, analytics, page0, ownFrRows, ownFrPending, partnerImagesPage] = await Promise.all([
     fetchPartnerDashboardStats(userId),
     fetchPartnerAnalytics(userId),
     queryPartnerBooksPage({ ownerId: userId, skip: 0 }),
@@ -300,6 +309,7 @@ export async function loadPartnerDashboardData(userId: string): Promise<Dashboar
     prisma.featureRequest.count({
       where: { requestedBy: userId, status: FeatureRequestStatus.PENDING },
     }),
+    queryPartnerFeatureImagesPage({ ownerId: userId, skip: 0 }),
   ]);
 
   return {
@@ -318,6 +328,9 @@ export async function loadPartnerDashboardData(userId: string): Promise<Dashboar
       imageUrl: fr.image.imageUrl,
     })),
     ownFeatureRequestsPendingCount: ownFrPending,
+    initialPartnerFeatureImages: partnerImagesPage.rows,
+    initialPartnerFeatureImagesHasMore: partnerImagesPage.hasMore,
+    partnerFeatureImagesPageSize: PARTNER_FEATURE_IMAGES_PAGE_SIZE,
   };
 }
 
@@ -328,6 +341,7 @@ export async function loadAdminDashboardData(
   admin: DashboardAdminData;
   adminBooksAll: DashboardAdminBooksAll | null;
   adminStats: AdminStatsPayload | null;
+  adminFeatureImages: DashboardAdminFeatureImagesInitial | null;
 }> {
   const [
     pendingBooks,
@@ -364,26 +378,33 @@ export async function loadAdminDashboardData(
 
   const tabLoads = await Promise.all([
     activeTab === "admin-stats"
-      ? Promise.all([getAdminStatsPayload(vendorWindowDays), loadTopBookRequests()])
+      ? Promise.all([getAdminStatsPayload(vendorWindowDays), queryTopBookRequestsByTitle(5)])
       : Promise.resolve(null),
     activeTab === "feature-approvals"
-      ? prisma.featureRequest.findMany({
-          where: { status: FeatureRequestStatus.PENDING },
-          orderBy: { createdAt: "desc" },
-          take: 50,
-          include: {
-            image: {
-              select: {
-                id: true,
-                imageUrl: true,
-                userPrompt: true,
-                chapterNumberAtTime: true,
-                book: { select: { id: true, title: true, author: true, coverImageUrl: true } },
-                user: { select: { username: true, name: true } },
+      ? Promise.all([
+          prisma.featureRequest.findMany({
+            where: { status: FeatureRequestStatus.PENDING },
+            orderBy: { createdAt: "desc" },
+            take: 50,
+            include: {
+              image: {
+                select: {
+                  id: true,
+                  imageUrl: true,
+                  userPrompt: true,
+                  chapterNumberAtTime: true,
+                  book: { select: { id: true, title: true, author: true, coverImageUrl: true } },
+                  user: { select: { username: true, name: true } },
+                },
               },
             },
-          },
-        })
+          }),
+          queryAdminFeatureImagesPage({
+            filter: "featured",
+            skip: 0,
+            take: ADMIN_FEATURE_IMAGES_PAGE_SIZE,
+          }),
+        ])
       : Promise.resolve(null),
     activeTab === "spoiler-comments" ? queryAdminSpoilerCommentsQueue(80) : Promise.resolve(null),
     activeTab === "flagged-comments" ? queryAdminFlaggedCommentsQueue(80) : Promise.resolve(null),
@@ -400,10 +421,15 @@ export async function loadAdminDashboardData(
   ]);
 
   const statsBundle = tabLoads[0];
-  const featureRows = tabLoads[1];
+  const featureBundle = tabLoads[1];
   const spoilerQueue = tabLoads[2];
   const flaggedQueue = tabLoads[3];
   const allBooksPage = tabLoads[4];
+
+  const featureRows =
+    featureBundle && Array.isArray(featureBundle) ? featureBundle[0] : null;
+  const featuredImagesPage =
+    featureBundle && Array.isArray(featureBundle) ? featureBundle[1] : null;
 
   const topBooks =
     statsBundle && Array.isArray(statsBundle) ? statsBundle[1] : [];
@@ -434,5 +460,12 @@ export async function loadAdminDashboardData(
         }
       : null,
     adminStats: statsBundle && Array.isArray(statsBundle) ? statsBundle[0] : null,
+    adminFeatureImages: featuredImagesPage
+      ? {
+          featured: featuredImagesPage.rows,
+          featuredHasMore: featuredImagesPage.hasMore,
+          pageSize: ADMIN_FEATURE_IMAGES_PAGE_SIZE,
+        }
+      : null,
   };
 }

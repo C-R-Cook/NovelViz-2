@@ -11,6 +11,7 @@ import {
   hasDevIdentityCookie,
   resolveDevUserIdFromCookies,
 } from "@/lib/dev-users";
+import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 import "./globals.css";
 
 async function readDevCookieUserId(): Promise<string | null> {
@@ -33,7 +34,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const { userId: clerkUserId } = await auth();
+  const cookieStore = await cookies();
   const devCookieUserId = await readDevCookieUserId();
+  const devGuestMode = hasDevGuestMode(cookieStore.get(DEV_GUEST_COOKIE)?.value);
   const isDev = process.env.NODE_ENV !== "production";
 
   return (
@@ -57,6 +60,7 @@ export default async function RootLayout({
               <DevRoleSwitcher
                 clerkSignedIn={!!clerkUserId}
                 devCookieUserId={devCookieUserId}
+                devGuestMode={devGuestMode}
               />
             </div>
           ) : null}

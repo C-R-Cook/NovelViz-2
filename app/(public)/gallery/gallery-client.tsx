@@ -303,7 +303,7 @@ function GallerySquareCard({
           className={`object-cover transition-[filter] duration-200 ease-out ${locked ? "blur-[24px]" : "blur-0"}`}
           sizes={imageSizes}
         />
-        {!locked && badgeMode === "featured" && viewerUserId !== null ? (
+        {!locked && image.isFeatured ? (
           <GalleryCardCornerBadge kind="featured-star" />
         ) : null}
         {!locked && padlockVariant ? (
@@ -737,6 +737,10 @@ export function GalleryClient(props: GalleryClientProps) {
     setGallerySessionRevealAll(false);
     try {
       sessionStorage.removeItem("novelviz_session_unlocks");
+      if (sessionStorage.getItem("novelviz:gallery-scroll-top") === "1") {
+        sessionStorage.removeItem("novelviz:gallery-scroll-top");
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      }
     } catch {
       /* ignore */
     }
@@ -1202,7 +1206,7 @@ export function GalleryClient(props: GalleryClientProps) {
               <section className="space-y-4">
                 <GallerySectionLabel
                   label="LATEST FEATURED"
-                  sub="Hand-picked images from our community"
+                  sub="Admin-curated community visions"
                   right={finePointer && !reducedMotion ? "← drag to explore →" : undefined}
                 />
                 <CarouselRow
@@ -1291,7 +1295,7 @@ export function GalleryClient(props: GalleryClientProps) {
               <section className="space-y-4">
                 <GallerySectionLabel
                   label="FEATURED"
-                  sub="Beloved images from across the catalogue"
+                  sub="Admin-curated images from across the catalogue"
                   right={
                     props.layout === "member" && featuredResolved.length > 0
                       ? `${featuredResolved.length} images`

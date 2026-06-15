@@ -9,6 +9,7 @@ import {
   type DevUserRole,
   resolveDevUserIdFromCookies,
 } from "@/lib/dev-users";
+import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 import { prisma } from "@/lib/prisma";
 import type { UserRole } from "@db";
 
@@ -134,6 +135,10 @@ async function getDevUserFromCookies(): Promise<CurrentUser | null> {
 
 async function getCurrentUserUncached(): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
+    const store = await cookies();
+    if (hasDevGuestMode(store.get(DEV_GUEST_COOKIE)?.value)) {
+      return null;
+    }
     const clerkUser = await getClerkUser();
     if (clerkUser) return clerkUser;
     return getDevUserFromCookies();
@@ -148,6 +153,10 @@ async function getCurrentUserUncached(): Promise<CurrentUser | null> {
  */
 export async function ensureCurrentUser(maxAttempts = 8): Promise<CurrentUser | null> {
   if (process.env.NODE_ENV !== "production") {
+    const store = await cookies();
+    if (hasDevGuestMode(store.get(DEV_GUEST_COOKIE)?.value)) {
+      return null;
+    }
     const dev = await getDevUserFromCookies();
     if (dev) return dev;
   }

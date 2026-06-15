@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { FeatureRequestStatus } from "@db";
 import { NextResponse } from "next/server";
 
 type RouteContext = { params: Promise<{ imageId: string }> };
@@ -28,9 +29,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: "isFeatured must be a boolean" }, { status: 400 });
   }
 
-  const image = await prisma.generatedImage.update({
+  const existing = await prisma.generatedImage.findUnique({
     where: { id: imageId },
-    data: { isFeatured },
+    select: { id: true, isPublic: true, featureRequest: { select: { id: true, status: true } } },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Image not found" }, { status: 404 });
+  }
+
+  if (isFeatured && !existing.isPublic) {
+    return NextResponse.json(
+      { error: "Only public images can be featured" },
+      { status: 400 },
+    );
+  }
+
+  const image = await prisma.$transaction(async (tx) => {
+    const updated = await tx.generatedImage.update({
+      where: { id: imageId },
+      data: { isFeatured },
+    });
+
+    if (isFeatured && existing.featureRequest?.status === FeatureRequestStatus.PENDING) {
+      await tx.featureRequest.update({
+        where: { id: existing.featureRequest.id },
+        data: {
+          status: FeatureRequestStatus.APPROVED,
+          reviewedBy: user.id,
+        },
+      });
+    }
+
+    return updated;
   });
 
   return NextResponse.json({ id: image.id, isFeatured: image.isFeatured });

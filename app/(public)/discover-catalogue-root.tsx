@@ -26,17 +26,9 @@ export async function DiscoverCatalogueRoot() {
   ]);
 
   const featuredIds = featured.map((b) => b.id);
-  const inLibraryRows =
-    user && featuredIds.length > 0
-      ? await prisma.userBook.findMany({
-          where: { userId: user.id, bookId: { in: featuredIds }, isActive: true },
-          select: { bookId: true },
-        })
-      : [];
-  const inLibrarySet = new Set(inLibraryRows.map((r) => r.bookId));
-  const featuredLibrary = featured.map((b) => ({
-    bookId: b.id,
-    inLibrary: inLibrarySet.has(b.id),
+  const featuredLibrary = featuredIds.map((bookId) => ({
+    bookId,
+    inLibrary: false,
   }));
 
   return (

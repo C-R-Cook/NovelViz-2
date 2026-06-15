@@ -111,6 +111,7 @@ export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[
     { kind: "tab", tab: "all-books", icon: "📋" },
     { kind: "tab", tab: "all-users", icon: "👥" },
     { kind: "tab", tab: "admin-stats", icon: "📈" },
+    { kind: "link", id: "admin-book-requests", href: "/admin/requests", label: "Book requests", icon: "📖" },
     { kind: "divider", id: "d-helpers" },
     { kind: "helpers", id: "admin-helpers" },
     { kind: "divider", id: "d-gutenberg" },
@@ -140,7 +141,6 @@ export function defaultDashboardTab(role: DashboardUserRole): DashboardTabSlug {
 function normalizeRawTab(role: DashboardUserRole, raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   if (raw === "reader") return "overview";
-  if (raw === "feature-requests" && role === "admin") return "feature-approvals";
   if (raw === "analytics") return "stats";
   return raw;
 }
@@ -173,11 +173,11 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
     case "stats":
       return "Analytics";
     case "feature-requests":
-      return "Feature Requests";
+      return "Request Featured Images";
     case "for-review":
       return "For Review";
     case "feature-approvals":
-      return "Feature Approvals";
+      return "Manage Featured Images";
     case "spoiler-comments":
       return "Spoiler Comments";
     case "flagged-comments":

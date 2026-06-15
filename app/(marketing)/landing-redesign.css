@@ -789,6 +789,44 @@
   margin-bottom: 2.25rem;
 }
 
+.landing-gallery-masonry--empty {
+  columns: 1;
+}
+
+.landing-gallery-empty {
+  margin: 0;
+  padding: 1.5rem 0;
+}
+
+.landing-gallery-masonry--count-1 {
+  columns: 1;
+  max-width: 28rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.landing-gallery-masonry--count-2 {
+  columns: 2;
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.landing-gallery-masonry--count-3 {
+  columns: 2;
+  max-width: 56rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 639px) {
+  .landing-gallery-masonry--count-2,
+  .landing-gallery-masonry--count-3 {
+    columns: 1;
+    max-width: 28rem;
+  }
+}
+
 @media (min-width: 640px) {
   .landing-gallery-masonry {
     columns: 2;

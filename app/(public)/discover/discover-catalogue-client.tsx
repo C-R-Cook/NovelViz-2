@@ -1128,7 +1128,7 @@ export function DiscoverCatalogueClient({
           </button>
         </section>
 
-        {!searchActive && showFeatured ? (
+        {!searchActive && showFeatured && !isLoggedIn ? (
           <section className="discover-concept-cta relative mt-16 overflow-hidden rounded-lg border border-accent/18 px-6 py-10 sm:mt-20 sm:px-10 sm:py-12">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-accent-dim to-transparent" />
             {!reducedMotion ? <DiscoverParticleField /> : null}

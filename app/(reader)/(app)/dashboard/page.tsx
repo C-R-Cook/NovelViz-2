@@ -106,6 +106,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       admin={adminBundle?.admin ?? null}
       adminBooksAll={adminBundle?.adminBooksAll ?? null}
       adminStats={adminBundle?.adminStats ?? null}
+      adminFeatureImages={adminBundle?.adminFeatureImages ?? null}
       account={{
         viewerId: session.id,
         user: {

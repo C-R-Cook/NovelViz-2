@@ -143,7 +143,7 @@ export function BookRequestModal({ open, onClose }: Props) {
             </div>
             <div>
               <label htmlFor="br-msg" className={labelClass}>
-                Why would you like this book on NovelViz?{" "}
+                Additional information{" "}
                 <span className="font-normal text-text-muted">(optional)</span>
               </label>
               <textarea

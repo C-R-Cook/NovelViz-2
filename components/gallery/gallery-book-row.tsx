@@ -29,6 +29,7 @@ type Props = {
   onAddToLibrary?: (bookId: string) => void;
   addLibraryPending?: boolean;
   onOpenCoverFallback?: (bookId: string) => void;
+  onOpenBookGallery?: (bookId: string) => void;
 };
 
 function HeartIcon({ className, filled }: { className?: string; filled?: boolean }) {
@@ -44,6 +45,25 @@ function HeartIcon({ className, filled }: { className?: string; filled?: boolean
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className} aria-hidden>
       <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+    </svg>
+  );
+}
+
+function LockIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
   );
 }
@@ -106,7 +126,11 @@ function GalleryRowImageCard({
       onOpenCoverFallback?.(image.bookId);
       return;
     }
-    if (carouselIndex >= 0) onOpenImage(carouselIds, carouselIndex);
+    if (carouselIndex >= 0) {
+      onOpenImage(carouselIds, carouselIndex);
+      return;
+    }
+    onOpenImage([image.id], 0);
   };
 
   return (
@@ -191,6 +215,12 @@ function GalleryRowImageCard({
             )}
           </div>
         </div>
+        {locked && !isCoverFallback ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-2 text-center">
+            <LockIcon className="h-8 w-8 text-accent-text/95" />
+            <p className="text-xs font-medium text-text-primary">Chapter {image.chapterNumberAtTime}</p>
+          </div>
+        ) : null}
       </div>
     </article>
   );
@@ -202,55 +232,70 @@ function InvitationCard({
   pending,
   onAdd,
   isCoverFallback,
+  onOpenBookGallery,
+  onOpenBookPage,
 }: {
   row: BookGalleryRow;
   isLoggedIn: boolean;
   pending?: boolean;
   onAdd?: (bookId: string) => void;
   isCoverFallback?: boolean;
+  onOpenBookGallery?: (bookId: string) => void;
+  onOpenBookPage?: (bookId: string) => void;
 }) {
-  if (isCoverFallback) {
-    return (
-      <div className="invitation-card relative aspect-square w-[66vw] min-w-[66vw] shrink-0 overflow-hidden rounded-xl border border-accent/35 md:w-[180px] md:min-w-[180px]">
-        {row.coverImageUrl ? (
-          <Image
-            src={row.coverImageUrl}
-            alt=""
-            fill
-            unoptimized
-            className="object-cover object-top blur-sm brightness-[0.35]"
-            sizes="180px"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-bg-overlay/80" />
-        )}
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-3 text-center">
-          <p className="text-sm font-semibold text-text-primary">Explore this book</p>
-          <Link
-            href={`/discover/${row.bookId}`}
-            className="rounded-md border border-accent/50 bg-accent/20 px-3 py-1.5 text-xs font-semibold text-accent-text transition hover:bg-accent/30"
-          >
-            View in catalogue
-          </Link>
-          {isLoggedIn ? (
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => onAdd?.(row.bookId)}
-              className="text-[11px] font-medium text-text-secondary underline-offset-2 hover:underline disabled:opacity-60"
-            >
-              + Add to library
-            </button>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
+  const addButton = isLoggedIn ? (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={(e) => {
+        e.stopPropagation();
+        onAdd?.(row.bookId);
+      }}
+      className="rounded-md border border-accent/50 bg-accent/20 px-3 py-1.5 text-xs font-semibold text-accent-text transition hover:bg-accent/30 disabled:opacity-60"
+    >
+      + Add to library
+    </button>
+  ) : (
+    <Link
+      href="/login"
+      onClick={(e) => e.stopPropagation()}
+      className="rounded-md border border-accent/50 bg-accent/20 px-3 py-1.5 text-xs font-semibold text-accent-text transition hover:bg-accent/30"
+    >
+      + Add to library
+    </Link>
+  );
 
-  const moreCount = Math.max(1, row.totalPublicImages - row.images.length);
+  const navigateCard = () => {
+    if (isCoverFallback) {
+      onOpenBookPage?.(row.bookId);
+      return;
+    }
+    onOpenBookGallery?.(row.bookId);
+  };
+
+  const heading = isCoverFallback ? (
+    <p className="text-sm font-semibold text-text-primary">Explore this book</p>
+  ) : (
+    <p className="text-sm font-semibold text-text-primary">
+      {Math.max(1, row.totalPublicImages - row.images.length)} more image
+      {Math.max(1, row.totalPublicImages - row.images.length) === 1 ? "" : "s"} inside
+    </p>
+  );
 
   return (
-    <div className="invitation-card relative aspect-square w-[66vw] min-w-[66vw] shrink-0 overflow-hidden rounded-xl border border-accent/35 md:w-[180px] md:min-w-[180px]">
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={isCoverFallback ? `View ${row.title} in catalogue` : `View ${row.title} gallery`}
+      className="invitation-card relative aspect-square w-[66vw] min-w-[66vw] shrink-0 cursor-pointer overflow-hidden rounded-xl border border-accent/35 outline-none md:w-[180px] md:min-w-[180px]"
+      onClick={navigateCard}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigateCard();
+        }
+      }}
+    >
       {row.coverImageUrl ? (
         <Image
           src={row.coverImageUrl}
@@ -264,26 +309,8 @@ function InvitationCard({
         <div className="absolute inset-0 bg-bg-overlay/80" />
       )}
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-3 text-center">
-        <p className="text-sm font-semibold text-text-primary">
-          {moreCount} more image{moreCount === 1 ? "" : "s"} inside
-        </p>
-        {isLoggedIn ? (
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => onAdd?.(row.bookId)}
-            className="rounded-md border border-accent/50 bg-accent/20 px-3 py-1.5 text-xs font-semibold text-accent-text transition hover:bg-accent/30 disabled:opacity-60"
-          >
-            + Add to library
-          </button>
-        ) : (
-          <Link
-            href="/login"
-            className="rounded-md border border-accent/50 bg-accent/20 px-3 py-1.5 text-xs font-semibold text-accent-text transition hover:bg-accent/30"
-          >
-            + Add to library
-          </Link>
-        )}
+        {heading}
+        {addButton}
       </div>
     </div>
   );
@@ -307,6 +334,7 @@ export function GalleryBookRow({
   onAddToLibrary,
   addLibraryPending,
   onOpenCoverFallback,
+  onOpenBookGallery,
 }: Props) {
   const { scrollRef, stripClassName, pointerHandlers } = useHorizontalDragScroll({
     enabled: enableDragScroll,
@@ -362,6 +390,8 @@ export function GalleryBookRow({
             pending={addLibraryPending}
             onAdd={onAddToLibrary}
             isCoverFallback={row.isCoverFallback}
+            onOpenBookGallery={onOpenBookGallery}
+            onOpenBookPage={onOpenCoverFallback}
           />
         ) : null}
       </div>

@@ -10,6 +10,7 @@ import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
 };
 
 function truncateForMeta(text: string | null, max = 155): string | undefined {
@@ -43,8 +44,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function DiscoverBookDetailPage({ params }: PageProps) {
+export default async function DiscoverBookDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params;
+  const { from } = await searchParams;
+
+  const backHref = from === "gallery" ? "/gallery" : "/discover";
+  const backLabel = from === "gallery" ? "Back to public gallery" : "Back to discover";
 
   const book = await getPublishedDiscoverBookById(id);
 
@@ -86,10 +91,10 @@ export default async function DiscoverBookDetailPage({ params }: PageProps) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-9">
       <Link
-        href="/discover"
+        href={backHref}
         className="inline-flex text-xs font-medium text-text-muted transition hover:text-accent-text sm:text-sm"
       >
-        ← Back to discover
+        ← {backLabel}
       </Link>
 
       <div className="mt-5 flex flex-row items-start gap-3.5 rounded-lg border border-border/95 bg-bg-surface p-2.5 shadow-sm shadow-bg-overlay/5 sm:mt-6 sm:gap-5 sm:p-3">

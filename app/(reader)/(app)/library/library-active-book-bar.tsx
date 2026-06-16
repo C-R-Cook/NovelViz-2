@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { LibraryBookRow } from "./library-types";
+import { NOT_STARTED_CHAPTER_ID } from "./use-library-chapter-progress";
 
 type ChapterProgress = {
   selectedChapterId: string;
@@ -11,6 +12,7 @@ type ChapterProgress = {
   chapterNumber: number;
   progressPercent: number;
   total: number;
+  isNotStarted: boolean;
 };
 
 type Props = {
@@ -28,6 +30,7 @@ export function LibraryActiveBookBar({ book, chapters, progress }: Props) {
     progressPercent,
     total,
     chapterNumber,
+    isNotStarted,
   } = progress;
 
   if (total === 0) {
@@ -72,7 +75,9 @@ export function LibraryActiveBookBar({ book, chapters, progress }: Props) {
             />
           </div>
           <span className="library-active-book-bar-progress-label">
-            Ch. {chapterNumber} / {total} · {progressPercent}%
+            {isNotStarted
+              ? `Not started · ${progressPercent}%`
+              : `Ch. ${chapterNumber} / ${total} · ${progressPercent}%`}
           </span>
         </div>
         <label className="library-active-book-bar-chapter-label">
@@ -85,6 +90,7 @@ export function LibraryActiveBookBar({ book, chapters, progress }: Props) {
             aria-busy={saving}
             aria-disabled={book.removedFromCatalogue}
           >
+            <option value={NOT_STARTED_CHAPTER_ID}>* Not Started *</option>
             {chapters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.title?.trim() || "Untitled"}

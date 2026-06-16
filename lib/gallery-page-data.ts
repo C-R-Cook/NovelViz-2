@@ -5,7 +5,6 @@ import {
   type GalleryDiscoveryMode,
   type GalleryImageCard,
   type GalleryLibraryMeta,
-  type GalleryLockKind,
   type GalleryPageApiResponse,
 } from "@/lib/gallery-types";
 import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
@@ -32,6 +31,7 @@ export const galleryImageSelect = {
       author: true,
       coverImageUrl: true,
       genre: true,
+      _count: { select: { chapters: true } },
     },
   },
   user: {
@@ -58,6 +58,7 @@ type GeneratedImageRow = {
     author: string;
     coverImageUrl: string | null;
     genre: string | null;
+    _count: { chapters: number };
   };
   user: { username: string | null; name: string | null };
 };
@@ -102,9 +103,26 @@ function memberLock(
     return { isLocked: false, lockKind: "none" };
   }
 
+  if (opts.viewerUserId === image.userId) {
+    return { isLocked: false, lockKind: "none" };
+  }
+
   const bookSpoiler = opts.spoilerByBookId.get(image.bookId);
   const mode = effectiveChapterGateMode(bookSpoiler, opts.globalSpoilerProtection);
+  if (mode === "show_all") {
+    return { isLocked: false, lockKind: "none" };
+  }
+
   const currentChapter = opts.progressByBookId.get(image.bookId);
+  const totalChapters = image.book._count.chapters;
+
+  if (currentChapter === undefined) {
+    if (isChapterWithinDiscoveryThreshold(image.chapterNumberAtTime, totalChapters)) {
+      return { isLocked: false, lockKind: "none" };
+    }
+    return { isLocked: true, lockKind: "unstarted" };
+  }
+
   const behind = isGalleryImageChapterLocked({
     viewerUserId: opts.viewerUserId,
     imageUserId: image.userId,
@@ -117,17 +135,7 @@ function memberLock(
     return { isLocked: false, lockKind: "none" };
   }
 
-  const lockKind: GalleryLockKind = currentChapter === undefined ? "unstarted" : "chapter";
-  return { isLocked: true, lockKind };
-}
-
-function shouldIncludeLibraryImage(
-  image: GeneratedImageRow,
-  lock: Pick<GalleryImageCard, "isLocked" | "lockKind">,
-  viewerUserId: string | null,
-): boolean {
-  if (viewerUserId !== null && image.userId === viewerUserId) return true;
-  return !lock.isLocked;
+  return { isLocked: true, lockKind: "chapter" };
 }
 
 function baseFields(
@@ -238,7 +246,6 @@ function buildLibraryRowsFromImages(
     totalPublicByBook.set(img.bookId, (totalPublicByBook.get(img.bookId) ?? 0) + 1);
 
     const lock = memberLock(img, lockOpts);
-    if (!shouldIncludeLibraryImage(img, lock, ctx.userId)) continue;
 
     const card: GalleryImageCard = {
       ...baseFields(img, likedIds.has(img.id), countMap.get(img.id) ?? 0, ctx),

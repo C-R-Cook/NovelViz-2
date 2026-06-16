@@ -89,3 +89,25 @@ export async function POST(request: Request, context: RouteContext) {
 
   return NextResponse.json({ progress });
 }
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { bookId } = await context.params;
+
+  const dbUser = await prisma.user.findUnique({
+    where: { clerkId: user.clerkId },
+  });
+  if (!dbUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  await prisma.readingProgress.deleteMany({
+    where: { userId: dbUser.id, bookId },
+  });
+
+  return NextResponse.json({ progress: null });
+}

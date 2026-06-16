@@ -704,7 +704,7 @@
   border-radius: 9px;
   border: 1px solid var(--border-subtle);
   padding: 1.5rem;
-  max-width: min(100%, 56rem);
+  max-width: min(100%, 72rem);
   background: color-mix(in srgb, var(--bg-surface) 55%, transparent);
 }
 

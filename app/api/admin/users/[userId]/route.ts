@@ -1,5 +1,6 @@
 import { requireAdminApi } from "@/lib/admin-auth";
 import { BADGES, getBadgeDefinition } from "@/lib/badges";
+import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
 import { prisma } from "@/lib/prisma";
 import { getCreditBalance, getCreditTransactions } from "@/lib/credits";
 import { establishLimitFloorsForTier } from "@/lib/limit-floors";
@@ -177,4 +178,32 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   return NextResponse.json({ user });
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const auth = await requireAdminApi();
+  if (!auth.ok) return auth.response;
+
+  const { userId } = await context.params;
+
+  if (userId === auth.user.id) {
+    return NextResponse.json(
+      { error: "You cannot delete your own account from the admin panel. Use account settings instead." },
+      { status: 403 },
+    );
+  }
+
+  try {
+    await deleteUserCompletely(userId, { preventLastAdmin: true });
+  } catch (err) {
+    if (err instanceof DeleteUserError) {
+      const status =
+        err.code === "not_found" ? 404 : err.code === "last_admin" ? 403 : 400;
+      return NextResponse.json({ error: err.message }, { status });
+    }
+    console.error("[api/admin/users] DELETE failed", err);
+    return NextResponse.json({ error: "Could not delete user" }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
 }

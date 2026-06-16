@@ -718,6 +718,7 @@ export function DashboardClient({
               stats={account.stats}
               memberSinceLabel={account.memberSinceLabel}
               isProduction={account.isProduction}
+              embedded
             />
           </div>
         );

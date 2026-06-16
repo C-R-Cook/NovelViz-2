@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
 import { prisma } from "@/lib/prisma";
 import { isValidUsernameFormat } from "@/lib/username";
 import { AgeRange, BookGenre, Gender } from "@db";
@@ -170,22 +171,17 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const userId = session.id;
-
-  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-  if (!existing) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  try {
+    await deleteUserCompletely(session.id, { preventLastAdmin: true });
+  } catch (err) {
+    if (err instanceof DeleteUserError) {
+      const status =
+        err.code === "not_found" ? 404 : err.code === "last_admin" ? 403 : 400;
+      return NextResponse.json({ error: err.message }, { status });
+    }
+    console.error("[api/account] DELETE failed", err);
+    return NextResponse.json({ error: "Could not delete account" }, { status: 500 });
   }
-
-  await prisma.$transaction([
-    prisma.generatedImage.deleteMany({ where: { userId } }),
-    prisma.query.deleteMany({ where: { userId } }),
-    prisma.readingProgress.deleteMany({ where: { userId } }),
-    prisma.userBook.deleteMany({ where: { userId } }),
-    prisma.bookRequest.deleteMany({ where: { userId } }),
-    prisma.book.updateMany({ where: { ownerId: userId }, data: { ownerId: null } }),
-    prisma.user.delete({ where: { id: userId } }),
-  ]);
 
   return NextResponse.json({ success: true });
 }

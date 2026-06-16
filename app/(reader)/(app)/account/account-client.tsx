@@ -39,6 +39,8 @@ export type AccountPageClientProps = {
   };
   memberSinceLabel: string;
   isProduction: boolean;
+  /** When true, omits page title (e.g. dashboard account tab). */
+  embedded?: boolean;
 };
 
 export function AccountPageClient({
@@ -47,6 +49,7 @@ export function AccountPageClient({
   stats,
   memberSinceLabel,
   isProduction,
+  embedded = false,
 }: AccountPageClientProps) {
   const router = useRouter();
   const { signOut } = useClerk();
@@ -67,14 +70,14 @@ export function AccountPageClient({
   const [genrePreferences, setGenrePreferences] = useState<string[]>(initialUser.genrePreferences);
 
   const [profileSaving, setProfileSaving] = useState(false);
-  const [publicSaving, setPublicSaving] = useState(false);
-  const [prefsSaving, setPrefsSaving] = useState(false);
+  const [aboutSaving, setAboutSaving] = useState(false);
+  const [readingPrefsSaving, setReadingPrefsSaving] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
-  const [publicError, setPublicError] = useState<string | null>(null);
-  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [aboutError, setAboutError] = useState<string | null>(null);
+  const [readingPrefsError, setReadingPrefsError] = useState<string | null>(null);
   const [profileOk, setProfileOk] = useState(false);
-  const [publicOk, setPublicOk] = useState(false);
-  const [prefsOk, setPrefsOk] = useState(false);
+  const [aboutOk, setAboutOk] = useState(false);
+  const [readingPrefsOk, setReadingPrefsOk] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
@@ -143,7 +146,7 @@ export function AccountPageClient({
   }, [initialUser.country]);
 
   const avatarInitials = useMemo(
-    () => userInitials(initialUser.username ?? initialUser.name, initialUser.email),
+    () => userInitials(initialUser.name ?? initialUser.username, initialUser.email),
     [initialUser.email, initialUser.name, initialUser.username],
   );
 
@@ -151,48 +154,28 @@ export function AccountPageClient({
     setGenrePreferences((prev) =>
       prev.includes(value) ? prev.filter((g) => g !== value) : [...prev, value],
     );
-    setPrefsOk(false);
+    setReadingPrefsOk(false);
   }, []);
 
-  const canSavePublicUsername =
+  const canSaveProfile =
     isValidUsernameFormat(normalizedPublicUsername) &&
     (unchangedUsername || usernameCheck === "ok") &&
-    !publicSaving;
-
-  async function savePublicProfile(e: React.FormEvent) {
-    e.preventDefault();
-    setPublicError(null);
-    setPublicOk(false);
-    if (!canSavePublicUsername) return;
-    setPublicSaving(true);
-    try {
-      const res = await fetch("/api/account", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: normalizedPublicUsername }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setPublicError(data.error ?? "Could not save username");
-        return;
-      }
-      setPublicOk(true);
-      router.refresh();
-    } finally {
-      setPublicSaving(false);
-    }
-  }
+    !profileSaving;
 
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     setProfileError(null);
     setProfileOk(false);
+    if (!canSaveProfile) return;
     setProfileSaving(true);
     try {
       const res = await fetch("/api/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim() || null }),
+        body: JSON.stringify({
+          name: name.trim() || null,
+          username: normalizedPublicUsername,
+        }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
@@ -206,34 +189,57 @@ export function AccountPageClient({
     }
   }
 
-  async function savePreferences(e: React.FormEvent) {
+  async function saveAboutYou(e: React.FormEvent) {
     e.preventDefault();
-    setPrefsError(null);
-    setPrefsOk(false);
-    setPrefsSaving(true);
+    setAboutError(null);
+    setAboutOk(false);
+    setAboutSaving(true);
     try {
-      const body = {
-        country: country || null,
-        ageRange: ageRange || null,
-        gender: gender || null,
-        subscribedToMailingList,
-        globalSpoilerProtection,
-        genrePreferences,
-      };
       const res = await fetch("/api/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({
+          country: country || null,
+          ageRange: ageRange || null,
+          gender: gender || null,
+        }),
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setPrefsError(data.error ?? "Could not save preferences");
+        setAboutError(data.error ?? "Could not save details");
         return;
       }
-      setPrefsOk(true);
+      setAboutOk(true);
       router.refresh();
     } finally {
-      setPrefsSaving(false);
+      setAboutSaving(false);
+    }
+  }
+
+  async function saveReadingPreferences(e: React.FormEvent) {
+    e.preventDefault();
+    setReadingPrefsError(null);
+    setReadingPrefsOk(false);
+    setReadingPrefsSaving(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          globalSpoilerProtection,
+          genrePreferences,
+          subscribedToMailingList,
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setReadingPrefsError(data.error ?? "Could not save preferences");
+        return;
+      }
+      setReadingPrefsOk(true);
+      router.refresh();
+    } finally {
+      setReadingPrefsSaving(false);
     }
   }
 
@@ -261,78 +267,38 @@ export function AccountPageClient({
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 xl:max-w-6xl">
-      <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary">
-        My Account
-      </h1>
-      <p className="mt-2 text-sm text-text-secondary">
-        Manage your profile and reading preferences.
-      </p>
-
-      <div className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start lg:gap-8">
-        <div className="flex min-w-0 flex-col gap-6 lg:gap-8">
-        <section className={sectionClass} aria-labelledby="public-profile-heading">
-          <h2 id="public-profile-heading" className="text-lg font-semibold text-text-primary">
-            Public profile
-          </h2>
+    <div
+      className={
+        embedded
+          ? "min-w-0"
+          : "mx-auto max-w-5xl px-4 py-10 sm:px-6 xl:max-w-6xl"
+      }
+    >
+      {!embedded ? (
+        <>
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-primary">
+            My Account
+          </h1>
           <p className="mt-2 text-sm text-text-secondary">
-            This is how you appear in the gallery and public areas.
+            Manage your profile and reading preferences.
           </p>
-          <form className="mt-6 space-y-4" onSubmit={(e) => void savePublicProfile(e)}>
-            <div>
-              <label htmlFor="account-username" className={labelClass}>
-                Username
-              </label>
-              <div className="relative mt-1">
-                <input
-                  id="account-username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  className={`${inputClass} pr-10`}
-                  value={publicUsername}
-                  onChange={(e) => {
-                    setPublicUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""));
-                    setPublicOk(false);
-                  }}
-                  maxLength={20}
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-sm">
-                  {usernameCheck === "checking" ? (
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
-                  ) : usernameCheck === "ok" ? (
-                    <span className="text-success">✓</span>
-                  ) : usernameCheck === "bad" && normalizedPublicUsername.length > 0 ? (
-                    <span className="text-error">✕</span>
-                  ) : null}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-text-muted">
-                3–20 characters: letters, numbers, and underscores only.
-              </p>
-            </div>
-            {publicError ? (
-              <p className="text-sm text-error" role="alert">
-                {publicError}
-              </p>
-            ) : null}
-            {publicOk ? (
-              <p className="text-sm text-success">Username saved.</p>
-            ) : null}
-            <button
-              type="submit"
-              disabled={!canSavePublicUsername}
-              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
-            >
-              {publicSaving ? "Saving…" : "Save username"}
-            </button>
-          </form>
-        </section>
+        </>
+      ) : null}
 
-        <section className={sectionClass} aria-labelledby="profile-heading">
+      <div
+        className={`grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start lg:gap-8${embedded ? "" : " mt-10"}`}
+      >
+        <section
+          className={`${sectionClass} min-w-0 lg:col-span-2`}
+          aria-labelledby="profile-heading"
+        >
           <h2 id="profile-heading" className="text-lg font-semibold text-text-primary">
             Profile
           </h2>
+          <p className="mt-2 text-sm text-text-secondary">
+            Your name and email are private. Your username is how you appear in the gallery and
+            other public areas.
+          </p>
           <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
             <div
               className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-accent text-2xl font-semibold text-text-inverse shadow-inner"
@@ -340,7 +306,39 @@ export function AccountPageClient({
             >
               {avatarInitials}
             </div>
-            <form className="min-w-0 flex-1 space-y-4" onSubmit={saveProfile}>
+            <form className="min-w-0 flex-1 space-y-4" onSubmit={(e) => void saveProfile(e)}>
+              <div>
+                <label htmlFor="account-username" className={labelClass}>
+                  Username
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    id="account-username"
+                    name="username"
+                    type="text"
+                    autoComplete="username"
+                    className={`${inputClass} pr-10`}
+                    value={publicUsername}
+                    onChange={(e) => {
+                      setPublicUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""));
+                      setProfileOk(false);
+                    }}
+                    maxLength={20}
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-sm">
+                    {usernameCheck === "checking" ? (
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
+                    ) : usernameCheck === "ok" ? (
+                      <span className="text-success">✓</span>
+                    ) : usernameCheck === "bad" && normalizedPublicUsername.length > 0 ? (
+                      <span className="text-error">✕</span>
+                    ) : null}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-text-muted">
+                  3–20 characters: letters, numbers, and underscores only.
+                </p>
+              </div>
               <div>
                 <label htmlFor="account-name" className={labelClass}>
                   Name
@@ -377,7 +375,7 @@ export function AccountPageClient({
               ) : null}
               <button
                 type="submit"
-                disabled={profileSaving}
+                disabled={!canSaveProfile}
                 className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
               >
                 {profileSaving ? "Saving…" : "Save profile"}
@@ -385,13 +383,15 @@ export function AccountPageClient({
             </form>
           </div>
         </section>
-        </div>
 
-        <section className={`${sectionClass} min-w-0`} aria-labelledby="prefs-heading">
-          <h2 id="prefs-heading" className="text-lg font-semibold text-text-primary">
-            Reading preferences
+        <section className={`${sectionClass} min-w-0`} aria-labelledby="about-you-heading">
+          <h2 id="about-you-heading" className="text-lg font-semibold text-text-primary">
+            About you
           </h2>
-          <form className="mt-6 space-y-6" onSubmit={savePreferences}>
+          <p className="mt-2 text-sm text-text-secondary">
+            Optional details that help us understand our readership.
+          </p>
+          <form className="mt-6 space-y-4" onSubmit={(e) => void saveAboutYou(e)}>
             <div>
               <label htmlFor="account-country" className={labelClass}>
                 Country
@@ -402,7 +402,7 @@ export function AccountPageClient({
                 value={country}
                 onChange={(e) => {
                   setCountry(e.target.value);
-                  setPrefsOk(false);
+                  setAboutOk(false);
                 }}
               >
                 <option value="">Prefer not to say</option>
@@ -423,7 +423,7 @@ export function AccountPageClient({
                 value={ageRange}
                 onChange={(e) => {
                   setAgeRange(e.target.value);
-                  setPrefsOk(false);
+                  setAboutOk(false);
                 }}
               >
                 <option value="">Prefer not to say</option>
@@ -444,7 +444,7 @@ export function AccountPageClient({
                 value={gender}
                 onChange={(e) => {
                   setGender(e.target.value);
-                  setPrefsOk(false);
+                  setAboutOk(false);
                 }}
               >
                 <option value="">Prefer not to say</option>
@@ -455,6 +455,29 @@ export function AccountPageClient({
                 ))}
               </select>
             </div>
+            {aboutError ? (
+              <p className="text-sm text-error" role="alert">
+                {aboutError}
+              </p>
+            ) : null}
+            {aboutOk ? (
+              <p className="text-sm text-success">Details saved.</p>
+            ) : null}
+            <button
+              type="submit"
+              disabled={aboutSaving}
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
+            >
+              {aboutSaving ? "Saving…" : "Save details"}
+            </button>
+          </form>
+        </section>
+
+        <section className={`${sectionClass} min-w-0`} aria-labelledby="prefs-heading">
+          <h2 id="prefs-heading" className="text-lg font-semibold text-text-primary">
+            Reading preferences
+          </h2>
+          <form className="mt-6 space-y-6" onSubmit={(e) => void saveReadingPreferences(e)}>
             <div className="rounded-lg border border-border/80 bg-bg-base/50 p-4">
               <label className="flex cursor-pointer items-start gap-3">
                 <input
@@ -462,7 +485,7 @@ export function AccountPageClient({
                   checked={globalSpoilerProtection}
                   onChange={(e) => {
                     setGlobalSpoilerProtection(e.target.checked);
-                    setPrefsOk(false);
+                    setReadingPrefsOk(false);
                   }}
                   className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
                 />
@@ -475,20 +498,6 @@ export function AccountPageClient({
                 </span>
               </label>
             </div>
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={subscribedToMailingList}
-                onChange={(e) => {
-                  setSubscribedToMailingList(e.target.checked);
-                  setPrefsOk(false);
-                }}
-                className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
-              />
-              <span className="text-sm text-text-primary">
-                Keep me updated about new books, features and early access offers
-              </span>
-            </label>
             <div>
               <span className={labelClass}>Genre preferences</span>
               <p className="mt-1 text-xs text-text-muted">Select all that apply.</p>
@@ -513,20 +522,34 @@ export function AccountPageClient({
                 })}
               </div>
             </div>
-            {prefsError ? (
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={subscribedToMailingList}
+                onChange={(e) => {
+                  setSubscribedToMailingList(e.target.checked);
+                  setReadingPrefsOk(false);
+                }}
+                className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
+              />
+              <span className="text-sm text-text-primary">
+                Keep me updated about new books, features and early access offers
+              </span>
+            </label>
+            {readingPrefsError ? (
               <p className="text-sm text-error" role="alert">
-                {prefsError}
+                {readingPrefsError}
               </p>
             ) : null}
-            {prefsOk ? (
+            {readingPrefsOk ? (
               <p className="text-sm text-success">Preferences saved.</p>
             ) : null}
             <button
               type="submit"
-              disabled={prefsSaving}
+              disabled={readingPrefsSaving}
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
             >
-              {prefsSaving ? "Saving…" : "Save preferences"}
+              {readingPrefsSaving ? "Saving…" : "Save preferences"}
             </button>
           </form>
         </section>

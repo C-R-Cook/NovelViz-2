@@ -103,11 +103,13 @@ Empty states (no_books / no_images / global empty)
 ### Library rows (`buildLibraryRows`)
 
 - Books in the viewer’s **active library** (`UserBook.isActive: true`) on published books.
-- All **public** images per book.
-- **Chapter-locked images are excluded server-side** unless `?session=true` or viewer is admin.
-- Own images are never excluded.
+- All **public** images per book are returned with `isLocked` / `lockKind` flags (client blurs locked cards).
+- **Unstarted preview:** when there is no `ReadingProgress`, images at or below `ceil(chapterCount * 0.10)` are unlocked; later chapters are locked (`lockKind: "unstarted"`).
+- **Started reading:** images with `chapterNumberAtTime <= currentChapter` are unlocked; later chapters are locked (`lockKind: "chapter"`).
+- Own images are never locked.
+- Session reveal (`?session=true`) or admin: all library images returned with `isLocked: false`.
 - Row order: `ReadingProgress.updatedAt desc`, then `UserBook.addedAt desc`.
-- Books with zero visible images after filtering are omitted.
+- Books with zero public images are omitted.
 
 ### Discovery rows (`buildDiscoveryRows`)
 
@@ -132,7 +134,7 @@ Client-side only — no refetch. Pills are built from genres present in loaded r
 
 ### Session reveal (main gallery)
 
-When a member selects **“Showing spoilers”**, the client **refetches** `GET /api/gallery?session=true`. The API includes chapter-locked library images with `isLocked: false` (same trust model as per-book gallery). Toggling back refetches without the param.
+When a member selects **“Showing spoilers”**, the client **refetches** `GET /api/gallery?session=true`. The API returns all library images with `isLocked: false` (same trust model as per-book gallery). Toggling back refetches without the param.
 
 Likes while session reveal is active send:
 
@@ -216,12 +218,14 @@ Implemented in `lib/gallery-image-lock-server.ts` via `isDiscoveryPreviewLikeAll
 
 ### When an image is locked
 
-Given `gate_chapters` mode, **`isGalleryImageChapterLocked`** returns true when:
+Given `gate_chapters` mode, a **community** image is locked when the viewer is **not** the image creator and:
 
-1. Viewer is **not** the image creator, **and**
-2. Either no reading progress, or `currentChapter < image.chapterNumberAtTime`.
+1. **No reading progress:** image is above the 10% discovery threshold (`chapterNumberAtTime > ceil(totalChapters * 0.10)`).
+2. **Reading progress saved:** `currentChapter < image.chapterNumberAtTime`.
 
-**Exceptions:** admin viewers; own images; discovery preview likes (like API only); session reveal / `?session=true` API override.
+When there is no reading progress, images at or below the 10% threshold are **unlocked** (library early preview).
+
+**Exceptions:** admin viewers; own images; discovery preview likes (like API only); session reveal / `?session=true` API override; `UNLOCKED` per-book or global protection off (`show_all` mode).
 
 ### Lock kinds
 
@@ -229,7 +233,7 @@ Given `gate_chapters` mode, **`isGalleryImageChapterLocked`** returns true when:
 |------------|---------|
 | `none` | Visible |
 | `chapter` | Reader has started but hasn’t reached this chapter |
-| `unstarted` | No reading progress for this book |
+| `unstarted` | No reading progress; image is beyond the 10% early-preview threshold |
 
 (`guest_blur` was used by the old guest library teaser; removed from main gallery.)
 
@@ -264,7 +268,7 @@ flowchart TD
   D -->|Yes| F[libraryRows + discoveryRows]
 
   F --> G{session=true?}
-  G -->|No| H[Library: exclude chapter-locked images]
+  G -->|No| H[Library: all public images with lock flags]
   G -->|Yes| I[Library: all public images unlocked in API]
 
   C --> J[Discovery: max 5 books, images through 10% chapter threshold]
@@ -279,7 +283,7 @@ flowchart TD
 |--------|----------------------------------|----------------------------------|--------------|
 | Guest | Empty (no library) | Up to 5 preview rows; invitation → login | All images from API |
 | Member, no library books | Empty state CTA | Discovery rows + invitation | Locks unless admin / session / own image |
-| Member, with library | One row per library book | Discovery for non-library books | Same as before |
+| Member, with library | One row per library book with public images; locked cards blurred | Discovery for non-library books | Same as before |
 | Admin | All library images, never locked | Discovery previews, never locked | Never locked |
 
 ---

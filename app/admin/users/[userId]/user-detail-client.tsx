@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 type GrantRow = {
@@ -143,6 +144,7 @@ function statusTextClass(status: string): string {
 }
 
 export function UserDetailClient({ userId, betaMode }: { userId: string; betaMode: boolean }) {
+  const router = useRouter();
   const [tab, setTab] = useState<Tab>("account");
   const [data, setData] = useState<DetailPayload | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,6 +178,11 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
   const [creditAdjust, setCreditAdjust] = useState("");
   const [creditNote, setCreditNote] = useState("");
   const [creditBusy, setCreditBusy] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -284,6 +291,27 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
       setError("Failed to revoke grant");
     } finally {
       setRevokeBusy(false);
+    }
+  }
+
+  async function confirmDeleteUser() {
+    if (!data) return;
+    setDeleteErr(null);
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setDeleteErr(body.error ?? "Could not delete user");
+        return;
+      }
+      setDeleteOpen(false);
+      router.push("/admin/users");
+      router.refresh();
+    } catch {
+      setDeleteErr("Could not delete user");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -542,6 +570,27 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
               )}
             </section>
           ) : null}
+
+          <section className="rounded-lg border border-error/40 bg-bg-surface p-5">
+            <h2 className="mb-2 font-mono text-[10px] uppercase tracking-widest text-error">
+              Danger zone
+            </h2>
+            <p className="text-sm text-text-secondary">
+              Permanently delete this user, their Clerk account, and all associated data. This cannot
+              be undone.
+            </p>
+            <button
+              type="button"
+              className="mt-4 rounded-md border border-error/60 px-4 py-2 text-sm font-medium text-error transition hover:bg-error/10"
+              onClick={() => {
+                setDeleteConfirmEmail("");
+                setDeleteErr(null);
+                setDeleteOpen(true);
+              }}
+            >
+              Delete user
+            </button>
+          </section>
         </div>
       ) : null}
 
@@ -1033,6 +1082,68 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                 </div>
               </article>
             ))}
+          </div>
+        </div>
+      ) : null}
+
+      {deleteOpen && data ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg-overlay/50 p-4 backdrop-blur-sm"
+          role="presentation"
+          onClick={() => (deleteBusy ? null : setDeleteOpen(false))}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-delete-user-title"
+            className="max-w-md rounded-xl border border-border bg-bg-surface p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 id="admin-delete-user-title" className="text-lg font-semibold text-text-primary">
+              Delete user permanently?
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-text-secondary">
+              This removes <span className="font-medium text-text-primary">{data.user.email}</span> from
+              Clerk and deletes all of their NovelViz data. Type their email to confirm.
+            </p>
+            <label className="mt-4 block text-sm">
+              <span className="text-text-muted">Email confirmation</span>
+              <input
+                type="email"
+                value={deleteConfirmEmail}
+                onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                placeholder={data.user.email}
+                autoComplete="off"
+                disabled={deleteBusy}
+              />
+            </label>
+            {deleteErr ? (
+              <p className="mt-3 text-sm text-error" role="alert">
+                {deleteErr}
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                className="rounded-md border border-border px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-bg-base"
+                disabled={deleteBusy}
+                onClick={() => setDeleteOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="rounded-md bg-error px-4 py-2 text-sm font-medium text-text-primary transition hover:bg-error/90 disabled:opacity-60"
+                disabled={
+                  deleteBusy ||
+                  deleteConfirmEmail.trim().toLowerCase() !== data.user.email.toLowerCase()
+                }
+                onClick={() => void confirmDeleteUser()}
+              >
+                {deleteBusy ? "Deleting…" : "Delete user"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

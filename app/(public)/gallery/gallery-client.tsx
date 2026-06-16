@@ -283,7 +283,7 @@ export function GalleryClient(props: GalleryClientSessionProps) {
       }
     }
     return ids;
-  }, [filteredLibraryRows, filteredDiscoveryRows]);
+  }, [filteredLibraryRows, filteredDiscoveryRows, props.isAdmin]);
 
   const libraryImageCount = useMemo(
     () => filteredLibraryRows.reduce((n, row) => n + row.images.length, 0),
@@ -517,7 +517,14 @@ export function GalleryClient(props: GalleryClientSessionProps) {
 
   const openCoverFallbackBook = useCallback(
     (bookId: string) => {
-      router.push(`/discover/${bookId}`);
+      router.push(`/discover/${bookId}?from=gallery`);
+    },
+    [router],
+  );
+
+  const openBookGallery = useCallback(
+    (bookId: string) => {
+      router.push(`/gallery/${bookId}?from=gallery`);
     },
     [router],
   );
@@ -678,6 +685,7 @@ export function GalleryClient(props: GalleryClientSessionProps) {
                         onAddToLibrary={addBookFromInvitation}
                         addLibraryPending={invitationPendingBookId === row.bookId}
                         onOpenCoverFallback={openCoverFallbackBook}
+                        onOpenBookGallery={openBookGallery}
                       />
                     ))}
                   </div>

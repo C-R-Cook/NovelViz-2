@@ -5,6 +5,7 @@ import { type PointerEvent as ReactPointerEvent, useCallback, useRef, useState }
 type DragState = {
   pointerId: number | null;
   startX: number;
+  startY: number;
   scrollLeft0: number;
   moved: boolean;
 };
@@ -14,11 +15,14 @@ type Options = {
   onDragMoved?: () => void;
 };
 
+const DRAG_THRESHOLD_PX = 8;
+
 export function useHorizontalDragScroll({ enabled = true, onDragMoved }: Options = {}) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState>({
     pointerId: null,
     startX: 0,
+    startY: 0,
     scrollLeft0: 0,
     moved: false,
   });
@@ -32,39 +36,48 @@ export function useHorizontalDragScroll({ enabled = true, onDragMoved }: Options
       dragRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
+        startY: e.clientY,
         scrollLeft0: el.scrollLeft,
         moved: false,
       };
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
     },
     [enabled],
   );
 
-  const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const d = dragRef.current;
-    if (d.pointerId !== e.pointerId) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    const dx = e.clientX - d.startX;
-    if (!d.moved && Math.abs(dx) > 6) {
-      d.moved = true;
-      setDragging(true);
-    }
-    if (d.moved) {
+  const onPointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const d = dragRef.current;
+      if (!enabled || d.pointerId !== e.pointerId) return;
+      const el = scrollRef.current;
+      if (!el) return;
+
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+
+      if (!d.moved) {
+        if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
+        if (Math.abs(dx) <= Math.abs(dy)) return;
+        d.moved = true;
+        setDragging(true);
+        try {
+          el.setPointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
+
       el.scrollLeft = d.scrollLeft0 - dx * 1.35;
-    }
-  }, []);
+    },
+    [enabled],
+  );
 
   const endDrag = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       const d = dragRef.current;
-      if (d.pointerId !== e.pointerId) return;
+      if (!enabled) return;
+      if (d.pointerId === null || d.pointerId !== e.pointerId) return;
       const el = scrollRef.current;
-      if (el) {
+      if (el && d.moved) {
         try {
           el.releasePointerCapture(e.pointerId);
         } catch {
@@ -72,21 +85,29 @@ export function useHorizontalDragScroll({ enabled = true, onDragMoved }: Options
         }
       }
       if (d.moved) onDragMoved?.();
-      dragRef.current = { pointerId: null, startX: 0, scrollLeft0: 0, moved: false };
+      dragRef.current = {
+        pointerId: null,
+        startX: 0,
+        startY: 0,
+        scrollLeft0: 0,
+        moved: false,
+      };
       setDragging(false);
     },
-    [onDragMoved],
+    [enabled, onDragMoved],
   );
 
   return {
     scrollRef,
     dragging,
-    stripClassName: dragging ? "gallery-book-row-strip--dragging" : "",
-    pointerHandlers: {
-      onPointerDown,
-      onPointerMove,
-      onPointerUp: endDrag,
-      onPointerCancel: endDrag,
-    },
+    stripClassName: dragging ? "book-row-strip--dragging" : "",
+    pointerHandlers: enabled
+      ? {
+          onPointerDown,
+          onPointerMove,
+          onPointerUp: endDrag,
+          onPointerCancel: endDrag,
+        }
+      : {},
   };
 }

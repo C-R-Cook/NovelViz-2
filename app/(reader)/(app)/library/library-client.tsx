@@ -234,6 +234,7 @@ export function LibraryClient({
                             chapterNumber: chapterProgress.chapterNumber,
                             progressPercent: chapterProgress.progressPercent,
                             total: chapterProgress.total,
+                            isNotStarted: chapterProgress.isNotStarted,
                           }}
                         />
                       </div>

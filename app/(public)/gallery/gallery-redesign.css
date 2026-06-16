@@ -389,11 +389,23 @@
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 0.25rem;
-  touch-action: pan-x;
+  touch-action: manipulation;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
   cursor: grab;
+}
+
+@media (pointer: fine) {
+  .book-row-strip {
+    touch-action: pan-x;
+  }
+}
+
+@media (pointer: coarse) {
+  .book-row-strip {
+    cursor: default;
+  }
 }
 
 .book-row-strip::-webkit-scrollbar {

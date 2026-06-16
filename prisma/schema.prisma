@@ -149,6 +149,8 @@ model Book {
   author                       String
   ownerId                      String?
   coverImageUrl                String?
+  /// True when coverImageUrl is (or was set from) partner/admin Cover AI — used for gallery discover fallback rows.
+  coverIsAiGenerated           Boolean    @default(false)
   description                  String?
   genre                        BookGenre?
   publishedYear                Int?

@@ -279,6 +279,7 @@ export function GalleryBookClient({
 
   const modalImage = modalIndex !== null ? images[modalIndex] : null;
   const modalLocked = modalImage ? displayLocked(modalImage) : false;
+  const modalLikeAllowed = modalImage ? canLikeImage(modalImage) : false;
   const chapterGap =
     modalLocked && modalImage
       ? Math.max(1, modalImage.chapterNumberAtTime - (currentChapterNumber ?? 0))
@@ -718,7 +719,7 @@ export function GalleryBookClient({
                         <button
                           type="button"
                           onClick={() => void likeImage(modalImage.id)}
-                          disabled={!likeAllowed || !!likingIds[modalImage.id]}
+                          disabled={!modalLikeAllowed || !!likingIds[modalImage.id]}
                           className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:cursor-not-allowed ${
                             modalImage.likedByViewer
                               ? "opacity-100 disabled:opacity-100"

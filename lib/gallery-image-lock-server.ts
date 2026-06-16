@@ -1,4 +1,8 @@
-import { effectiveChapterGateMode, isGalleryImageChapterLocked } from "@/lib/gallery-spoiler";
+import {
+  effectiveChapterGateMode,
+  isGalleryImageChapterLocked,
+} from "@/lib/gallery-spoiler";
+import { isDiscoveryPreviewLikeAllowed } from "@/lib/gallery-page-data";
 import { prisma } from "@/lib/prisma";
 
 /** Chapter-gate lock for a public gallery image — same rules as gallery list APIs. Admin always sees unlocked. */
@@ -15,6 +19,16 @@ export async function isGeneratedImageChapterLockedForViewer(args: {
 }): Promise<boolean> {
   if (args.isAdmin) return false;
   if (args.sessionBrowsingUnlockedBookIds.includes(args.bookId)) return false;
+
+  if (
+    await isDiscoveryPreviewLikeAllowed({
+      userId: args.userId,
+      bookId: args.bookId,
+      chapterNumberAtTime: args.chapterNumberAtTime,
+    })
+  ) {
+    return false;
+  }
 
   const [dbUser, userBook, progress] = await Promise.all([
     prisma.user.findUnique({
@@ -42,6 +56,7 @@ export async function isGeneratedImageChapterLockedForViewer(args: {
     mode,
     currentChapter,
     imageChapter: args.chapterNumberAtTime,
+    isAdmin: args.isAdmin,
   });
 }
 

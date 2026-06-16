@@ -109,7 +109,7 @@ export async function POST(request: Request, context: RouteContext) {
   const [updated, chapterCount] = await prisma.$transaction([
     prisma.book.update({
       where: { id: bookId },
-      data: { coverImageUrl: secureUrl },
+      data: { coverImageUrl: secureUrl, coverIsAiGenerated: true },
     }),
     prisma.chapter.count({ where: { bookId } }),
   ]);

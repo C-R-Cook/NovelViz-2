@@ -28,9 +28,15 @@ export function isChapterBehindLock(
   return currentChapter < imageChapter;
 }
 
+/** Admins are treated as having read every chapter on every book for gallery spoiler purposes. */
+export function isGalleryAdminViewer(isAdmin: boolean | undefined | null): boolean {
+  return isAdmin === true;
+}
+
 /**
  * Chapter spoiler lock for gallery display — never locks the viewer's own generated images,
  * even if they moved back to an earlier chapter after creating the image.
+ * Admins are never chapter-locked.
  */
 export function isGalleryImageChapterLocked(args: {
   viewerUserId: string | null | undefined;
@@ -38,7 +44,9 @@ export function isGalleryImageChapterLocked(args: {
   mode: ChapterGateMode;
   currentChapter: number | undefined;
   imageChapter: number;
+  isAdmin?: boolean;
 }): boolean {
+  if (isGalleryAdminViewer(args.isAdmin)) return false;
   if (args.viewerUserId != null && args.viewerUserId === args.imageUserId) {
     return false;
   }

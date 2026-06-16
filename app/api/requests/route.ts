@@ -1,4 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
+import {
+  AdminEmailCategory,
+  absoluteAppUrl,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { NextResponse } from "next/server";
@@ -35,6 +40,23 @@ export async function POST(request: Request) {
       authorName,
       message,
     },
+  });
+
+  const requesterLabel =
+    session != null
+      ? `${session.name?.trim() || session.username || session.id} (${session.email})`
+      : "Guest";
+
+  sendAdminEmail({
+    category: AdminEmailCategory.BOOK_REQUEST,
+    subjectDetail: `${bookTitle} - ${authorName}`,
+    bodyLines: [
+      { label: "Book title", value: bookTitle },
+      { label: "Author", value: authorName },
+      ...(message ? [{ label: "Message", value: message }] : []),
+      { label: "Requester", value: requesterLabel },
+      { label: "Admin queue", value: absoluteAppUrl("/admin/requests") },
+    ],
   });
 
   return NextResponse.json({ success: true });

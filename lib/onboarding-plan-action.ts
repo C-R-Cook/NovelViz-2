@@ -1,6 +1,10 @@
 "use server";
 
 import { ensureCurrentUser } from "@/lib/auth";
+import {
+  AdminEmailCategory,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { establishLimitFloorsForTier } from "@/lib/limit-floors";
 import { ONBOARDING_PLAN_COOKIE } from "@/lib/onboarding-cookies";
 import { prisma } from "@/lib/prisma";
@@ -68,6 +72,18 @@ export async function completePlanStep(
           publisherName: ONBOARDING_PARTNER_PUBLISHER_NAME,
           catalogueNote: ONBOARDING_PARTNER_CATALOGUE_NOTE,
         },
+      });
+
+      sendAdminEmail({
+        category: AdminEmailCategory.PARTNER_REQUEST,
+        subjectDetail: `${ONBOARDING_PARTNER_PUBLISHER_NAME} - ${name}`,
+        bodyLines: [
+          { label: "Source", value: "Onboarding" },
+          { label: "Name", value: name },
+          { label: "Email", value: email },
+          { label: "Publisher / imprint", value: ONBOARDING_PARTNER_PUBLISHER_NAME },
+          { label: "Catalogue", value: ONBOARDING_PARTNER_CATALOGUE_NOTE },
+        ],
       });
     }
   }

@@ -9,8 +9,8 @@ export async function generateMetadata({ params }: { params: Promise<{ bookId: s
     where: { id: bookId, deletedAt: null, status: "published" },
     select: { title: true },
   });
-  if (!book) return { title: "Gallery | NovelViz" };
-  return { title: `${book.title} — Gallery | NovelViz` };
+  if (!book) return { title: "Public Gallery | NovelViz" };
+  return { title: `${book.title} — Public Gallery | NovelViz` };
 }
 
 export default async function GalleryBookPage({ params }: { params: Promise<{ bookId: string }> }) {

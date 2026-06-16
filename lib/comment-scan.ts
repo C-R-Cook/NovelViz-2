@@ -1,4 +1,9 @@
 import { getAnthropicTextResponse } from "@/lib/anthropic-text";
+import {
+  AdminEmailCategory,
+  absoluteAppUrl,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import type { CommentSpoilerScanDebug } from "@/lib/comment-spoiler-scan-debug";
 import { createNotification } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
@@ -75,6 +80,7 @@ export async function scanCommentForSpoilers(commentId: string): Promise<Comment
           book: { select: { title: true } },
         },
       },
+      user: { select: { username: true } },
     },
   });
 
@@ -194,6 +200,25 @@ export async function scanCommentForSpoilers(commentId: string): Promise<Comment
   const message = `Your comment on "${bookTitle}" (${chapterNote}) was flagged as a possible spoiler and is under review. Reword it from the gallery or wait for a decision.`;
 
   await createNotification(row.userId, NotificationType.COMMENT_HIDDEN_PENDING, message, link);
+
+  sendAdminEmail({
+    category: AdminEmailCategory.SPOILER_FLAG,
+    subjectDetail: `"${bookTitle}" - Ch. ${gateChapter}`,
+    bodyLines: [
+      { label: "Book", value: bookTitle },
+      { label: "Image chapter", value: String(imageChapter) },
+      {
+        label: "Spoiler chapter",
+        value:
+          parsed.spoilerChapter != null ? String(parsed.spoilerChapter) : "(same as image chapter)",
+      },
+      { label: "Comment author", value: row.user.username ?? row.userId },
+      { label: "Comment", value: row.content },
+      { label: "Public Gallery", value: absoluteAppUrl(link) },
+      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=spoiler-comments") },
+    ],
+  });
+
   return debug;
 }
 

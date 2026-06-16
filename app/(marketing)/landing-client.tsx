@@ -1,6 +1,7 @@
 "use client";
 
 import { DiscoverParticleField } from "@/components/discover-particle-field";
+import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
 import type { FeaturedImageCard } from "@/lib/featured-image-selection";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -230,7 +231,7 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
             Features
           </button>
           <button type="button" className="landing-nav-link" onClick={() => scrollToSection("gallery")}>
-            Gallery
+            Public Gallery
           </button>
         </div>
 
@@ -428,7 +429,7 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={item.imageUrl} alt={item.userPrompt} loading="lazy" />
-                <div className="landing-gallery-overlay" aria-hidden />
+                <ImageThumbnailBottomBar />
                 <div className="landing-gallery-caption">
                   <div className="landing-gallery-meta">
                     {item.bookTitle} · Ch. {item.chapterNumberAtTime}

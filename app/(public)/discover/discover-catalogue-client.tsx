@@ -3,6 +3,7 @@
 import "./discover-redesign.css";
 
 import { BookRequestModal } from "@/components/book-request-modal";
+import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
 import { DISCOVER_DEFAULT_PALETTE } from "@/lib/discover-genre-palette";
@@ -905,7 +906,7 @@ export function DiscoverCatalogueClient({
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={img.imageUrl} alt="" className="discover-concept-vision-img" />
-                        <div className="discover-concept-vision-grad" />
+                        <ImageThumbnailBottomBar />
                         <div className="discover-concept-vision-badge font-mono">CH. {img.chapterNumberAtTime}</div>
                         <div className="discover-concept-vision-bottom">
                           <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-accent-text">

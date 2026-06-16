@@ -1,5 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
 import {
+  AdminEmailCategory,
+  absoluteAppUrl,
+  sendAdminEmail,
+} from "@/lib/admin-email";
+import {
   isCommentSpoilerScanDebugEnabled,
   parseCommentSpoilerScanDebug,
 } from "@/lib/comment-spoiler-scan-debug";
@@ -33,10 +38,12 @@ export async function POST(_request: Request, context: RouteContext) {
     select: {
       id: true,
       userId: true,
+      content: true,
       status: true,
       spoilerGateChapter: true,
       spoilerModerationAt: true,
       spoilerScanDebug: true,
+      user: { select: { username: true } },
       image: {
         select: {
           id: true,
@@ -143,6 +150,24 @@ export async function POST(_request: Request, context: RouteContext) {
     `A comment on "${bookTitle}" was reported for inappropriate content.`,
     link,
   );
+
+  const chapter = comment.image.chapterNumberAtTime;
+  sendAdminEmail({
+    category: AdminEmailCategory.COMMENT_FLAG,
+    subjectDetail: `"${bookTitle}" - Ch. ${chapter}`,
+    bodyLines: [
+      { label: "Book", value: bookTitle },
+      { label: "Chapter", value: String(chapter) },
+      { label: "Comment author", value: comment.user.username ?? comment.userId },
+      { label: "Comment", value: comment.content },
+      {
+        label: "Reported by",
+        value: `${sessionUser.username ?? sessionUser.id} (${sessionUser.email ?? "no email"})`,
+      },
+      { label: "Public Gallery", value: absoluteAppUrl(link) },
+      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=flagged-comments") },
+    ],
+  });
 
   return NextResponse.json({ ok: true });
 }

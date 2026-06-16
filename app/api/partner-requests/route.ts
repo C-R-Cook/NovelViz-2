@@ -1,4 +1,8 @@
 import { getCurrentUser } from "@/lib/auth";
+import {
+  AdminEmailCategory,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { NextResponse } from "next/server";
@@ -84,6 +88,23 @@ export async function POST(request: Request) {
       websiteUrl: websiteUrlRaw || null,
       catalogueNote: catalogueDescription,
     },
+  });
+
+  sendAdminEmail({
+    category: AdminEmailCategory.PARTNER_REQUEST,
+    subjectDetail: `${publisherName} - ${name}`,
+    bodyLines: [
+      { label: "Source", value: "Dashboard form" },
+      { label: "Name", value: name },
+      { label: "Email", value: email },
+      ...(dbUser.username?.trim()
+        ? [{ label: "Username", value: dbUser.username.trim() }]
+        : []),
+      ...(pseudonymRaw ? [{ label: "Pseudonym", value: pseudonymRaw }] : []),
+      { label: "Publisher / imprint", value: publisherName },
+      ...(websiteUrlRaw ? [{ label: "Website", value: websiteUrlRaw }] : []),
+      { label: "Catalogue", value: catalogueDescription },
+    ],
   });
 
   return NextResponse.json({ success: true });

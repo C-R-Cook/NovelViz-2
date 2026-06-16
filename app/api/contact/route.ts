@@ -1,3 +1,8 @@
+import {
+  AdminEmailCategory,
+  CONTACT_SUBJECT_LABELS,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { NextResponse } from "next/server";
 
 const ALLOWED_SUBJECTS = new Set([
@@ -20,7 +25,7 @@ function isNonEmptyString(v: unknown): v is string {
 }
 
 /**
- * Contact form intake. TODO: send email (e.g. Resend) instead of logging only.
+ * Contact form intake — sends admin notification via Resend.
  */
 export async function POST(request: Request) {
   let body: Body;
@@ -51,11 +56,21 @@ export async function POST(request: Request) {
     );
   }
 
-  console.info("[contact] submission", {
-    name: name.trim(),
-    email: email.trim(),
-    subject,
-    messageLength: message.trim().length,
+  const trimmedName = name.trim();
+  const trimmedEmail = email.trim();
+  const trimmedMessage = message.trim();
+  const subjectLabel = CONTACT_SUBJECT_LABELS[subject] ?? subject;
+
+  sendAdminEmail({
+    category: AdminEmailCategory.CONTACT,
+    subjectDetail: `${subjectLabel} - ${trimmedName}`,
+    replyTo: trimmedEmail,
+    bodyLines: [
+      { label: "Name", value: trimmedName },
+      { label: "Email", value: trimmedEmail },
+      { label: "Subject", value: subjectLabel },
+      { label: "Message", value: trimmedMessage },
+    ],
   });
 
   return NextResponse.json({ success: true });

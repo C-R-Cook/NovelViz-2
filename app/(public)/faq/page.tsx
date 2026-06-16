@@ -22,13 +22,15 @@
 
 import type { Metadata } from "next";
 
+import { FaqAccordionItem } from "@/components/faq-accordion-item";
+
 export const metadata: Metadata = {
   title: "FAQ | NovelViz",
   description: "Frequently asked questions about NovelViz, spoiler-safe AI, and your library.",
 };
 
 /** Single FAQ row: question (summary) + answer (expanded body). */
-type FAQItem = { q: string; a: string };
+type FAQItem = { q: string; a: string; /** Optional anchor for links (e.g. `/faq#generated-prompt`). */ id?: string };
 
 /** One block on the page: a section title + any number of accordion items. */
 type FAQSection = { title: string; items: FAQItem[]; /** Optional anchor for links (e.g. `/faq#publisher-partnership`). */ id?: string };
@@ -111,6 +113,11 @@ const SECTIONS: FAQSection[] = [
       {
         q: "Can I generate images from any scene?",
         a: "You can generate images of any character, location, object, or moment — but only from content you've already read. The AI draws visual details directly from the book's descriptions up to your current chapter. Anything beyond where you are in the story is strictly off limits.",
+      },
+      {
+        id: "generated-prompt",
+        q: "What is the generated prompt?",
+        a: "When you create an image, you write a short original prompt describing what you want to see. NovelViz enriches that using passages from the book (only up to your current chapter) plus instructions for the image model. The generated prompt is that expanded, model-ready text — it is what was actually sent to produce your image. It is usually longer and more detailed than what you typed, and may include style, lighting, composition, and scene details inferred from the book.",
       },
     ],
   },
@@ -228,15 +235,16 @@ export default function FAQPage() {
             </h2>
             <div className="space-y-3">
               {section.items.map((item) => (
-                <details key={item.q} className={ACCORDION_DETAILS_CLASS}>
-                  <summary className={ACCORDION_SUMMARY_CLASS}>
-                    <span className="min-w-0 flex-1">{item.q}</span>
-                    <span className={ACCORDION_CHEVRON_CLASS} aria-hidden>
-                      ▼
-                    </span>
-                  </summary>
-                  <div className={ACCORDION_ANSWER_CLASS}>{item.a}</div>
-                </details>
+                <FaqAccordionItem
+                  key={item.q}
+                  id={item.id}
+                  q={item.q}
+                  a={item.a}
+                  detailsClass={ACCORDION_DETAILS_CLASS}
+                  summaryClass={ACCORDION_SUMMARY_CLASS}
+                  chevronClass={ACCORDION_CHEVRON_CLASS}
+                  answerClass={ACCORDION_ANSWER_CLASS}
+                />
               ))}
             </div>
           </section>

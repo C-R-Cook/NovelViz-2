@@ -813,23 +813,6 @@
   transform: scale(1.06);
 }
 
-.discover-concept-vision-grad {
-  pointer-events: none;
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0) 58%);
-  transition: opacity 0.35s ease;
-}
-
-.discover-concept-vision-card:hover .discover-concept-vision-grad {
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(0, 0, 0, 0.22) 52%,
-    rgba(0, 0, 0, 0) 100%
-  );
-}
-
 .discover-concept-vision-badge {
   position: absolute;
   top: 10px;
@@ -849,5 +832,6 @@
   right: 0;
   bottom: 0;
   left: 0;
+  z-index: 10;
   padding: 14px 12px;
 }

@@ -1,7 +1,13 @@
 "use client";
 
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
+import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
 import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
+import {
+  GalleryImageModalShell,
+  galleryImageModalDialogClassName,
+  galleryImageModalDialogHeightClassName,
+} from "@/components/gallery/gallery-image-modal-shell";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
@@ -195,12 +201,18 @@ export function GalleryBookClient({
 
   const canLike = isLoggedIn || isAdmin;
 
+  function canLikeImage(image: ApiImage): boolean {
+    if (!canLike) return false;
+    if (viewerUserId !== null && image.userId === viewerUserId) return false;
+    if (image.likedByViewer) return false;
+    if (displayLocked(image)) return false;
+    return true;
+  }
+
   async function likeImage(imageId: string) {
-    if (!canLike || likingIds[imageId]) return;
+    if (likingIds[imageId]) return;
     const prior = images.find((i) => i.id === imageId);
-    if (!prior || prior.likedByViewer) return;
-    if (viewerUserId !== null && prior.userId === viewerUserId) return;
-    if (displayLocked(prior)) return;
+    if (!prior || !canLikeImage(prior)) return;
 
     const beforeLikeCount = prior.likeCount;
     const beforeLikedByViewer = prior.likedByViewer;
@@ -208,11 +220,7 @@ export function GalleryBookClient({
     setLikingIds((prev) => ({ ...prev, [imageId]: true }));
     setImages((prev) =>
       prev.map((img) =>
-        img.id !== imageId
-          ? img
-          : viewerUserId !== null && img.userId === viewerUserId
-            ? img
-            : { ...img, likeCount: img.likeCount + 1, likedByViewer: true },
+        img.id !== imageId ? img : { ...img, likeCount: img.likeCount + 1, likedByViewer: true },
       ),
     );
     try {
@@ -309,7 +317,7 @@ export function GalleryBookClient({
 
   const from = searchParams.get("from");
   const backHref = from === "reader" || from === "library" ? `/library?book=${bookId}` : "/gallery";
-  const backLabel = from === "reader" ? "Back to your book" : "Back to gallery";
+  const backLabel = from === "reader" ? "Back to your book" : "Back to public gallery";
 
   useEffect(() => {
     setModalCtaError(null);
@@ -505,7 +513,8 @@ export function GalleryBookClient({
           const locked = displayLocked(image);
           const username = image.username?.trim() || "Anonymous reader";
           const alreadyLiked = image.likedByViewer;
-          const likeDisabled = !canLike || !!likingIds[image.id] || alreadyLiked || locked;
+          const likeAllowed = canLikeImage(image);
+          const likeDisabled = !likeAllowed || !!likingIds[image.id];
           const isOwnImage = viewerUserId !== null && viewerUserId === image.userId;
           const padlockVariant = sessionReveal
             ? (viewerUserId !== null && image.userId === viewerUserId ? "aqua" : null)
@@ -550,12 +559,8 @@ export function GalleryBookClient({
                     className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[28%] bg-gradient-to-b from-black/42 to-transparent"
                     aria-hidden
                   />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 w-full">
-                    <div
-                      className="absolute inset-x-0 bottom-0 h-[48%] min-h-[5rem] bg-gradient-to-t from-black/75 via-black/40 to-transparent"
-                      aria-hidden
-                    />
-                    <div className="relative p-3 pt-8">
+                  <ImageThumbnailBottomBar />
+                  <div className="absolute inset-x-0 bottom-0 z-10 p-3 pt-8">
                     <div className="flex items-end justify-between gap-2">
                       <div className="min-w-0 flex-1 pr-1">
                         <p className="text-xs font-medium text-text-muted">Chapter {image.chapterNumberAtTime}</p>
@@ -611,7 +616,6 @@ export function GalleryBookClient({
                         )}
                       </div>
                     </div>
-                    </div>
                   </div>
                   {locked ? (
                     <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-2 text-center">
@@ -627,17 +631,11 @@ export function GalleryBookClient({
       </div>
 
       {modalImage ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-bg-overlay/70 backdrop-blur-sm"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) dismissModalImage();
-            }}
-          />
+        <GalleryImageModalShell onClose={dismissModalImage}>
           <div
             role="dialog"
             aria-modal="true"
-            className="relative flex h-[90dvh] max-h-[90dvh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
+            className={`${galleryImageModalDialogClassName} ${galleryImageModalDialogHeightClassName}`}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button
@@ -720,7 +718,7 @@ export function GalleryBookClient({
                         <button
                           type="button"
                           onClick={() => void likeImage(modalImage.id)}
-                          disabled={!canLike || !!likingIds[modalImage.id] || modalImage.likedByViewer}
+                          disabled={!likeAllowed || !!likingIds[modalImage.id]}
                           className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition hover:bg-bg-raised disabled:cursor-not-allowed ${
                             modalImage.likedByViewer
                               ? "opacity-100 disabled:opacity-100"
@@ -771,7 +769,7 @@ export function GalleryBookClient({
                         onClick={() => dismissModalImage()}
                         className={modalViewGalleryButtonClass}
                       >
-                        View Gallery
+                        View Public Gallery
                       </Link>
                     </div>
                     <div className="text-sm text-text-muted shrink-0">
@@ -873,7 +871,7 @@ export function GalleryBookClient({
               ) : null}
             </div>
           </div>
-        </div>
+        </GalleryImageModalShell>
       ) : null}
     </div>
   );

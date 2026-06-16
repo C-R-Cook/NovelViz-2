@@ -7,7 +7,7 @@
  * - lib/partner-book-analytics.ts
  */
 
-export const USE_PARTNER_ANALYTICS_MOCK = true;
+export const USE_PARTNER_ANALYTICS_MOCK = false;
 
 function lastNMonthKeys(n: number): { monthKey: string; label: string }[] {
   const out: { monthKey: string; label: string }[] = [];

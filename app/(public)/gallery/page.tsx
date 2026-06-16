@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 import type { SpoilerProtection } from "@db";
 
 export const metadata = {
-  title: "Gallery | NovelViz",
+  title: "Public Gallery | NovelViz",
 };
 
 type GeneratedImageForGallery = {

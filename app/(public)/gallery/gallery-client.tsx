@@ -6,10 +6,16 @@ import { useRouter } from "next/navigation";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import "./gallery-redesign.css";
+import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
 import { GalleryCardCornerBadge } from "@/components/gallery/gallery-card-corner-badge";
 import { GalleryImageComments } from "@/components/gallery/gallery-image-comments";
 import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
 import { GalleryImagePromptDisclosure } from "@/components/gallery/gallery-image-prompt-disclosure";
+import {
+  GalleryImageModalShell,
+  galleryImageModalDialogClassName,
+  galleryImageModalDialogHeightClassName,
+} from "@/components/gallery/gallery-image-modal-shell";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
 import { GallerySpoilerSelect } from "@/components/gallery/gallery-spoiler-select";
@@ -126,7 +132,7 @@ function formatCardDate(iso: string) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-/** Modal "View Gallery" link — `h-9` to align with Make public/private and toolbars */
+/** Modal "View Public Gallery" link — `h-9` to align with Make public/private and toolbars */
 const modalViewGalleryButtonClass =
   "inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-blue-600/50 bg-blue-600/15 px-3 text-sm font-medium text-blue-200 shadow-sm transition hover:border-blue-500/60 hover:bg-blue-600/25";
 
@@ -315,13 +321,10 @@ function GallerySquareCard({
           aria-hidden
         />
 
-        <div className="absolute inset-x-0 bottom-0 z-10 w-full">
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-[48%] min-h-[5rem] bg-gradient-to-t from-black/75 via-black/40 to-transparent"
-            aria-hidden
-          />
-          <div className="relative p-3">
-            <div className="flex items-end justify-between gap-2 pr-0">
+        <ImageThumbnailBottomBar />
+
+        <div className="absolute inset-x-0 bottom-0 z-10 p-3">
+          <div className="flex items-end justify-between gap-2 pr-0">
               <div className="min-w-0 flex-1 pr-2">
               <Link
                 href={`/gallery/${image.bookId}?from=gallery`}
@@ -382,7 +385,6 @@ function GallerySquareCard({
               </div>
             </div>
           </div>
-        </div>
 
         {locked ? (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-bg-overlay/45 px-4 text-center">
@@ -770,8 +772,10 @@ export function GalleryClient(props: GalleryClientProps) {
   const getMemberChapterGateLock = useCallback(
     (image: GalleryImageCard): { locked: boolean; lockKind: GalleryLockKind } => {
       const bookSpoiler = spoilerSettingsByBookId[image.bookId] ?? "INHERIT";
-      const globalForSession = gallerySessionRevealAll ? false : true;
-      const mode = effectiveChapterGateMode(bookSpoiler, globalForSession);
+      const accountGlobalSpoiler =
+        props.layout === "member" ? props.globalSpoilerProtection : true;
+      const globalForLock = gallerySessionRevealAll ? false : accountGlobalSpoiler;
+      const mode = effectiveChapterGateMode(bookSpoiler, globalForLock);
       const behind = isGalleryImageChapterLocked({
         viewerUserId,
         imageUserId: image.userId,
@@ -784,7 +788,7 @@ export function GalleryClient(props: GalleryClientProps) {
         image.currentChapterNumber === undefined ? "unstarted" : "chapter";
       return { locked: true, lockKind };
     },
-    [spoilerSettingsByBookId, gallerySessionRevealAll, viewerUserId],
+    [props.layout, props.globalSpoilerProtection, spoilerSettingsByBookId, gallerySessionRevealAll, viewerUserId],
   );
 
   const isImageLocked = useCallback(
@@ -794,6 +798,17 @@ export function GalleryClient(props: GalleryClientProps) {
       return getMemberChapterGateLock(image).locked;
     },
     [isAdmin, isMember, getMemberChapterGateLock],
+  );
+
+  const canLikeImage = useCallback(
+    (image: GalleryImageCard): boolean => {
+      if (!canLike) return false;
+      if (viewerUserId && image.userId === viewerUserId) return false;
+      if (image.likedByViewer) return false;
+      if (isImageLocked(image)) return false;
+      return true;
+    },
+    [canLike, viewerUserId, isImageLocked],
   );
 
   const galleryOverlayLockKind = useCallback(
@@ -830,22 +845,20 @@ export function GalleryClient(props: GalleryClientProps) {
   }, [props.layout, fromLibraryResolved, featuredResolved]);
 
   async function likeImage(imageId: string) {
-    if (!canLike) return;
     if (likingIds[imageId]) return;
 
     const prior = imagesById[imageId];
-    if (!prior || prior.likedByViewer) return;
-    if (viewerUserId && prior.userId === viewerUserId) return;
-    if (isImageLocked(prior)) return;
+    if (!prior || !canLikeImage(prior)) return;
 
     const beforeLikeCount = prior.likeCount;
     const beforeLikedByViewer = prior.likedByViewer;
+    const sessionBrowsingUnlockedBookIds =
+      gallerySessionRevealAll && prior.bookId ? [prior.bookId] : [];
 
     setLikingIds((prev) => ({ ...prev, [imageId]: true }));
     setImagesById((prev) => {
       const img = prev[imageId];
-      if (!img || img.likedByViewer) return prev;
-      if (viewerUserId && img.userId === viewerUserId) return prev;
+      if (!img || !canLikeImage(img)) return prev;
       return { ...prev, [imageId]: { ...img, likeCount: img.likeCount + 1, likedByViewer: true } };
     });
 
@@ -853,7 +866,7 @@ export function GalleryClient(props: GalleryClientProps) {
       const res = await fetch(`/api/gallery/${imageId}/like`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionBrowsingUnlockedBookIds: [] }),
+        body: JSON.stringify({ sessionBrowsingUnlockedBookIds }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         likeCount?: number;
@@ -1185,7 +1198,7 @@ export function GalleryClient(props: GalleryClientProps) {
               <h1
                 className={`gallery-title tracking-tight text-2xl sm:text-3xl ${headerVisible ? "gallery-concept-hero-in gallery-concept-hero-in--delay" : "opacity-0 translate-y-3"}`}
               >
-                Gallery
+                Public Gallery
               </h1>
               <p
                 className={`gallery-subtitle mt-2 ${headerVisible ? "gallery-concept-hero-in gallery-concept-hero-in--delay2" : "opacity-0 translate-y-3"}`}
@@ -1260,7 +1273,6 @@ export function GalleryClient(props: GalleryClientProps) {
               <section className="space-y-4">
                 <GallerySectionLabel
                   label="FROM YOUR LIBRARY"
-                  sub="Images from books you're reading"
                   right={
                     props.library.kind === "images" ? `${fromLibraryResolved.length} images` : undefined
                   }
@@ -1295,7 +1307,6 @@ export function GalleryClient(props: GalleryClientProps) {
               <section className="space-y-4">
                 <GallerySectionLabel
                   label="FEATURED"
-                  sub="Admin-curated images from across the catalogue"
                   right={
                     props.layout === "member" && featuredResolved.length > 0
                       ? `${featuredResolved.length} images`
@@ -1316,40 +1327,15 @@ export function GalleryClient(props: GalleryClientProps) {
               </section>
             </div>
           )}
-
-          <div className="gallery-cta-banner">
-            <div className="gallery-cta-content">
-              <p className="gallery-cta-eyebrow">Create your own</p>
-              <h2 className="gallery-cta-heading">Imagine your story.</h2>
-              <p className="gallery-cta-sub">
-                Generate images from the chapters you&apos;ve read — spoilers never included.
-              </p>
-            </div>
-            <div className="gallery-cta-actions">
-              <Link href="/discover" className="gallery-cta-primary">
-                START READING →
-              </Link>
-              <Link href="/discover" className="gallery-cta-secondary">
-                BROWSE BOOKS
-              </Link>
-            </div>
-          </div>
         </div>
       </div>
 
       {modalState && modalActiveImage ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-bg-overlay/70 backdrop-blur-sm"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) closeModal();
-            }}
-          />
-
+        <GalleryImageModalShell onClose={closeModal}>
           <div
             role="dialog"
             aria-modal="true"
-            className="relative flex h-[90dvh] max-h-[90dvh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
+            className={`${galleryImageModalDialogClassName} ${galleryImageModalDialogHeightClassName}`}
             onMouseDown={(e) => e.stopPropagation()}
           >
             <button
@@ -1435,7 +1421,7 @@ export function GalleryClient(props: GalleryClientProps) {
                           type="button"
                           onClick={() => void likeImage(modalActiveImage.id)}
                           disabled={
-                            !canLike || !!likingIds[modalActiveImage.id] || modalActiveImage.likedByViewer
+                            !canLikeImage(modalActiveImage) || !!likingIds[modalActiveImage.id]
                           }
                           className={`inline-flex items-center gap-2 rounded-md border bg-bg-surface px-3 py-2 text-sm font-medium transition duration-200 ease-out hover:bg-bg-raised disabled:cursor-not-allowed ${
                             modalActiveImage.likedByViewer
@@ -1489,7 +1475,7 @@ export function GalleryClient(props: GalleryClientProps) {
                         onClick={() => closeModal()}
                         className={modalViewGalleryButtonClass}
                       >
-                        View Gallery
+                        View Public Gallery
                       </Link>
                     </div>
 
@@ -1597,7 +1583,7 @@ export function GalleryClient(props: GalleryClientProps) {
               ) : null}
             </div>
           </div>
-        </div>
+        </GalleryImageModalShell>
       ) : null}
     </div>
   );

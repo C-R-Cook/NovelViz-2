@@ -64,12 +64,20 @@ const GRID_BASE = {
 
 type BarRow = { label: string; count?: number; total?: number };
 
-export function ReadersOverTimeArea({ data, valueKey }: { data: AreaRow[]; valueKey: string }) {
+export function ReadersOverTimeArea({
+  data,
+  valueKey,
+  height = 200,
+}: {
+  data: AreaRow[];
+  valueKey: string;
+  height?: number;
+}) {
   const accent = useCSSVar("--accent");
   const gid = useId().replace(/:/g, "");
   const gradId = `readerFill-${gid}`;
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 10, right: 12, left: 0, bottom: 4 }}>
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">

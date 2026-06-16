@@ -1,6 +1,8 @@
 "use client";
 
 import { AccountPageClient, type AccountPageClientProps } from "@/app/(reader)/(app)/account/account-client";
+import { DashboardLibrarySettings } from "@/app/(reader)/(app)/dashboard/dashboard-library-settings";
+import { DashboardReaderImages } from "@/app/(reader)/(app)/dashboard/dashboard-reader-images";
 import { DashboardPartnerSection } from "@/app/(reader)/(app)/dashboard/dashboard-partner-section";
 import { FeatureImagesAdmin } from "@/app/(reader)/(app)/dashboard/feature-images-admin";
 import { PartnerFeatureImages } from "@/app/(reader)/(app)/dashboard/partner-feature-images";
@@ -20,7 +22,6 @@ import { UsersAdminClient } from "@/app/admin/users/users-client";
 import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
 import { gutenbergNavLinkIsActive } from "@/lib/gutenberg-admin-nav";
-import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
 import {
@@ -38,8 +39,8 @@ import type { PartnerAnalyticsPayload } from "@/lib/partner-analytics";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import type { PartnerDashboardBookRow } from "@/lib/partner-books-list";
 import type { PartnerFeatureImageRow } from "@/lib/partner-feature-images";
+import type { PartnerQueryRow } from "@/lib/partner-queries";
 import type { FeatureRequestStatus } from "@db";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -76,6 +77,17 @@ export type DashboardClientProps = {
     username: string | null;
     email: string;
     stats: { libraryBookCount: number; queryCount: number; generatedImageCount: number };
+    libraryBooks: {
+      bookId: string;
+      title: string;
+      author: string;
+      coverImageUrl: string | null;
+      currentChapterNumber: number | null;
+      chapterCount: number;
+      queryCount: number;
+      imageCount: number;
+      progressPercent: number;
+    }[];
     currentlyReading: {
       bookId: string;
       title: string;
@@ -98,11 +110,16 @@ export type DashboardClientProps = {
     }[];
     recentImages: {
       id: string;
+      bookId: string;
       imageUrl: string;
       bookTitle: string;
       chapterNumberAtTime: number;
       userPrompt: string;
+      fullPrompt: string;
       isPublic: boolean;
+      isFeatured: boolean;
+      likeCount: number;
+      commentCount: number;
       createdAtMs: number;
     }[];
   };
@@ -125,6 +142,9 @@ export type DashboardClientProps = {
     initialPartnerFeatureImages: PartnerFeatureImageRow[];
     initialPartnerFeatureImagesHasMore: boolean;
     partnerFeatureImagesPageSize: number;
+    initialPartnerQueries: PartnerQueryRow[];
+    initialPartnerQueriesHasMore: boolean;
+    partnerQueriesPageSize: number;
   } | null;
   admin: {
     pendingBooks: {
@@ -233,47 +253,6 @@ function GemDivider() {
       <span className="dashboard-divider-line" />
       <span className="dashboard-divider-gem">✦</span>
       <span className="dashboard-divider-line" />
-    </div>
-  );
-}
-
-function ProgressArc({ pct, size = 48 }: { pct: number; size?: number }) {
-  const r = (size - 5) / 2;
-  const circ = 2 * Math.PI * r;
-  const dash = (Math.min(100, Math.max(0, pct)) / 100) * circ;
-  return (
-    <svg width={size} height={size} className="shrink-0" style={{ transform: "rotate(-90deg)" }} aria-hidden>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="color-mix(in srgb, var(--text-primary) 8%, transparent)"
-        strokeWidth={2.5}
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={r}
-        fill="none"
-        stroke="var(--accent)"
-        strokeWidth={2.5}
-        strokeDasharray={`${dash} ${circ - dash}`}
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function KpiCard({ label, value, sub, delayMs = 0 }: { label: string; value: string | number; sub?: string; delayMs?: number }) {
-  return (
-    <div
-      className="dashboard-kpi dashboard-stagger-item"
-      style={delayMs ? { animationDelay: `${delayMs}ms` } : undefined}
-    >
-      <div className="dashboard-kpi-label">{label}</div>
-      <div className="dashboard-kpi-value">{typeof value === "number" ? value.toLocaleString() : value}</div>
-      {sub ? <div className="dashboard-kpi-sub">{sub}</div> : null}
     </div>
   );
 }
@@ -572,226 +551,23 @@ export function DashboardClient({
     );
   }
 
-  function bookRow(b: (typeof reader.currentlyReading)[0], i: number, opts?: { staggerClass?: string }) {
-    const delay = reducedMotion ? 0 : i * 75;
-    const chTotal = Math.max(1, b.chapterCount);
-    const pctBar = Math.round((b.currentChapterNumber / chTotal) * 100);
+  function librarySettingsSection() {
     return (
-      <Link
-        key={b.bookId}
-        href={`/library?book=${b.bookId}`}
-        className={`dashboard-book-row ${opts?.staggerClass ?? "dashboard-stagger-item"} block no-underline`}
-        style={delay ? { animationDelay: `${delay}ms` } : undefined}
-      >
-        <div className="relative h-14 w-[42px] shrink-0 overflow-hidden rounded border border-border-subtle bg-bg-surface">
-          {b.coverImageUrl ? (
-            <Image src={b.coverImageUrl} alt="" fill className="object-cover brightness-[0.92]" sizes="42px" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-[10px] text-text-muted">—</div>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="dashboard-book-genre">{b.genreLabel}</div>
-          <div className="dashboard-book-title">{b.title}</div>
-          <div className="dashboard-book-author">by {b.author}</div>
-          <div className="dashboard-book-progress-track">
-            <div className="dashboard-book-progress-fill" style={{ width: `${Math.min(100, pctBar)}%` }} />
-          </div>
-          <div className="dashboard-book-meta-row">
-            <span>
-              CH. {b.currentChapterNumber} / {chTotal}
-            </span>
-            <span className="text-accent/90">{b.progressPercent}%</span>
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col items-center gap-1.5">
-          <div className="relative flex items-center justify-center">
-            <ProgressArc pct={b.progressPercent} />
-            <span className="pointer-events-none absolute font-mono text-[8px] text-accent/80">{b.progressPercent}%</span>
-          </div>
-          <div className="flex gap-2.5">
-            <div className="text-center">
-              <div className="font-mono text-[11px] text-accent/90">{b.queryCount}</div>
-              <div className="font-mono text-[7px] tracking-wide text-text-muted">Q&A</div>
-            </div>
-            <div className="text-center">
-              <div className="font-mono text-[11px] text-accent/90">{b.imageCount}</div>
-              <div className="font-mono text-[7px] tracking-wide text-text-muted">IMG</div>
-            </div>
-          </div>
-        </div>
-      </Link>
-    );
-  }
-
-  function overviewSection() {
-    const first = reader.currentlyReading[0];
-
-    // Collect actionable admin queue items with non-zero counts
-    const actionItems: { count: number; label: string; tab: DashboardTabSlug; icon: string }[] = admin
-      ? [
-          { count: admin.pendingReviewCount, label: "For Review", tab: "for-review" as const, icon: "✅" },
-          { count: admin.featureRequestsPendingCount, label: "Featured image requests", tab: "feature-approvals" as const, icon: "⭐" },
-          { count: admin.spoilerCommentsPendingCount, label: "Spoiler Comments", tab: "spoiler-comments" as const, icon: "⚠️" },
-          { count: admin.flaggedCommentsPendingCount, label: "Flagged Comments", tab: "flagged-comments" as const, icon: "🚩" },
-        ].filter((item) => item.count > 0)
-      : [];
-
-    return (
-      <div>
-        {/* Reader activity KPIs — 3 cards for reader/partner, 4 for admin (includes pending reviews) */}
-        <div
-          className={
-            role === "admin" && admin
-              ? "dashboard-kpi-grid dashboard-kpi-grid--3plus1"
-              : "dashboard-kpi-grid dashboard-kpi-grid--3"
-          }
-        >
-          <KpiCard label="Books in library" value={reader.stats.libraryBookCount} sub="Active in your library" delayMs={reducedMotion ? 0 : 80} />
-          <KpiCard label="Q&A sessions" value={reader.stats.queryCount} sub="Questions asked" delayMs={reducedMotion ? 0 : 140} />
-          <KpiCard label="Images created" value={reader.stats.generatedImageCount} sub="Across all books" delayMs={reducedMotion ? 0 : 200} />
-          {role === "admin" && admin ? (
-            <KpiCard
-              label="Pending reviews"
-              value={admin.pendingReviewCount}
-              sub="Books in queue"
-              delayMs={reducedMotion ? 0 : 260}
-            />
-          ) : null}
-        </div>
-
-        {/* Publisher snapshot — compact 4-stat row for partners and admins */}
-        {partner ? (
-          <div className="dashboard-kpi-grid dashboard-kpi-grid--4 mt-4">
-            <KpiCard label="Your books" value={partner.stats.totalBooks} sub="In catalogue" delayMs={reducedMotion ? 0 : 80} />
-            <KpiCard label="Readers" value={partner.stats.totalReaders} sub="Across all titles" delayMs={reducedMotion ? 0 : 120} />
-            <KpiCard label="Q&A queries" value={partner.stats.totalQueries} sub="On your books" delayMs={reducedMotion ? 0 : 160} />
-            <KpiCard label="Images generated" value={partner.stats.totalImages} sub="By readers" delayMs={reducedMotion ? 0 : 200} />
-          </div>
-        ) : null}
-
-        {/* Pending action items — admin only, only shown when there are items to act on */}
-        {actionItems.length > 0 ? (
-          <div className="dashboard-action-items">
-            <SectionLabel
-              label="Pending action items"
-              right={`${actionItems.reduce((s, item) => s + item.count, 0)} total`}
-            />
-            <div className="dashboard-action-pills">
-              {actionItems.map((item) => (
-                <button
-                  key={item.tab}
-                  type="button"
-                  className="dashboard-action-pill"
-                  onClick={() => pushTab(item.tab)}
-                >
-                  <span className="dashboard-action-pill-icon" aria-hidden>{item.icon}</span>
-                  <span className="dashboard-action-pill-count">{item.count}</span>
-                  <span className="dashboard-action-pill-label">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {first ? (
-          <div className="dashboard-cta-band">
-            {!reducedMotion ? <DiscoverParticleField /> : null}
-            <div className="dashboard-cta-band-inner min-w-0">
-              <div className="dashboard-cta-eyebrow">Continue reading</div>
-              <div className="dashboard-cta-title">
-                You&apos;re on Chapter {first.currentChapterNumber} of {first.title}.
-              </div>
-              <div className="dashboard-cta-sub">
-                {Math.max(0, first.chapterCount - first.currentChapterNumber)} chapters remaining — your AI companion is ready.
-              </div>
-            </div>
-            <div className="dashboard-cta-actions">
-              <Link
-                href={`/library?book=${first.bookId}`}
-                className="rounded border border-accent bg-accent px-5 py-2 font-mono text-[8px] font-bold uppercase tracking-widest text-text-primary transition hover:opacity-95"
-              >
-                Open reader →
-              </Link>
-              <Link
-                href={`/library?book=${first.bookId}`}
-                className="rounded border border-border-subtle px-4 py-2 font-mono text-[8px] uppercase tracking-widest text-text-muted transition hover:border-accent/40 hover:text-text-secondary"
-              >
-                Ask question
-              </Link>
-            </div>
-          </div>
-        ) : null}
-
-        <SectionLabel label="Currently reading" right={`${reader.currentlyReading.length} books`} />
-        <div className="flex flex-col gap-2">
-          {reader.currentlyReading.length === 0 ? (
-            <p className="text-sm text-text-secondary">No books in progress. Add a book from Discover and open it to start reading.</p>
-          ) : (
-            reader.currentlyReading.map((b, i) => bookRow(b, i))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  function readingSection() {
-    return (
-      <div>
-        <SectionLabel label="In progress" right={`${reader.currentlyReading.length} books`} />
-        <div className="flex flex-col gap-2">
-          {reader.currentlyReading.length === 0 ? (
-            <p className="text-sm text-text-secondary">No books in progress.</p>
-          ) : (
-            reader.currentlyReading.map((b, i) => bookRow(b, i))
-          )}
-        </div>
-      </div>
+      <DashboardLibrarySettings
+        stats={reader.stats}
+        libraryBooks={reader.libraryBooks}
+        reducedMotion={reducedMotion}
+      />
     );
   }
 
   function imagesSection() {
     return (
-      <div>
-        <SectionLabel label="Recent images" right={`${reader.recentImages.length} shown`} />
-        {reader.recentImages.length === 0 ? (
-          <p className="text-sm text-text-secondary">No images yet.</p>
-        ) : (
-          <div className="dashboard-image-strip">
-            {reader.recentImages.map((img, i) => {
-              const delay = reducedMotion ? 0 : i * 65;
-              return (
-                <Link
-                  key={img.id}
-                  href="/gallery"
-                  className="dashboard-image-thumb dashboard-stagger-item block overflow-hidden"
-                  style={delay ? { animationDelay: `${delay}ms` } : undefined}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element -- storage URLs */}
-                  <img src={img.imageUrl} alt="" className="dashboard-image-thumb-img" />
-                  <div
-                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"
-                    aria-hidden
-                  />
-                  <span
-                    className={`pointer-events-none absolute right-1.5 top-1.5 rounded-full border px-1.5 py-0.5 font-mono text-[7px] uppercase tracking-wide ${
-                      img.isPublic
-                        ? "border-success/45 bg-success/20 text-success"
-                        : "border-border-subtle bg-bg-overlay/40 text-text-muted"
-                    }`}
-                  >
-                    {img.isPublic ? "Public" : "Private"}
-                  </span>
-                  <div className="pointer-events-none absolute bottom-0 left-0 right-0 p-2">
-                    <div className="mb-0.5 font-mono text-[7px] uppercase tracking-widest text-accent/90">Ch.{img.chapterNumberAtTime}</div>
-                    <div className="line-clamp-2 font-serif text-[9px] leading-snug text-text-primary/90">{truncate(img.userPrompt, 80)}</div>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      <DashboardReaderImages
+        images={reader.recentImages}
+        reducedMotion={reducedMotion}
+        viewerRole={role}
+      />
     );
   }
 
@@ -842,7 +618,7 @@ export function DashboardClient({
             <span className="dashboard-upload-cta-arrow" aria-hidden>→</span>
           </div>
         </Link>
-        <SectionLabel label="Your published books" right={`${partner.stats.totalBooks} in catalogue`} />
+        <SectionLabel label="Published books" right={`${partner.stats.totalBooks} in catalogue`} />
         <PartnerDashboardBooksClient
           initialBooks={partner.initialBooks}
           initialHasMore={partner.initialHasMore}
@@ -918,9 +694,8 @@ export function DashboardClient({
   function mainInner() {
     switch (tab) {
       case "overview":
-        return overviewSection();
       case "reading":
-        return readingSection();
+        return librarySettingsSection();
       case "images":
         return imagesSection();
       case "queries":
@@ -957,6 +732,9 @@ export function DashboardClient({
             initialImages={partner.initialPartnerFeatureImages}
             initialHasMore={partner.initialPartnerFeatureImagesHasMore}
             pageSize={partner.partnerFeatureImagesPageSize}
+            initialQueries={partner.initialPartnerQueries}
+            initialQueriesHasMore={partner.initialPartnerQueriesHasMore}
+            queriesPageSize={partner.partnerQueriesPageSize}
             className="dashboard-partner-feature-wrap"
           />
         ) : null;
@@ -1020,7 +798,7 @@ export function DashboardClient({
       case "admin-stats":
         return adminStatsSection();
       default:
-        return overviewSection();
+        return librarySettingsSection();
     }
   }
 
@@ -1049,7 +827,7 @@ export function DashboardClient({
                 <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
                 <div className="dashboard-sidebar-name">{reader.displayName}</div>
               </div>
-              {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a Publisher */}
+              {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a partner */}
               <div className="dashboard-sidebar-cta-wrap">
                 {role === "reader" ? (
                   <button
@@ -1057,7 +835,7 @@ export function DashboardClient({
                     className="dashboard-sidebar-cta"
                     onClick={() => { pushTab("partner-program"); closeSidebar(); }}
                   >
-                    ✦ Become a Publisher
+                    ✦ Become a partner
                   </button>
                 ) : (
                   <Link

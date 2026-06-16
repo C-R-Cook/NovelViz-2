@@ -467,7 +467,7 @@ export function AccountPageClient({
                   className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
                 />
                 <span className="text-sm text-text-primary">
-                  <span className="font-medium">Gallery spoiler protection</span>
+                  <span className="font-medium">Public gallery spoiler protection</span>
                   <span className="mt-1 block text-text-secondary">
                     When enabled, hide gallery images and comments from chapters you have not reached yet.
                     Books in your library can still override this per book from the gallery.

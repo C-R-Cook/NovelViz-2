@@ -563,36 +563,97 @@
   flex-wrap: wrap;
 }
 
-.dashboard-image-thumb {
-  position: relative;
+.dashboard-image-card {
+  display: flex;
   width: 120px;
-  aspect-ratio: 3 / 4;
-  border-radius: 7px;
-  overflow: hidden;
+  flex-direction: column;
   flex-shrink: 0;
+  border-radius: 7px;
   border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  overflow: hidden;
   transition:
     border-color 0.2s ease,
     box-shadow 0.25s ease,
     transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.dashboard-image-thumb:hover {
+.dashboard-image-card:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   box-shadow: 0 12px 36px color-mix(in srgb, var(--text-primary) 12%, transparent);
   transform: translateY(-4px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dashboard-image-thumb:hover {
+  .dashboard-image-card:hover {
     transform: none;
   }
+}
+
+.dashboard-image-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  flex-shrink: 0;
+  background: var(--bg-base);
+  padding: 0;
+}
+
+.dashboard-image-share-btn {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.35rem 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.dashboard-image-share-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.dashboard-image-share-btn--public {
+  background: color-mix(in srgb, var(--success) 14%, var(--bg-surface));
+  color: var(--success);
+}
+
+.dashboard-image-share-btn--public:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error) 12%, var(--bg-surface));
+  color: var(--error);
+}
+
+.dashboard-image-share-btn--private {
+  background: var(--bg-surface);
+  color: var(--text-muted);
+}
+
+.dashboard-image-share-btn--private:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--success) 12%, var(--bg-surface));
+  color: var(--success);
 }
 
 .dashboard-image-thumb-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* Legacy selector — thumb hover styles moved to .dashboard-image-card */
+.dashboard-image-thumb:hover {
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
 }
 
 /* Partner books grid header + row (restyle) */

@@ -97,8 +97,8 @@ export function BookStatsClient({
           Readers over time
         </h2>
         <p className="mt-1 text-xs text-text-secondary">Cumulative adds to library for this title</p>
-        <div className="mt-4 h-[280px] w-full min-w-0">
-          <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" />
+        <div className="mt-4 h-[200px] w-full min-w-0 overflow-hidden">
+          <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" height={200} />
         </div>
       </section>
 

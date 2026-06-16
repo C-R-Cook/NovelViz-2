@@ -1,4 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
+import {
+  AdminEmailCategory,
+  absoluteAppUrl,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { canAccessBookCoverAi } from "@/lib/cover-ai-access";
 import { prisma } from "@/lib/prisma";
 import { resolveDbUserFromSession } from "@/lib/resolve-db-user-from-session";
@@ -24,6 +29,7 @@ export async function POST(_request: Request, context: RouteContext) {
     where: { id: bookId, deletedAt: null },
     select: {
       id: true,
+      title: true,
       ownerId: true,
       coverGenAttemptsConsumed: true,
       coverGenAttemptsGranted: true,
@@ -60,6 +66,25 @@ export async function POST(_request: Request, context: RouteContext) {
       bookId,
       requesterId: dbUser.id,
     },
+  });
+
+  const requester = await prisma.user.findUnique({
+    where: { id: dbUser.id },
+    select: { name: true, email: true, username: true },
+  });
+  const requesterName =
+    requester?.name?.trim() || requester?.username || dbUser.id;
+
+  sendAdminEmail({
+    category: AdminEmailCategory.COVER_AI_REQUEST,
+    subjectDetail: `"${book.title}" - ${requesterName}`,
+    bodyLines: [
+      { label: "Book", value: book.title },
+      { label: "Requester", value: `${requesterName} (${requester?.email ?? "no email"})` },
+      { label: "Generations granted", value: String(granted) },
+      { label: "Generations consumed", value: String(consumed) },
+      { label: "Admin book", value: absoluteAppUrl(`/admin/books/${bookId}`) },
+    ],
   });
 
   return NextResponse.json({ ok: true, alreadyPending: false });

@@ -56,7 +56,7 @@ export function SpoilerReviewGalleryModal({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={`Gallery preview: ${row.bookTitle}`}
+        aria-label={`Public gallery preview: ${row.bookTitle}`}
         className="relative flex h-[90dvh] max-h-[90dvh] min-h-0 w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-border bg-bg-surface shadow-2xl"
         onMouseDown={(e) => e.stopPropagation()}
       >

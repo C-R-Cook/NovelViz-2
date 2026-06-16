@@ -80,9 +80,10 @@ export function LibraryActiveBookBar({ book, chapters, progress }: Props) {
           <select
             value={selectedChapterId}
             onChange={(e) => void selectChapter(e.target.value)}
-            disabled={saving || !selectedChapterId}
+            disabled={saving || !selectedChapterId || book.removedFromCatalogue}
             className="library-active-book-bar-select"
             aria-busy={saving}
+            aria-disabled={book.removedFromCatalogue}
           >
             {chapters.map((c) => (
               <option key={c.id} value={c.id}>

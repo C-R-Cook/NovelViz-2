@@ -314,3 +314,23 @@ html[data-theme="moonlight-silver"]
   [role="button"]:is([class~="bg-accent/95"], [class~="bg-accent/90"], [class~="bg-accent/85"], [class~="bg-accent/80"]) {
   color: var(--text-on-accent) !important;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Image thumbnail bottom scrim — metadata row over generated/community art   */
+/* -------------------------------------------------------------------------- */
+.image-thumb-bottom-bar {
+  pointer-events: none;
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 5;
+  height: 48%;
+  min-height: 5.5rem;
+  background: linear-gradient(
+    to top,
+    rgb(0 0 0 / 0.94) 0%,
+    rgb(0 0 0 / 0.82) 24%,
+    rgb(0 0 0 / 0.52) 54%,
+    rgb(0 0 0 / 0) 100%
+  );
+}

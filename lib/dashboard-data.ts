@@ -35,11 +35,27 @@ import {
   queryPartnerFeatureImagesPage,
   type PartnerFeatureImageRow,
 } from "@/lib/partner-feature-images";
+import {
+  PARTNER_QUERIES_PAGE_SIZE,
+  queryPartnerQueriesPage,
+  type PartnerQueryRow,
+} from "@/lib/partner-queries";
 import { prisma } from "@/lib/prisma";
-import { FeatureRequestStatus } from "@db";
+import { CommentStatus, FeatureRequestStatus } from "@db";
 
 export type DashboardReaderData = {
   stats: { libraryBookCount: number; queryCount: number; generatedImageCount: number };
+  libraryBooks: {
+    bookId: string;
+    title: string;
+    author: string;
+    coverImageUrl: string | null;
+    currentChapterNumber: number | null;
+    chapterCount: number;
+    queryCount: number;
+    imageCount: number;
+    progressPercent: number;
+  }[];
   currentlyReading: {
     bookId: string;
     title: string;
@@ -62,11 +78,16 @@ export type DashboardReaderData = {
   }[];
   recentImages: {
     id: string;
+    bookId: string;
     imageUrl: string;
     bookTitle: string;
     chapterNumberAtTime: number;
     userPrompt: string;
+    fullPrompt: string;
     isPublic: boolean;
+    isFeatured: boolean;
+    likeCount: number;
+    commentCount: number;
     createdAtMs: number;
   }[];
 };
@@ -90,6 +111,9 @@ export type DashboardPartnerData = {
   initialPartnerFeatureImages: PartnerFeatureImageRow[];
   initialPartnerFeatureImagesHasMore: boolean;
   partnerFeatureImagesPageSize: number;
+  initialPartnerQueries: PartnerQueryRow[];
+  initialPartnerQueriesHasMore: boolean;
+  partnerQueriesPageSize: number;
 };
 
 export type DashboardAdminFeatureImagesInitial = {
@@ -178,6 +202,7 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
     libraryBookCount,
     queryCount,
     generatedImageCount,
+    userBooks,
     readingProgress,
     recentQueries,
     recentImages,
@@ -187,6 +212,21 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
     prisma.userBook.count({ where: { userId, isActive: true } }),
     prisma.query.count({ where: { userId } }),
     prisma.generatedImage.count({ where: { userId } }),
+    prisma.userBook.findMany({
+      where: { userId, isActive: true, book: { deletedAt: null } },
+      orderBy: { addedAt: "desc" },
+      include: {
+        book: {
+          select: {
+            id: true,
+            title: true,
+            author: true,
+            coverImageUrl: true,
+            _count: { select: { chapters: true } },
+          },
+        },
+      },
+    }),
     prisma.readingProgress.findMany({
       where: {
         userId,
@@ -225,12 +265,21 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
       take: 24,
       select: {
         id: true,
+        bookId: true,
         imageUrl: true,
         userPrompt: true,
+        fullPrompt: true,
         chapterNumberAtTime: true,
         isPublic: true,
+        isFeatured: true,
+        likeCount: true,
         createdAt: true,
         book: { select: { title: true } },
+        _count: {
+          select: {
+            comments: { where: { status: CommentStatus.VISIBLE } },
+          },
+        },
       },
     }),
     prisma.query.groupBy({
@@ -247,9 +296,30 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
 
   const qCountMap = new Map(queryByBook.map((r) => [r.bookId, r._count._all]));
   const imgCountMap = new Map(imageByBook.map((r) => [r.bookId, r._count._all]));
+  const progressMap = new Map(readingProgress.map((rp) => [rp.bookId, rp]));
+
+  const libraryBooks = userBooks.map((ub) => {
+    const chCount = Math.max(1, ub.book._count.chapters);
+    const rp = progressMap.get(ub.book.id);
+    const currentChapterNumber = rp?.currentChapterNumber ?? null;
+    const pct =
+      currentChapterNumber != null ? Math.round((currentChapterNumber / chCount) * 100) : 0;
+    return {
+      bookId: ub.book.id,
+      title: ub.book.title,
+      author: ub.book.author,
+      coverImageUrl: ub.book.coverImageUrl,
+      currentChapterNumber,
+      chapterCount: chCount,
+      queryCount: qCountMap.get(ub.book.id) ?? 0,
+      imageCount: imgCountMap.get(ub.book.id) ?? 0,
+      progressPercent: Math.min(100, pct),
+    };
+  });
 
   return {
     stats: { libraryBookCount, queryCount, generatedImageCount },
+    libraryBooks,
     currentlyReading: readingProgress.map((rp) => {
       const chCount = Math.max(1, rp.book._count.chapters);
       const pct = Math.round((rp.currentChapterNumber / chCount) * 100);
@@ -276,18 +346,24 @@ export async function loadReaderDashboardData(userId: string): Promise<Dashboard
     })),
     recentImages: recentImages.map((img) => ({
       id: img.id,
+      bookId: img.bookId,
       imageUrl: img.imageUrl,
       bookTitle: img.book.title,
       chapterNumberAtTime: img.chapterNumberAtTime,
       userPrompt: img.userPrompt,
+      fullPrompt: img.fullPrompt,
       isPublic: img.isPublic,
+      isFeatured: img.isFeatured,
+      likeCount: img.likeCount,
+      commentCount: img._count.comments,
       createdAtMs: img.createdAt.getTime(),
     })),
   };
 }
 
 export async function loadPartnerDashboardData(userId: string): Promise<DashboardPartnerData> {
-  const [stats, analytics, page0, ownFrRows, ownFrPending, partnerImagesPage] = await Promise.all([
+  const [stats, analytics, page0, ownFrRows, ownFrPending, partnerImagesPage, partnerQueriesPage] =
+    await Promise.all([
     fetchPartnerDashboardStats(userId),
     fetchPartnerAnalytics(userId),
     queryPartnerBooksPage({ ownerId: userId, skip: 0 }),
@@ -310,6 +386,7 @@ export async function loadPartnerDashboardData(userId: string): Promise<Dashboar
       where: { requestedBy: userId, status: FeatureRequestStatus.PENDING },
     }),
     queryPartnerFeatureImagesPage({ ownerId: userId, skip: 0 }),
+    queryPartnerQueriesPage({ ownerId: userId, skip: 0 }),
   ]);
 
   return {
@@ -331,6 +408,9 @@ export async function loadPartnerDashboardData(userId: string): Promise<Dashboar
     initialPartnerFeatureImages: partnerImagesPage.rows,
     initialPartnerFeatureImagesHasMore: partnerImagesPage.hasMore,
     partnerFeatureImagesPageSize: PARTNER_FEATURE_IMAGES_PAGE_SIZE,
+    initialPartnerQueries: partnerQueriesPage.rows,
+    initialPartnerQueriesHasMore: partnerQueriesPage.hasMore,
+    partnerQueriesPageSize: PARTNER_QUERIES_PAGE_SIZE,
   };
 }
 

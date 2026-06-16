@@ -74,8 +74,8 @@ export function PartnerDashboardAnalytics({ data }: { data: PartnerAnalyticsPayl
         {areaData.length === 0 ? (
           <p className="mt-4 text-sm text-text-muted">No reader data yet — stats will appear once readers start adding your books.</p>
         ) : (
-          <div className="mt-4 h-[200px] w-full min-w-0">
-            <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" />
+          <div className="mt-4 h-[200px] w-full min-w-0 overflow-hidden">
+            <ReadersOverTimeArea data={areaData} valueKey="cumulativeReaders" height={200} />
           </div>
         )}
       </div>

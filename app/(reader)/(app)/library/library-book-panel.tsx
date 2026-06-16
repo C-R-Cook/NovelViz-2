@@ -7,6 +7,8 @@ import ReactMarkdown from "react-markdown";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { AdminFeaturedImageToggle } from "@/components/gallery/admin-featured-image-toggle";
+import { GeneratedPromptFaqLink } from "@/components/generated-prompt-faq-link";
+import { PromptDetailsDisclosure } from "@/components/prompt-details-disclosure";
 import { ImageGenerationLoader } from "@/components/ui/image-generation-loader";
 import { ModalImageNavArrows } from "@/components/gallery/modal-image-nav-arrows";
 import { ModalImageSwipeView } from "@/components/gallery/modal-image-swipe-view";
@@ -462,9 +464,19 @@ export function LibraryBookPanel({
     </p>
   );
 
+  const delistedNotice = (
+    <p className="rounded-lg border border-border bg-bg-base/80 px-4 py-3 text-sm leading-relaxed text-text-secondary">
+      This book has been delisted from the catalogue by its publisher or a NovelViz administrator.
+      Ask a Question and Generate Image are not available for delisted titles. You can still view
+      images you created earlier.
+    </p>
+  );
+
   const aiSection =
     total === 0 ? (
       emptyNotice
+    ) : book.removedFromCatalogue ? (
+      delistedNotice
     ) : (
       <section className="library-book-tabs library-book-tabs--split">
               <div
@@ -776,11 +788,9 @@ export function LibraryBookPanel({
                   </button>
                 </div>
 
-                <details className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
-                  <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted sm:text-[11px]">
-                      Original Prompt
-                    </span>
+                <PromptDetailsDisclosure
+                  label="Original Prompt"
+                  actions={
                     <button
                       type="button"
                       title="Copy original prompt"
@@ -799,39 +809,42 @@ export function LibraryBookPanel({
                         <CopyIcon className="h-3.5 w-3.5" />
                       )}
                     </button>
-                  </summary>
+                  }
+                >
                   <p className="mt-2 text-xs text-text-primary sm:text-sm">
                     {selectedHistoryImage.userPrompt}
                   </p>
-                </details>
-                <details className="rounded-md border border-border bg-bg-base/60 px-3 py-2">
-                  <summary className="flex cursor-pointer list-none items-center gap-2 marker:content-none [&::-webkit-details-marker]:hidden">
-                    <span className="min-w-0 flex-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted sm:text-[11px]">
-                      Generated Prompt
-                    </span>
-                    <button
-                      type="button"
-                      title="Copy generated prompt"
-                      aria-label="Copy generated prompt"
-                      className="shrink-0 rounded p-1 text-text-muted transition hover:bg-bg-raised/80 hover:text-text-primary"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        void copyPromptText("generated", selectedHistoryImage.fullPrompt);
-                      }}
-                      onMouseDown={(e) => e.stopPropagation()}
-                    >
-                      {promptCopied === "generated" ? (
-                        <CheckIcon className="h-3.5 w-3.5 text-success" />
-                      ) : (
-                        <CopyIcon className="h-3.5 w-3.5" />
-                      )}
-                    </button>
-                  </summary>
+                </PromptDetailsDisclosure>
+                <PromptDetailsDisclosure
+                  label="Generated Prompt"
+                  actions={
+                    <>
+                      <GeneratedPromptFaqLink />
+                      <button
+                        type="button"
+                        title="Copy generated prompt"
+                        aria-label="Copy generated prompt"
+                        className="shrink-0 rounded p-1 text-text-muted transition hover:bg-bg-raised/80 hover:text-text-primary"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void copyPromptText("generated", selectedHistoryImage.fullPrompt);
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
+                        {promptCopied === "generated" ? (
+                          <CheckIcon className="h-3.5 w-3.5 text-success" />
+                        ) : (
+                          <CopyIcon className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </>
+                  }
+                >
                   <p className="mt-2 text-xs leading-relaxed text-text-secondary sm:text-sm">
                     {selectedHistoryImage.fullPrompt}
                   </p>
-                </details>
+                </PromptDetailsDisclosure>
               </div>
             </div>
           </div>

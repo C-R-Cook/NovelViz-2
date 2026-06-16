@@ -43,6 +43,10 @@ Set each variable for the right **environment** only (checkboxes: Production / P
 | `CLERK_SECRET_KEY` | Clerk **production** instance |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk **production** publishable key |
 | `CLERK_WEBHOOK_SECRET` | Webhook signing secret for prod Clerk → `https://<your-domain>/api/webhooks/clerk` |
+| `RESEND_API_KEY` | Resend API key (admin notification emails) |
+| `ADMIN_NOTIFICATION_EMAIL` | Admin inbox, e.g. `hello@novelviz.com` |
+| `EMAIL_FROM` | Verified sender, e.g. `NovelViz <notifications@novelviz.com>` |
+| `NEXT_PUBLIC_APP_URL` | Public site URL for links in emails, e.g. `https://novelviz.com` |
 | … | Other prod secrets (`OPENAI_API_KEY`, `CLOUDINARY_URL`, etc.) |
 
 Do **not** attach the dev Neon branch to Production.
@@ -91,6 +95,12 @@ OPENAI_API_KEY=...
 CLOUDINARY_URL=...
 # Scripts (Gutenberg ingest on dev DB):
 GUTENBERG_ADMIN_USER_ID=dev_user_admin
+
+# ─── Admin email (Resend — optional locally; logs instead of sending without key) ───
+# RESEND_API_KEY=re_...
+# ADMIN_NOTIFICATION_EMAIL=hello@novelviz.com
+# EMAIL_FROM="NovelViz <notifications@novelviz.com>"
+# NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # ─── Everything else you already use locally ───
 # BETA_MODE=true

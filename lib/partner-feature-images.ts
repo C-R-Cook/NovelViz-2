@@ -11,6 +11,7 @@ export type PartnerFeatureImageRow = {
   chapterNumberAtTime: number;
   createdAtMs: number;
   isFeatured: boolean;
+  isPublic: boolean;
   bookId: string;
   bookTitle: string;
   bookAuthor: string;
@@ -26,6 +27,7 @@ const imageSelect = {
   chapterNumberAtTime: true,
   createdAt: true,
   isFeatured: true,
+  isPublic: true,
   book: {
     select: {
       id: true,
@@ -49,6 +51,7 @@ function mapImageRow(img: ImageRow): PartnerFeatureImageRow {
     chapterNumberAtTime: img.chapterNumberAtTime,
     createdAtMs: img.createdAt.getTime(),
     isFeatured: img.isFeatured,
+    isPublic: img.isPublic,
     bookId: img.book.id,
     bookTitle: img.book.title,
     bookAuthor: img.book.author,
@@ -81,7 +84,6 @@ export async function queryPartnerFeatureImagesPage(args: {
 
   const rows = await prisma.generatedImage.findMany({
     where: {
-      isPublic: true,
       book: { ownerId: args.ownerId, deletedAt: null },
     },
     orderBy: { createdAt: "desc" },

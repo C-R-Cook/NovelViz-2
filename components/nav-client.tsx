@@ -139,6 +139,13 @@ export function NavChrome({
       >
         Discover
       </Link>
+      <Link
+        href="/gallery"
+        className={navLinkClass(isActive(pathname, "/gallery"))}
+        onClick={() => setMenuOpen(false)}
+      >
+        Public Gallery
+      </Link>
       {isLoggedIn ? (
         <Link
           href="/library"
@@ -148,13 +155,6 @@ export function NavChrome({
           My Library
         </Link>
       ) : null}
-      <Link
-        href="/gallery"
-        className={navLinkClass(isActive(pathname, "/gallery"))}
-        onClick={() => setMenuOpen(false)}
-      >
-        Gallery
-      </Link>
       {isLoggedIn ? (
         <Link
           href="/dashboard"

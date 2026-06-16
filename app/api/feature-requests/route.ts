@@ -1,4 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
+import {
+  AdminEmailCategory,
+  absoluteAppUrl,
+  sendAdminEmail,
+} from "@/lib/admin-email";
 import { prisma } from "@/lib/prisma";
 import { FeatureRequestStatus } from "@db";
 import { NextResponse } from "next/server";
@@ -69,6 +74,43 @@ export async function POST(request: Request) {
       status: true,
       createdAt: true,
     },
+  });
+
+  const details = await prisma.generatedImage.findUnique({
+    where: { id: image.id },
+    select: {
+      bookId: true,
+      chapterNumberAtTime: true,
+      userPrompt: true,
+      book: { select: { title: true } },
+    },
+  });
+
+  const requester = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { username: true, email: true, name: true },
+  });
+
+  const bookTitle = details?.book.title ?? "Unknown book";
+  const chapter = details?.chapterNumberAtTime ?? 0;
+  const galleryLink = `/gallery/${details?.bookId ?? image.bookId}?image=${encodeURIComponent(image.id)}`;
+
+  sendAdminEmail({
+    category: AdminEmailCategory.FEATURE_REQUEST,
+    subjectDetail: `"${bookTitle}" - Ch. ${chapter}`,
+    bodyLines: [
+      { label: "Book", value: bookTitle },
+      { label: "Chapter", value: String(chapter) },
+      { label: "Image prompt", value: details?.userPrompt ?? "(none)" },
+      {
+        label: "Requester",
+        value: requester
+          ? `${requester.name?.trim() || requester.username || user.id} (${requester.email})`
+          : user.id,
+      },
+      { label: "Public Gallery", value: absoluteAppUrl(galleryLink) },
+      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=feature-requests") },
+    ],
   });
 
   return NextResponse.json(created, { status: 201 });

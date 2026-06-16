@@ -36,7 +36,6 @@ export type DashboardNavEntry =
   | { kind: "link"; id: string; href: string; label: string; icon: string };
 
 const READER_TABS: DashboardTabSlug[] = [
-  "overview",
   "reading",
   "images",
   "queries",
@@ -58,8 +57,8 @@ const ADMIN_EXTRA: DashboardTabSlug[] = [
 
 function allowedTabsForRole(role: DashboardUserRole): Set<DashboardTabSlug> {
   if (role === "reader") return new Set(READER_TABS);
-  if (role === "partner") return new Set([...READER_TABS.slice(0, 4), ...PARTNER_EXTRA, "account"]);
-  return new Set([...READER_TABS.slice(0, 4), ...PARTNER_EXTRA, ...ADMIN_EXTRA, "account"]);
+  if (role === "partner") return new Set([...READER_TABS.slice(0, 3), ...PARTNER_EXTRA, "account"]);
+  return new Set([...READER_TABS.slice(0, 3), ...PARTNER_EXTRA, ...ADMIN_EXTRA, "account"]);
 }
 
 /** Flat list of selectable tabs for URL parsing (no dividers). */
@@ -67,80 +66,66 @@ export function dashboardTabsForRole(role: DashboardUserRole): DashboardTabSlug[
   return [...allowedTabsForRole(role)];
 }
 
-/** Sidebar structure: tabs, group labels, optional badges (resolved in UI from counts).
- *  Reader nav is intentionally flat — the CTA button at the top handles partner-program navigation.
- *  Partner and Admin navs use group-label entries as visual section dividers.
- */
+const READER_NAV: DashboardNavEntry[] = [
+  { kind: "group-label", id: "gl-reader-settings", label: "Reader Settings" },
+  { kind: "tab", tab: "reading", icon: "📚" },
+  { kind: "tab", tab: "images", icon: "🖼️" },
+  { kind: "tab", tab: "queries", icon: "💬" },
+];
+
+const PARTNER_NAV: DashboardNavEntry[] = [
+  { kind: "group-label", id: "gl-partner-settings", label: "Partner Settings" },
+  { kind: "tab", tab: "my-books", icon: "📖" },
+  { kind: "tab", tab: "stats", icon: "📊" },
+  { kind: "tab", tab: "feature-requests", icon: "✨", badge: "partnerFeatReq" },
+];
+
+const ADMIN_NAV: DashboardNavEntry[] = [
+  { kind: "group-label", id: "gl-admin-settings", label: "Admin Settings" },
+  { kind: "tab", tab: "for-review", icon: "✅", badge: "forReview" },
+  { kind: "tab", tab: "feature-approvals", icon: "⭐", badge: "featureApprovals" },
+  { kind: "tab", tab: "spoiler-comments", icon: "⚠️", badge: "spoilerComments" },
+  { kind: "tab", tab: "flagged-comments", icon: "🚩", badge: "flaggedComments" },
+  { kind: "tab", tab: "all-books", icon: "📋" },
+  { kind: "tab", tab: "all-users", icon: "👥" },
+  { kind: "tab", tab: "admin-stats", icon: "📈" },
+  { kind: "link", id: "admin-book-requests", href: "/admin/requests", label: "Book requests", icon: "📖" },
+  { kind: "divider", id: "d-helpers" },
+  { kind: "helpers", id: "admin-helpers" },
+  { kind: "divider", id: "d-gutenberg" },
+  ...GUTENBERG_ADMIN_NAV_LINKS.map((link) => ({
+    kind: "link" as const,
+    id: link.id,
+    href: link.href,
+    label: link.label,
+    icon: link.icon,
+  })),
+];
+
+/** Sidebar structure: account first, then role-scoped setting sections. */
 export function dashboardNavForRole(role: DashboardUserRole): DashboardNavEntry[] {
-  const base: DashboardNavEntry[] = [
-    { kind: "tab", tab: "overview", icon: "🏠" },
-    { kind: "tab", tab: "reading", icon: "📖" },
-    { kind: "tab", tab: "images", icon: "🖼️" },
-    { kind: "tab", tab: "queries", icon: "💬" },
-  ];
-  if (role === "reader") {
-    // partner-program tab accessible via the sidebar CTA button; not listed here to keep reader nav clean.
-    return [
-      ...base,
-      { kind: "divider", id: "d-reader-account" },
-      { kind: "tab", tab: "account", icon: "👤" },
-    ];
-  }
-  const partnerBlock: DashboardNavEntry[] = [
-    { kind: "group-label", id: "gl-publisher", label: "Publisher" },
-    { kind: "tab", tab: "my-books", icon: "📚" },
-    { kind: "tab", tab: "stats", icon: "📊" },
-    { kind: "tab", tab: "feature-requests", icon: "⭐", badge: "partnerFeatReq" },
-  ];
-  if (role === "partner") {
-    return [
-      { kind: "group-label", id: "gl-reader", label: "Reader" },
-      ...base,
-      ...partnerBlock,
-      { kind: "divider", id: "d2" },
-      { kind: "tab", tab: "account", icon: "👤" },
-    ];
-  }
-  const adminBlock: DashboardNavEntry[] = [
-    { kind: "group-label", id: "gl-moderation", label: "Moderation" },
-    { kind: "tab", tab: "for-review", icon: "✅", badge: "forReview" },
-    { kind: "tab", tab: "feature-approvals", icon: "⭐", badge: "featureApprovals" },
-    { kind: "tab", tab: "spoiler-comments", icon: "⚠️", badge: "spoilerComments" },
-    { kind: "tab", tab: "flagged-comments", icon: "🚩", badge: "flaggedComments" },
-    { kind: "group-label", id: "gl-admin", label: "Administration" },
-    { kind: "tab", tab: "all-books", icon: "📋" },
-    { kind: "tab", tab: "all-users", icon: "👥" },
-    { kind: "tab", tab: "admin-stats", icon: "📈" },
-    { kind: "link", id: "admin-book-requests", href: "/admin/requests", label: "Book requests", icon: "📖" },
-    { kind: "divider", id: "d-helpers" },
-    { kind: "helpers", id: "admin-helpers" },
-    { kind: "divider", id: "d-gutenberg" },
-    ...GUTENBERG_ADMIN_NAV_LINKS.map((link) => ({
-      kind: "link" as const,
-      id: link.id,
-      href: link.href,
-      label: link.label,
-      icon: link.icon,
-    })),
-    { kind: "divider", id: "d3" },
+  const accountBlock: DashboardNavEntry[] = [
     { kind: "tab", tab: "account", icon: "👤" },
+    { kind: "divider", id: "d-after-account" },
   ];
-  return [
-    { kind: "group-label", id: "gl-reader", label: "Reader" },
-    ...base,
-    ...partnerBlock,
-    ...adminBlock,
-  ];
+
+  if (role === "reader") {
+    return [...accountBlock, ...READER_NAV];
+  }
+  if (role === "partner") {
+    return [...accountBlock, ...READER_NAV, ...PARTNER_NAV];
+  }
+  return [...accountBlock, ...READER_NAV, ...PARTNER_NAV, ...ADMIN_NAV];
 }
 
 export function defaultDashboardTab(role: DashboardUserRole): DashboardTabSlug {
   void role;
-  return "overview";
+  return "reading";
 }
 
 function normalizeRawTab(role: DashboardUserRole, raw: string | undefined): string | undefined {
   if (!raw) return undefined;
-  if (raw === "reader") return "overview";
+  if (raw === "reader" || raw === "overview") return "reading";
   if (raw === "analytics") return "stats";
   return raw;
 }
@@ -159,21 +144,21 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
     case "overview":
       return "Overview";
     case "reading":
-      return "Currently Reading";
+      return "Library settings";
     case "images":
       return "My Images";
     case "queries":
       return "Q&A History";
     case "partner-program":
-      return "Publisher Program";
+      return "Partner Program";
     case "account":
       return "Account";
     case "my-books":
-      return "My Books";
+      return "Published books";
     case "stats":
       return "Analytics";
     case "feature-requests":
-      return "Request Featured Images";
+      return "Image and Q&A";
     case "for-review":
       return "For Review";
     case "feature-approvals":

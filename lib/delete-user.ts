@@ -100,3 +100,13 @@ export async function deleteUserCompletely(
   await deleteClerkAccount(user.clerkId);
   await deleteUserData(userId);
 }
+
+/** DB-only cleanup when Clerk has already removed the user (e.g. `user.deleted` webhook). */
+export async function deleteUserDataByClerkId(clerkId: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { clerkId },
+    select: { id: true },
+  });
+  if (!user) return;
+  await deleteUserData(user.id);
+}

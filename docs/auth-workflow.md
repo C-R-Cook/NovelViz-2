@@ -35,9 +35,25 @@ Account menu → **Sign out** → Clerk session cleared → `/`.
 ### DB user creation
 
 - **Primary:** Clerk webhook `user.created` → `POST /api/webhooks/clerk`  
+- **Updates:** `user.updated` syncs email/name; `user.deleted` removes the DB user  
 - **Fallback:** `ensureDbUserForClerk()` on first `getCurrentUser()` if webhook missed
 
 Ensure `CLERK_WEBHOOK_SECRET` is set in production.
+
+### Webhook URL (avoid 307 failures)
+
+Clerk (via Svix) sends `POST` requests and **does not replay the body** if your server responds with a redirect. A `307` in the Clerk dashboard usually means the request never reached the route handler.
+
+Configure the endpoint **exactly**:
+
+| Check | Correct |
+|-------|---------|
+| Path | `https://<your-domain>/api/webhooks/clerk` — **no** trailing slash |
+| Host | Use the same host users visit (`www` vs apex must match; Vercel may 307 between them) |
+| Protocol | `https` in production |
+| Events | Subscribe to `user.created`, `user.updated`, and `user.deleted` |
+
+The app rewrites `/api/webhooks/clerk/` → `/api/webhooks/clerk` internally and marks `/api/webhooks/*` as public in `proxy.ts` so Clerk middleware does not intercept webhook POSTs.
 
 ## Local development
 
@@ -60,7 +76,7 @@ Clears dev cookie + redirects home. If Clerk is signed in, also runs Clerk sign-
 ## Deploy checklist
 
 - [ ] Clerk production instance + `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY`  
-- [ ] Webhook endpoint → `/api/webhooks/clerk` with `user.created`  
+- [ ] Webhook endpoint → `https://<prod-domain>/api/webhooks/clerk` (no trailing slash; match `www` if the site uses it) with `user.created`, `user.updated`, `user.deleted`  
 - [ ] `CLERK_WEBHOOK_SECRET` in env  
 - [ ] Smoke test: sign-up → onboarding → library  
 - [ ] Smoke test: sign-in → library (existing user with username)  

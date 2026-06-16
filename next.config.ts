@@ -13,6 +13,13 @@ const nextConfig: NextConfig = {
       { source: "/books/:id", destination: "/discover/:id", permanent: true },
     ];
   },
+  /** Avoid 307/308 on webhook POSTs when the provider URL includes a trailing slash. */
+  async rewrites() {
+    return [
+      { source: "/api/webhooks/clerk/", destination: "/api/webhooks/clerk" },
+      { source: "/api/webhooks/stripe/", destination: "/api/webhooks/stripe" },
+    ];
+  },
   images: {
     remotePatterns: [
       {

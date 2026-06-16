@@ -5,6 +5,10 @@ import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 
 /** Next.js 16 Clerk middleware entry (this file replaces the legacy `middleware.ts` name). */
 
+const isPublicRoute = createRouteMatcher([
+  "/api/webhooks(.*)",
+]);
+
 const isProtectedAppRoute = createRouteMatcher([
   "/library(.*)",
   "/dashboard(.*)",
@@ -24,6 +28,11 @@ function hasDevSession(req: { cookies: { get: (name: string) => { value?: string
 }
 
 export default clerkMiddleware(async (auth, req) => {
+  // Webhooks must bypass Clerk auth entirely — POST bodies are not replayed on redirects.
+  if (isPublicRoute(req)) {
+    return NextResponse.next();
+  }
+
   if (isProtectedAppRoute(req)) {
     const guestPreview = hasDevGuestMode(req.cookies.get(DEV_GUEST_COOKIE)?.value);
     if (guestPreview) {

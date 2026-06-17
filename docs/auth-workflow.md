@@ -32,6 +32,13 @@ Clerk `SignIn` / `SignUp` components use `forceRedirectUrl="/auth/after"`.
 
 Account menu → **Sign out** → Clerk session cleared → `/`.
 
+### Email change (account page)
+
+Users change email inline on **Profile** via Clerk (`createEmailAddress` → verify code → promote primary → remove old). Neon `User.email` syncs on the `user.updated` webhook (not via `/api/account` PATCH).
+
+- **Component:** [`components/account/email-change-section.tsx`](../components/account/email-change-section.tsx)
+- **Dev role switcher:** UI visible; **Change email** disabled until signed in with Clerk
+
 ### DB user creation
 
 - **Primary:** Clerk webhook `user.created` → `POST /api/webhooks/clerk`  
@@ -44,14 +51,24 @@ Ensure `CLERK_WEBHOOK_SECRET` is set in production.
 
 Clerk (via Svix) sends `POST` requests and **does not replay the body** if your server responds with a redirect. A `307` in the Clerk dashboard usually means the request never reached the route handler.
 
+**Production check (June 2026):** `https://novelviz.com/...` returns **307 → `https://www.novelviz.com/...`**. The Clerk endpoint must use **`www`**:
+
+`https://www.novelviz.com/api/webhooks/clerk`
+
 Configure the endpoint **exactly**:
 
 | Check | Correct |
 |-------|---------|
-| Path | `https://<your-domain>/api/webhooks/clerk` — **no** trailing slash |
-| Host | Use the same host users visit (`www` vs apex must match; Vercel may 307 between them) |
+| Path | `https://www.novelviz.com/api/webhooks/clerk` — **no** trailing slash |
+| Host | **`www.novelviz.com`** — not `novelviz.com` (apex redirects with 307) |
 | Protocol | `https` in production |
 | Events | Subscribe to `user.created`, `user.updated`, and `user.deleted` |
+
+Quick test from a terminal (unsigned POST should return **400**, not 307):
+
+```bash
+curl -sI -X POST https://www.novelviz.com/api/webhooks/clerk
+```
 
 The app rewrites `/api/webhooks/clerk/` → `/api/webhooks/clerk` internally and marks `/api/webhooks/*` as public in `proxy.ts` so Clerk middleware does not intercept webhook POSTs.
 
@@ -76,7 +93,7 @@ Clears dev cookie + redirects home. If Clerk is signed in, also runs Clerk sign-
 ## Deploy checklist
 
 - [ ] Clerk production instance + `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY`  
-- [ ] Webhook endpoint → `https://<prod-domain>/api/webhooks/clerk` (no trailing slash; match `www` if the site uses it) with `user.created`, `user.updated`, `user.deleted`  
+- [ ] Webhook endpoint → `https://www.novelviz.com/api/webhooks/clerk` (must use `www`; apex `novelviz.com` 307-redirects and breaks Svix POSTs)  
 - [ ] `CLERK_WEBHOOK_SECRET` in env  
 - [ ] Smoke test: sign-up → onboarding → library  
 - [ ] Smoke test: sign-in → library (existing user with username)  

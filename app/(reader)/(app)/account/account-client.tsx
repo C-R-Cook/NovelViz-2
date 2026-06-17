@@ -1,7 +1,10 @@
 "use client";
 
 import { useAuth, useClerk } from "@clerk/nextjs";
+import { HelpCircle } from "lucide-react";
+import { EmailChangeSection } from "@/components/account/email-change-section";
 import { AGE_RANGE_OPTIONS, type AgeRange } from "@/lib/age-range";
+import { accountInputClass, accountLabelClass } from "@/lib/account-form-styles";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { COUNTRY_CODES, COUNTRY_OPTIONS } from "@/lib/countries";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
@@ -11,13 +14,14 @@ import { userInitials } from "@/lib/user-initials";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-accent/80 focus:ring-2 focus:ring-accent/25";
-
-const labelClass = "block text-sm font-medium text-text-primary";
+const inputClass = accountInputClass;
+const labelClass = accountLabelClass;
 
 const sectionClass =
   "rounded-xl border border-border bg-bg-surface/90 p-6 shadow-sm";
+
+const SPOILER_PROTECTION_TOOLTIP =
+  "When enabled, hide gallery images and comments from chapters you have not reached yet. Books in your library can still override this per book from the gallery.";
 
 export type AccountPageClientProps = {
   viewerId: string;
@@ -202,6 +206,7 @@ export function AccountPageClient({
           country: country || null,
           ageRange: ageRange || null,
           gender: gender || null,
+          subscribedToMailingList,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -228,7 +233,6 @@ export function AccountPageClient({
         body: JSON.stringify({
           globalSpoilerProtection,
           genrePreferences,
-          subscribedToMailingList,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -356,15 +360,7 @@ export function AccountPageClient({
                   }}
                 />
               </div>
-              <div>
-                <span className={labelClass}>Email</span>
-                <p className="mt-1 rounded-md border border-border bg-bg-base px-3 py-2 text-sm text-text-secondary">
-                  {initialUser.email}
-                </p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Email is managed by Clerk and cannot be changed here.
-                </p>
-              </div>
+              <EmailChangeSection fallbackEmail={initialUser.email} />
               {profileError ? (
                 <p className="text-sm text-error" role="alert">
                   {profileError}
@@ -389,7 +385,7 @@ export function AccountPageClient({
             About you
           </h2>
           <p className="mt-2 text-sm text-text-secondary">
-            Optional details that help us understand our readership.
+            Optional — helps us tailor book picks and featured titles to you.
           </p>
           <form className="mt-6 space-y-4" onSubmit={(e) => void saveAboutYou(e)}>
             <div>
@@ -455,6 +451,20 @@ export function AccountPageClient({
                 ))}
               </select>
             </div>
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={subscribedToMailingList}
+                onChange={(e) => {
+                  setSubscribedToMailingList(e.target.checked);
+                  setAboutOk(false);
+                }}
+                className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
+              />
+              <span className="text-sm text-text-primary">
+                Keep me updated about new books, features and early access offers
+              </span>
+            </label>
             {aboutError ? (
               <p className="text-sm text-error" role="alert">
                 {aboutError}
@@ -478,26 +488,6 @@ export function AccountPageClient({
             Reading preferences
           </h2>
           <form className="mt-6 space-y-6" onSubmit={(e) => void saveReadingPreferences(e)}>
-            <div className="rounded-lg border border-border/80 bg-bg-base/50 p-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={globalSpoilerProtection}
-                  onChange={(e) => {
-                    setGlobalSpoilerProtection(e.target.checked);
-                    setReadingPrefsOk(false);
-                  }}
-                  className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
-                />
-                <span className="text-sm text-text-primary">
-                  <span className="font-medium">Public gallery spoiler protection</span>
-                  <span className="mt-1 block text-text-secondary">
-                    When enabled, hide gallery images and comments from chapters you have not reached yet.
-                    Books in your library can still override this per book from the gallery.
-                  </span>
-                </span>
-              </label>
-            </div>
             <div>
               <span className={labelClass}>Genre preferences</span>
               <p className="mt-1 text-xs text-text-muted">Select all that apply.</p>
@@ -522,18 +512,25 @@ export function AccountPageClient({
                 })}
               </div>
             </div>
-            <label className="flex cursor-pointer items-start gap-3">
+            <label className="flex cursor-pointer items-center gap-3">
               <input
                 type="checkbox"
-                checked={subscribedToMailingList}
+                checked={globalSpoilerProtection}
                 onChange={(e) => {
-                  setSubscribedToMailingList(e.target.checked);
+                  setGlobalSpoilerProtection(e.target.checked);
                   setReadingPrefsOk(false);
                 }}
-                className="mt-1 h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
+                className="h-4 w-4 rounded border-border text-accent-text focus:ring-accent/30"
               />
-              <span className="text-sm text-text-primary">
-                Keep me updated about new books, features and early access offers
+              <span className="flex items-center gap-1.5 text-sm text-text-primary">
+                <span className="font-medium">Public gallery spoiler protection</span>
+                <span
+                  className="inline-flex text-text-muted"
+                  title={SPOILER_PROTECTION_TOOLTIP}
+                  aria-label={SPOILER_PROTECTION_TOOLTIP}
+                >
+                  <HelpCircle className="h-3.5 w-3.5" strokeWidth={2} aria-hidden />
+                </span>
               </span>
             </label>
             {readingPrefsError ? (

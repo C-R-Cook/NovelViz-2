@@ -48,7 +48,7 @@ function deriveUserFields(data: ClerkUserPayload) {
   const primary =
     data.email_addresses?.find((e) => e.id === data.primary_email_address_id) ??
     data.email_addresses?.[0];
-  const email = primary?.email_address ?? "";
+  const email = primary?.email_address ?? null;
   const nameFromParts = [data.first_name, data.last_name].filter(Boolean).join(" ");
   const name = nameFromParts || data.username || null;
   return { email, name };
@@ -63,12 +63,12 @@ async function upsertUserFromClerk(data: ClerkUserPayload) {
     where: { clerkId: data.id },
     create: {
       clerkId: data.id,
-      email,
+      email: email ?? "",
       name,
       usagePeriodAnchor: anchorDay,
     },
     update: {
-      email,
+      ...(email ? { email } : {}),
       name,
     },
   });
@@ -102,9 +102,19 @@ async function syncUserFromClerk(data: ClerkUserPayload) {
   }
 
   const { email, name } = deriveUserFields(data);
+  const updateData: { email?: string; name: string | null } = { name };
+
+  if (email) {
+    updateData.email = email;
+  } else {
+    console.warn(`${LOG_PREFIX} user sync: no primary email in payload, skipping email update`, {
+      clerkId: data.id,
+    });
+  }
+
   await prisma.user.update({
     where: { clerkId: data.id },
-    data: { email, name },
+    data: updateData,
   });
 }
 

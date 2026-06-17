@@ -67,8 +67,7 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
     setError(null);
   }
 
-  async function sendVerificationCode(e: React.FormEvent) {
-    e.preventDefault();
+  async function sendVerificationCode() {
     if (!user || !canChangeEmail) return;
 
     const trimmed = newEmail.trim().toLowerCase();
@@ -96,8 +95,7 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
     }
   }
 
-  async function verifyAndPromote(e: React.FormEvent) {
-    e.preventDefault();
+  async function verifyAndPromote() {
     if (!user || !pendingEmailAddress || !canChangeEmail) return;
 
     const code = verificationCode.trim();
@@ -179,7 +177,7 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
       ) : null}
 
       {flow === "enter-email" ? (
-        <form className="mt-1 space-y-3" onSubmit={(e) => void sendVerificationCode(e)}>
+        <div className="mt-1 space-y-3">
           <input
             id="account-new-email"
             type="email"
@@ -191,6 +189,12 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
               setNewEmail(e.target.value);
               setError(null);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void sendVerificationCode();
+              }
+            }}
             placeholder="New email address"
             disabled={busy}
           />
@@ -201,8 +205,9 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
           ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              type="submit"
+              type="button"
               disabled={busy}
+              onClick={() => void sendVerificationCode()}
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
             >
               {busy ? "Sending…" : "Send verification code"}
@@ -216,11 +221,11 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
               Cancel
             </button>
           </div>
-        </form>
+        </div>
       ) : null}
 
       {flow === "verify-code" && pendingEmailAddress ? (
-        <form className="mt-1 space-y-3" onSubmit={(e) => void verifyAndPromote(e)}>
+        <div className="mt-1 space-y-3">
           <p className="text-sm text-text-secondary">
             We sent a 6-digit code to{" "}
             <span className="font-medium text-text-primary">{newEmail.trim()}</span>
@@ -238,6 +243,12 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
               setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6));
               setError(null);
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void verifyAndPromote();
+              }
+            }}
             placeholder="000000"
             disabled={busy}
           />
@@ -248,8 +259,9 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
           ) : null}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              type="submit"
+              type="button"
               disabled={busy}
+              onClick={() => void verifyAndPromote()}
               className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-text-inverse shadow transition hover:bg-accent disabled:opacity-60"
             >
               {busy ? "Verifying…" : "Verify"}
@@ -267,7 +279,7 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
               Use a different email
             </button>
           </div>
-        </form>
+        </div>
       ) : null}
     </div>
   );

@@ -310,11 +310,12 @@ export function AccountPageClient({
             >
               {avatarInitials}
             </div>
-            <form className="min-w-0 flex-1 space-y-4" onSubmit={(e) => void saveProfile(e)}>
-              <div>
-                <label htmlFor="account-username" className={labelClass}>
-                  Username
-                </label>
+            <div className="min-w-0 flex-1 space-y-4">
+              <form className="space-y-4" onSubmit={(e) => void saveProfile(e)}>
+                <div>
+                  <label htmlFor="account-username" className={labelClass}>
+                    Username
+                  </label>
                 <div className="relative mt-1">
                   <input
                     id="account-username"
@@ -360,7 +361,6 @@ export function AccountPageClient({
                   }}
                 />
               </div>
-              <EmailChangeSection fallbackEmail={initialUser.email} />
               {profileError ? (
                 <p className="text-sm text-error" role="alert">
                   {profileError}
@@ -376,7 +376,9 @@ export function AccountPageClient({
               >
                 {profileSaving ? "Saving…" : "Save profile"}
               </button>
-            </form>
+              </form>
+              <EmailChangeSection fallbackEmail={initialUser.email} />
+            </div>
           </div>
         </section>
 

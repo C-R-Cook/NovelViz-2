@@ -175,11 +175,12 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
   }, [reducedMotion]);
 
   useEffect(() => {
+    if (isLoggedIn) return;
     const onScroll = () => setNavScrolled(window.scrollY > 40);
     queueMicrotask(() => onScroll());
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [isLoggedIn]);
 
   const NAV_SCROLL_OFFSET = 72;
 
@@ -215,41 +216,37 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
     <div className="landing-root">
       <div className="landing-glow" aria-hidden />
 
-      <nav
-        className={`landing-nav${navScrolled ? " landing-nav--scrolled" : ""}`}
-        aria-label="Landing"
-      >
-        <Link href="/" className="landing-nav-brand">
-          <span className="landing-nav-wordmark">NovelViz</span>
-        </Link>
+      {!isLoggedIn ? (
+        <nav
+          className={`landing-nav${navScrolled ? " landing-nav--scrolled" : ""}`}
+          aria-label="Landing"
+        >
+          <Link href="/" className="landing-nav-brand">
+            <span className="landing-nav-wordmark">NovelViz</span>
+          </Link>
 
-        <div className="landing-nav-links">
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("how-it-works")}>
-            How it works
-          </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("features")}>
-            Features
-          </button>
-          <button type="button" className="landing-nav-link" onClick={() => scrollToSection("gallery")}>
-            Public Gallery
-          </button>
-        </div>
+          <div className="landing-nav-links">
+            <button type="button" className="landing-nav-link" onClick={() => scrollToSection("how-it-works")}>
+              How it works
+            </button>
+            <button type="button" className="landing-nav-link" onClick={() => scrollToSection("features")}>
+              Features
+            </button>
+            <button type="button" className="landing-nav-link" onClick={() => scrollToSection("gallery")}>
+              Public Gallery
+            </button>
+          </div>
 
-        <div className="landing-nav-actions">
-          {isLoggedIn ? (
-            <Link href="/library" className="landing-nav-signin">
-              My Library
-            </Link>
-          ) : (
+          <div className="landing-nav-actions">
             <Link href="/login" className="landing-nav-signin">
               Sign In
             </Link>
-          )}
-          <Link href={joinBetaHref} className="landing-nav-cta">
-            Join Beta →
-          </Link>
-        </div>
-      </nav>
+            <Link href={joinBetaHref} className="landing-nav-cta">
+              Join Beta →
+            </Link>
+          </div>
+        </nav>
+      ) : null}
 
       <section className={`landing-hero${heroIn ? " landing-hero-in" : ""}`}>
         {!reducedMotion ? (

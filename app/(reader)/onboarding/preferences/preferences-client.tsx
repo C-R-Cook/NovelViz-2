@@ -165,8 +165,8 @@ export function PreferencesClient({
             Your full name <span className="text-accent-text">*</span>
           </label>
           <p className="onboarding-preferences__hint">
-            Your real name for account and partnership enquiries. This is private and not shown in the
-            gallery.
+            Your real name for account and partnership enquiries. This is private and never shown to other
+            users on NovelViz.
           </p>
           <input
             id="onb-full-name"

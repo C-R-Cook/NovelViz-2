@@ -290,6 +290,14 @@ export function GalleryClient(props: GalleryClientSessionProps) {
     [filteredLibraryRows],
   );
 
+  /** First visible gallery card — Next.js LCP candidate on /gallery. */
+  const firstLcpBookId = useMemo(() => {
+    for (const row of [...filteredLibraryRows, ...filteredDiscoveryRows]) {
+      if (row.images.length > 0) return row.bookId;
+    }
+    return null;
+  }, [filteredLibraryRows, filteredDiscoveryRows]);
+
   function canLikeImage(image: GalleryImageCard): boolean {
     if (isGalleryCoverFallbackImageId(image.id)) return false;
     if (!canLike) return false;
@@ -622,6 +630,7 @@ export function GalleryClient(props: GalleryClientSessionProps) {
                           key={row.bookId}
                           row={row}
                           variant="library"
+                          priorityFirstImage={row.bookId === firstLcpBookId}
                           carouselIds={modalCarouselIds}
                           viewerUserId={props.viewerUserId}
                           isAdmin={props.isAdmin}
@@ -670,6 +679,7 @@ export function GalleryClient(props: GalleryClientSessionProps) {
                         key={row.bookId}
                         row={row}
                         variant="discovery"
+                        priorityFirstImage={row.bookId === firstLcpBookId}
                         carouselIds={modalCarouselIds}
                         viewerUserId={props.viewerUserId}
                         isAdmin={props.isAdmin}

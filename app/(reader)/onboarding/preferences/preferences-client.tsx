@@ -1,6 +1,7 @@
 "use client";
 
 import { clearPlanStepCompleteCookie } from "@/lib/onboarding-cookies";
+import { DISPLAY_NAME_MAX, DISPLAY_NAME_MIN } from "@/lib/display-name";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
 import { GENDERS, ONBOARDING_AGE_RANGE_OPTIONS } from "@/lib/user-profile-options";
 import { isValidUsernameFormat } from "@/lib/username";
@@ -15,6 +16,7 @@ countries.registerLocale(enLocale);
 type CheckState = "idle" | "checking" | "available" | "taken" | "invalid";
 
 type Props = {
+  initialName: string;
   initialUsername: string;
   legacyGenresOnly: boolean;
   previewMode?: boolean;
@@ -25,11 +27,13 @@ const COUNTRY_OPTIONS = Object.entries(countries.getNames("en", { select: "offic
   .sort((a, b) => a.name.localeCompare(b.name));
 
 export function PreferencesClient({
+  initialName,
   initialUsername,
   legacyGenresOnly,
   previewMode = false,
 }: Props) {
   const router = useRouter();
+  const [fullName, setFullName] = useState(initialName);
   const [username, setUsername] = useState(initialUsername);
   const [checkState, setCheckState] = useState<CheckState>(
     legacyGenresOnly ? "available" : "idle",
@@ -42,6 +46,10 @@ export function PreferencesClient({
   const [subscribedToMailingList, setSubscribedToMailingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitErr, setSubmitErr] = useState<string | null>(null);
+
+  const trimmedName = fullName.trim().replace(/\s+/g, " ");
+  const nameOk =
+    trimmedName.length >= DISPLAY_NAME_MIN && trimmedName.length <= DISPLAY_NAME_MAX;
 
   const trimmed = username.trim();
   const normalized = trimmed.toLowerCase();
@@ -95,6 +103,7 @@ export function PreferencesClient({
   };
 
   const canSubmit =
+    nameOk &&
     formatOk &&
     (legacyGenresOnly || checkState === "available") &&
     genrePreferences.length > 0 &&
@@ -118,6 +127,7 @@ export function PreferencesClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: trimmedName,
           username: normalized,
           genrePreferences,
           ageRange: ageRange || null,
@@ -150,6 +160,34 @@ export function PreferencesClient({
         onSubmit={(e) => void onSubmit(e)}
         className="onboarding-preferences__form"
       >
+        <div>
+          <label htmlFor="onb-full-name" className="onboarding-preferences__label">
+            Your full name <span className="text-accent-text">*</span>
+          </label>
+          <p className="onboarding-preferences__hint">
+            Your real name for account and partnership enquiries. This is private and not shown in the
+            gallery.
+          </p>
+          <input
+            id="onb-full-name"
+            name="name"
+            type="text"
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="onboarding-preferences__input mt-2"
+            placeholder="Jane Smith"
+            maxLength={DISPLAY_NAME_MAX}
+            required
+            aria-invalid={fullName.trim().length > 0 && !nameOk}
+          />
+          {fullName.trim().length > 0 && !nameOk ? (
+            <p className="mt-1.5 text-xs text-error/90">
+              Enter {DISPLAY_NAME_MIN}–{DISPLAY_NAME_MAX} characters.
+            </p>
+          ) : null}
+        </div>
+
         <div>
           <label htmlFor="onb-username" className="onboarding-preferences__label">
             Choose a username <span className="text-accent-text">*</span>

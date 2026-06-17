@@ -1,14 +1,13 @@
-"use client";
+﻿"use client";
 
-import { type FormEvent, useCallback, useState } from "react";
 import Link from "next/link";
+import { type FormEvent, useCallback, useState } from "react";
 
 type Props = {
-  lockedFullName: string;
+  lockedName: string | null;
   lockedUsername: string | null;
   lockedEmail: string;
 };
-
 function PartnerGemDivider() {
   return (
     <div className="dashboard-section-divider" aria-hidden>
@@ -67,10 +66,11 @@ function IconCatalogue({ className }: { className?: string }) {
   );
 }
 
-export function DashboardPartnerSection({ lockedFullName, lockedUsername, lockedEmail }: Props) {
-  const usernameFieldValue = lockedUsername ? `@${lockedUsername}` : "—";
-
-  const [pseudonym, setPseudonym] = useState("");
+export function DashboardPartnerSection({ lockedName, lockedUsername, lockedEmail }: Props) {
+  const fullNameValue = lockedName?.trim() || "";
+  const usernameValue = lockedUsername?.trim() || "";
+  const hasFullName = fullNameValue.length > 0;
+  const canSubmit = hasFullName;
   const [publisherName, setPublisherName] = useState("");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [catalogueDescription, setCatalogueDescription] = useState("");
@@ -88,8 +88,7 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            pseudonym: pseudonym.trim() || undefined,
-            publisherName,
+            publisherName: publisherName.trim() || undefined,
             websiteUrl: websiteUrl.trim() || undefined,
             catalogueDescription,
           }),
@@ -106,7 +105,7 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
         setSubmitting(false);
       }
     },
-    [pseudonym, publisherName, websiteUrl, catalogueDescription],
+    [publisherName, websiteUrl, catalogueDescription],
   );
 
   return (
@@ -133,9 +132,9 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
           <div className="dashboard-partner-card-icon" aria-hidden>
             <IconAnalytics className="dashboard-partner-card-svg" />
           </div>
-          <h3 className="dashboard-partner-card-title">Chapter-level analytics</h3>
+          <h3 className="dashboard-partner-card-title">Chapter engagement insights</h3>
           <p className="dashboard-partner-card-copy">
-            See exactly where readers slow down, what they ask, and which chapters spark the most conversation. Reader intelligence, not just download counts.
+            See which chapters draw the most questions and images, how far readers have progressed, and what they&apos;re asking—real engagement signals from your catalogue.
           </p>
         </article>
         <article className="dashboard-partner-card dashboard-partner-reveal" data-stagger="3">
@@ -148,14 +147,6 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
           </p>
         </article>
       </div>
-
-      <p className="dashboard-partner-faq-note dashboard-partner-reveal" data-stagger="4">
-        The same topics in a formal Q&amp;A format live in our{" "}
-        <Link href="/faq#publisher-partnership" className="dashboard-partner-faq-note-link">
-          FAQ
-        </Link>
-        .
-      </p>
 
       <PartnerGemDivider />
 
@@ -220,32 +211,45 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
             </p>
             <form className="dashboard-partner-form" onSubmit={onSubmit}>
               <p className="dashboard-partner-locked-hint">
-                Your NovelViz account details below are included with this request and cannot be changed here.
+                Your NovelViz account details below are included with this request. Update them in{" "}
+                <Link href="/dashboard?tab=account" className="dashboard-partner-faq-note-link">
+                  Account settings
+                </Link>
+                .
               </p>
+              {!hasFullName ? (
+                <p className="dashboard-partner-error" role="alert">
+                  Add your full name in{" "}
+                  <Link href="/dashboard?tab=account" className="dashboard-partner-faq-note-link">
+                    Account settings
+                  </Link>{" "}
+                  before submitting this form.
+                </p>
+              ) : null}
               <div className="dashboard-partner-field-row">
                 <label className="dashboard-partner-field">
                   <span className="dashboard-partner-label">Full name</span>
                   <input
                     className="dashboard-partner-input dashboard-partner-input--locked"
                     name="lockedFullName"
-                    autoComplete="off"
-                    value={lockedFullName}
+                    autoComplete="name"
+                    value={hasFullName ? fullNameValue : "—"}
                     disabled
                     tabIndex={-1}
                     aria-readonly="true"
                   />
                 </label>
                 <label className="dashboard-partner-field">
-                  <span className="dashboard-partner-label">Username</span>
+                  <span className="dashboard-partner-label">Gallery username</span>
                   <input
                     className="dashboard-partner-input dashboard-partner-input--locked"
                     name="lockedUsername"
-                    autoComplete="off"
-                    value={usernameFieldValue}
+                    autoComplete="username"
+                    value={usernameValue || "—"}
                     disabled
                     tabIndex={-1}
                     aria-readonly="true"
-                    aria-label={lockedUsername ? `Username ${usernameFieldValue}` : "No username on your account"}
+                    aria-label={usernameValue ? `Gallery username ${usernameValue}` : "No gallery username on your account"}
                   />
                 </label>
               </div>
@@ -262,32 +266,18 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
                   aria-readonly="true"
                 />
               </label>
-              <div className="dashboard-partner-field-row">
-                <label className="dashboard-partner-field">
-                  <span className="dashboard-partner-label">
-                    Pseudonym <span className="dashboard-partner-optional">(optional)</span>
-                  </span>
-                  <input
-                    className="dashboard-partner-input"
-                    name="pseudonym"
-                    autoComplete="nickname"
-                    placeholder="How you'd like to be addressed in replies"
-                    value={pseudonym}
-                    onChange={(ev) => setPseudonym(ev.target.value)}
-                    maxLength={120}
-                  />
-                </label>
-                <label className="dashboard-partner-field">
-                  <span className="dashboard-partner-label">Publisher or author name / imprint</span>
-                  <input
-                    className="dashboard-partner-input"
-                    name="publisherName"
-                    value={publisherName}
-                    onChange={(ev) => setPublisherName(ev.target.value)}
-                    required
-                  />
-                </label>
-              </div>
+              <label className="dashboard-partner-field">
+                <span className="dashboard-partner-label">
+                  Publisher name <span className="dashboard-partner-optional">(optional)</span>
+                </span>
+                <input
+                  className="dashboard-partner-input"
+                  name="publisherName"
+                  value={publisherName}
+                  onChange={(ev) => setPublisherName(ev.target.value)}
+                  maxLength={200}
+                />
+              </label>
               <label className="dashboard-partner-field">
                 <span className="dashboard-partner-label">
                   Website or social link <span className="dashboard-partner-optional">(optional)</span>
@@ -320,7 +310,7 @@ export function DashboardPartnerSection({ lockedFullName, lockedUsername, locked
                 </p>
               ) : null}
               <div className="dashboard-partner-submit-wrap">
-                <button type="submit" className="dashboard-partner-submit" disabled={submitting}>
+                <button type="submit" className="dashboard-partner-submit" disabled={submitting || !canSubmit}>
                   {submitting ? "Sending…" : "Send Expression of Interest"}
                 </button>
               </div>

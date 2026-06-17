@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { parseDisplayName } from "@/lib/display-name";
 import { findDbProfileForSession } from "@/lib/session-profile";
 import { prisma } from "@/lib/prisma";
 import { isValidUsernameFormat } from "@/lib/username";
@@ -91,6 +92,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
+  const nameParsed = parseDisplayName(b.name);
+  const needsName = !me.name?.trim();
+  if (needsName && !nameParsed) {
+    return NextResponse.json({ error: "Please enter your full name" }, { status: 400 });
+  }
+  if (b.name !== undefined && b.name !== null && b.name !== "" && !nameParsed) {
+    return NextResponse.json({ error: "Please enter a valid full name" }, { status: 400 });
+  }
+
   const hasUsername = Boolean(me.username?.trim());
   const legacyGenresOnly = hasUsername && me.genrePreferences.length === 0;
 
@@ -128,6 +138,7 @@ export async function POST(request: Request) {
           ageRange,
           subscribedToMailingList,
           genrePreferences,
+          ...(nameParsed ? { name: nameParsed } : {}),
           ...(countryParsed !== undefined ? { country: countryParsed } : {}),
         },
       });
@@ -143,6 +154,7 @@ export async function POST(request: Request) {
           ageRange,
           subscribedToMailingList,
           genrePreferences,
+          ...(nameParsed ? { name: nameParsed } : {}),
           ...(countryParsed !== undefined ? { country: countryParsed } : {}),
         },
       });

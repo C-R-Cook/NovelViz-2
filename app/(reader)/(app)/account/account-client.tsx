@@ -346,7 +346,7 @@ export function AccountPageClient({
               </div>
               <div>
                 <label htmlFor="account-name" className={labelClass}>
-                  Name
+                  Full name
                 </label>
                 <input
                   id="account-name"

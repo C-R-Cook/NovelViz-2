@@ -2,6 +2,7 @@ import { verifyWebhook } from "@clerk/backend/webhooks";
 import { NextResponse } from "next/server";
 
 import { deleteUserDataByClerkId } from "@/lib/delete-user";
+import { nameFromClerkParts } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -49,8 +50,7 @@ function deriveUserFields(data: ClerkUserPayload) {
     data.email_addresses?.find((e) => e.id === data.primary_email_address_id) ??
     data.email_addresses?.[0];
   const email = primary?.email_address ?? null;
-  const nameFromParts = [data.first_name, data.last_name].filter(Boolean).join(" ");
-  const name = nameFromParts || data.username || null;
+  const name = nameFromClerkParts(data);
   return { email, name };
 }
 
@@ -69,7 +69,7 @@ async function upsertUserFromClerk(data: ClerkUserPayload) {
     },
     update: {
       ...(email ? { email } : {}),
-      name,
+      ...(name ? { name } : {}),
     },
   });
 
@@ -102,7 +102,7 @@ async function syncUserFromClerk(data: ClerkUserPayload) {
   }
 
   const { email, name } = deriveUserFields(data);
-  const updateData: { email?: string; name: string | null } = { name };
+  const updateData: { email?: string; name?: string } = {};
 
   if (email) {
     updateData.email = email;
@@ -110,6 +110,14 @@ async function syncUserFromClerk(data: ClerkUserPayload) {
     console.warn(`${LOG_PREFIX} user sync: no primary email in payload, skipping email update`, {
       clerkId: data.id,
     });
+  }
+
+  if (name) {
+    updateData.name = name;
+  }
+
+  if (Object.keys(updateData).length === 0) {
+    return;
   }
 
   await prisma.user.update({

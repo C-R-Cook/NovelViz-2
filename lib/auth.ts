@@ -10,6 +10,7 @@ import {
   resolveDevUserIdFromCookies,
 } from "@/lib/dev-users";
 import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
+import { nameFromClerkParts } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
 import type { UserRole } from "@db";
 
@@ -72,8 +73,10 @@ async function ensureDbUserForClerk(clerkUserId: string): Promise<DbUserForSessi
     clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId) ??
     clerkUser.emailAddresses[0];
   const email = primary?.emailAddress ?? "";
-  const nameFromParts = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ");
-  const name = nameFromParts || clerkUser.username || null;
+  const name = nameFromClerkParts({
+    first_name: clerkUser.firstName,
+    last_name: clerkUser.lastName,
+  });
   const signupDay = new Date().getDate();
   const anchorDay = Math.min(signupDay, 28);
 
@@ -85,7 +88,10 @@ async function ensureDbUserForClerk(clerkUserId: string): Promise<DbUserForSessi
       name,
       usagePeriodAnchor: anchorDay,
     },
-    update: { email, name },
+    update: {
+      email,
+      ...(name ? { name } : {}),
+    },
     select: userSelect,
   });
 }

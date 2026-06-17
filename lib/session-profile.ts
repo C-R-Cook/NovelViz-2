@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export type SessionProfileRow = {
   id: string;
+  name: string | null;
   username: string | null;
   genrePreferences: string[];
 };
@@ -11,6 +12,7 @@ export type OnboardingStage = "plan" | "preferences" | "complete";
 
 const profileSelect = {
   id: true,
+  name: true,
   username: true,
   genrePreferences: true,
 } as const;
@@ -48,6 +50,9 @@ export function getOnboardingStage(
   }
   if (!profile?.username?.trim()) {
     return options?.planStepComplete ? "preferences" : "plan";
+  }
+  if (!profile?.name?.trim()) {
+    return "preferences";
   }
   return "complete";
 }

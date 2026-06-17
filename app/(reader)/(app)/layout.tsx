@@ -31,6 +31,7 @@ export default async function ReaderAppShellLayout({
     (process.env.NODE_ENV !== "production" && DEV_USERS_BY_ID[session.id]
       ? {
           id: session.id,
+          name: session.name,
           username: session.username ?? session.id,
           genrePreferences: ["fiction"],
         }

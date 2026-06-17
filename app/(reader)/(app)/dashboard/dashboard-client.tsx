@@ -703,7 +703,7 @@ export function DashboardClient({
       case "partner-program":
         return (
           <DashboardPartnerSection
-            lockedFullName={account.user.name?.trim() || reader.displayName}
+            lockedName={account.user.name}
             lockedUsername={reader.username?.trim() || null}
             lockedEmail={reader.email}
           />
@@ -864,30 +864,47 @@ export function DashboardClient({
           </div>
 
           <main className="dashboard-main">
-            <div key={tab} className="dashboard-section-head dashboard-section-head--animate">
-              <div className="dashboard-section-head-row">
-                <div className="dashboard-section-head-text">
-                  <div className="dashboard-section-eyebrow">
-                    {reader.displayName} · {roleDisplayLabel}
-                  </div>
-                  {tab !== "partner-program" ? (
-                    <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
-                  ) : null}
+            {tab === "partner-program" ? (
+              <div className="dashboard-section-head dashboard-section-head--partner-program">
+                <div className="dashboard-section-head-row">
+                  <button
+                    type="button"
+                    className="dashboard-sidebar-toggle"
+                    aria-expanded={sidebarOpen}
+                    aria-controls="dashboard-sidebar"
+                    onClick={() => setSidebarOpen((o) => !o)}
+                  >
+                    <SidebarToggleIcon open={sidebarOpen} />
+                    <span className="dashboard-sidebar-toggle-label">
+                      {sidebarOpen ? "Close" : "Menu"}
+                    </span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="dashboard-sidebar-toggle"
-                  aria-expanded={sidebarOpen}
-                  aria-controls="dashboard-sidebar"
-                  onClick={() => setSidebarOpen((o) => !o)}
-                >
-                  <SidebarToggleIcon open={sidebarOpen} />
-                  <span className="dashboard-sidebar-toggle-label">
-                    {sidebarOpen ? "Close" : "Menu"}
-                  </span>
-                </button>
               </div>
-            </div>
+            ) : (
+              <div key={tab} className="dashboard-section-head dashboard-section-head--animate">
+                <div className="dashboard-section-head-row">
+                  <div className="dashboard-section-head-text">
+                    <div className="dashboard-section-eyebrow">
+                      {reader.displayName} · {roleDisplayLabel}
+                    </div>
+                    <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
+                  </div>
+                  <button
+                    type="button"
+                    className="dashboard-sidebar-toggle"
+                    aria-expanded={sidebarOpen}
+                    aria-controls="dashboard-sidebar"
+                    onClick={() => setSidebarOpen((o) => !o)}
+                  >
+                    <SidebarToggleIcon open={sidebarOpen} />
+                    <span className="dashboard-sidebar-toggle-label">
+                      {sidebarOpen ? "Close" : "Menu"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
             {mainInner()}
           </main>
         </div>

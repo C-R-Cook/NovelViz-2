@@ -13,7 +13,6 @@ const MAX = {
   publisherName: 200,
   websiteUrl: 2000,
   catalogueDescription: 12000,
-  pseudonym: 120,
 };
 
 function trimStr(v: unknown, max: number): string | null {
@@ -52,13 +51,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid JSON body." }, { status: 400 });
   }
 
-  const publisherName = trimStr(body.publisherName, MAX.publisherName);
+  const publisherNameRaw = optionalTrim(body.publisherName, MAX.publisherName);
   const catalogueDescription = trimStr(body.catalogueDescription, MAX.catalogueDescription);
   const websiteUrlRaw = optionalTrim(body.websiteUrl, MAX.websiteUrl);
-  const pseudonymRaw = optionalTrim(body.pseudonym, MAX.pseudonym);
 
-  if (!publisherName) {
-    return NextResponse.json({ message: "Publisher or author name / imprint is required." }, { status: 400 });
+  if (publisherNameRaw === null) {
+    return NextResponse.json({ message: "Publisher name is too long." }, { status: 400 });
   }
   if (!catalogueDescription) {
     return NextResponse.json({ message: "Please tell us about your catalogue." }, { status: 400 });
@@ -66,16 +64,21 @@ export async function POST(request: Request) {
   if (websiteUrlRaw === null) {
     return NextResponse.json({ message: "Website or social link is too long." }, { status: 400 });
   }
-  if (pseudonymRaw === null) {
-    return NextResponse.json({ message: "Pseudonym is too long." }, { status: 400 });
-  }
+
+  const publisherName = publisherNameRaw || null;
 
   const email = dbUser.email.trim();
   if (!email.includes("@")) {
     return NextResponse.json({ message: "Your account email is invalid; please update it in Account settings." }, { status: 400 });
   }
 
-  const name = dbUser.name?.trim() || email.split("@")[0] || "Reader";
+  const name = dbUser.name?.trim();
+  if (!name) {
+    return NextResponse.json(
+      { message: "Please add your full name in Account settings before applying." },
+      { status: 400 },
+    );
+  }
 
   await prisma.partnerRequest.create({
     data: {
@@ -83,7 +86,6 @@ export async function POST(request: Request) {
       name,
       email,
       accountUsername: dbUser.username?.trim() || null,
-      pseudonym: pseudonymRaw || null,
       publisherName,
       websiteUrl: websiteUrlRaw || null,
       catalogueNote: catalogueDescription,
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
 
   sendAdminEmail({
     category: AdminEmailCategory.PARTNER_REQUEST,
-    subjectDetail: `${publisherName} - ${name}`,
+    subjectDetail: publisherName ? `${publisherName} - ${name}` : `Partner request - ${name}`,
     bodyLines: [
       { label: "Source", value: "Dashboard form" },
       { label: "Name", value: name },
@@ -100,8 +102,7 @@ export async function POST(request: Request) {
       ...(dbUser.username?.trim()
         ? [{ label: "Username", value: dbUser.username.trim() }]
         : []),
-      ...(pseudonymRaw ? [{ label: "Pseudonym", value: pseudonymRaw }] : []),
-      { label: "Publisher / imprint", value: publisherName },
+      ...(publisherName ? [{ label: "Publisher", value: publisherName }] : []),
       ...(websiteUrlRaw ? [{ label: "Website", value: websiteUrlRaw }] : []),
       { label: "Catalogue", value: catalogueDescription },
     ],

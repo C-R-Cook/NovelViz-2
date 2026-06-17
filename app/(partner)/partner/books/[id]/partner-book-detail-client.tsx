@@ -864,7 +864,7 @@ export function PartnerBookDetailClient({
                         }
                       />
                       <Field
-                        label="Author"
+                        label="Author / Pseudonym"
                         value={author}
                         onChange={setAuthor}
                         required

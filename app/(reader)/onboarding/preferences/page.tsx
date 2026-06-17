@@ -37,6 +37,13 @@ export default async function OnboardingPreferencesPage() {
   }
 
   const initialUsername = profile.username?.trim() ?? "";
+  const initialName = profile.name?.trim() ?? "";
 
-  return <PreferencesClient initialUsername={initialUsername} legacyGenresOnly={Boolean(initialUsername)} />;
+  return (
+    <PreferencesClient
+      initialName={initialName}
+      initialUsername={initialUsername}
+      legacyGenresOnly={Boolean(initialUsername)}
+    />
+  );
 }

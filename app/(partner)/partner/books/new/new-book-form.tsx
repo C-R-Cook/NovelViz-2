@@ -209,7 +209,7 @@ export function NewPartnerBookForm() {
         </label>
         <label className="block space-y-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-text-muted">
-            Author
+            Author / Pseudonym
           </span>
           <input
             value={author}

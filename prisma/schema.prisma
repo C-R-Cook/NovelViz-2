@@ -495,7 +495,7 @@ model PartnerRequest {
   email            String
   accountUsername  String?
   pseudonym        String?
-  publisherName    String
+  publisherName    String?
   websiteUrl       String?
   catalogueNote    String   @db.Text
   createdAt        DateTime @default(now())

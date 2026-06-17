@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
+import { parseDisplayName } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
 import { isValidUsernameFormat } from "@/lib/username";
 import { AgeRange, BookGenre, Gender } from "@db";
@@ -63,11 +64,14 @@ export async function PATCH(request: Request) {
   } = {};
 
   if ("name" in b) {
-    if (b.name === null || b.name === undefined) {
+    if (b.name === null || b.name === undefined || b.name === "") {
       data.name = null;
     } else if (typeof b.name === "string") {
-      const trimmed = b.name.trim();
-      data.name = trimmed.length ? trimmed : null;
+      const parsed = parseDisplayName(b.name);
+      if (!parsed) {
+        return NextResponse.json({ error: "Please enter a valid full name" }, { status: 400 });
+      }
+      data.name = parsed;
     } else {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }

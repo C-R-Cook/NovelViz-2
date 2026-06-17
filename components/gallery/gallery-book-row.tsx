@@ -30,6 +30,8 @@ type Props = {
   addLibraryPending?: boolean;
   onOpenCoverFallback?: (bookId: string) => void;
   onOpenBookGallery?: (bookId: string) => void;
+  /** Marks the first above-the-fold card for LCP preload (see /gallery). */
+  priorityFirstImage?: boolean;
 };
 
 function HeartIcon({ className, filled }: { className?: string; filled?: boolean }) {
@@ -82,6 +84,7 @@ function GalleryRowImageCard({
   onOpenImage,
   isCoverFallback,
   onOpenCoverFallback,
+  priority,
 }: {
   image: GalleryImageCard;
   carouselIds: string[];
@@ -96,6 +99,7 @@ function GalleryRowImageCard({
   onOpenImage: (carouselIds: string[], index: number) => void;
   isCoverFallback?: boolean;
   onOpenCoverFallback?: (bookId: string) => void;
+  priority?: boolean;
 }) {
   const locked = isAdmin ? false : image.isLocked;
   const isOwnImage = viewerUserId !== null && viewerUserId === image.userId;
@@ -158,6 +162,8 @@ function GalleryRowImageCard({
           alt={isCoverFallback ? `${image.bookTitle} cover` : image.userPrompt}
           fill
           unoptimized
+          priority={priority}
+          loading={priority ? "eager" : undefined}
           className={`object-cover transition-[filter] duration-200 ${locked ? "blur-[24px]" : "blur-0"} ${isCoverFallback ? "object-top" : ""}`}
           sizes="(max-width: 767px) 66vw, 180px"
         />
@@ -335,6 +341,7 @@ export function GalleryBookRow({
   addLibraryPending,
   onOpenCoverFallback,
   onOpenBookGallery,
+  priorityFirstImage = false,
 }: Props) {
   const { scrollRef, stripClassName, pointerHandlers } = useHorizontalDragScroll({
     enabled: enableDragScroll,
@@ -381,6 +388,7 @@ export function GalleryBookRow({
             onOpenImage={onOpenImage}
             isCoverFallback={row.isCoverFallback}
             onOpenCoverFallback={onOpenCoverFallback}
+            priority={priorityFirstImage && index === 0}
           />
         ))}
         {variant === "discovery" ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth, useUser } from "@clerk/nextjs";
+import { useAuth, useReverification, useUser } from "@clerk/nextjs";
 import {
   accountInputClass,
   accountLabelClass,
@@ -39,6 +39,23 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const { user, isLoaded } = useUser();
+
+  const createEmailAddress = useReverification((email: string) => {
+    if (!user) throw new Error("Not signed in");
+    return user.createEmailAddress({ email });
+  });
+
+  const setPrimaryEmailAddress = useReverification((primaryEmailAddressId: string) => {
+    if (!user) throw new Error("Not signed in");
+    return user.update({ primaryEmailAddressId });
+  });
+
+  const destroyEmailAddress = useReverification((emailAddressId: string) => {
+    if (!user) throw new Error("Not signed in");
+    const emailAddress = user.emailAddresses.find((e) => e.id === emailAddressId);
+    if (!emailAddress) throw new Error("Email address not found");
+    return emailAddress.destroy();
+  });
 
   const [flow, setFlow] = useState<FlowState>("default");
   const [newEmail, setNewEmail] = useState("");
@@ -84,7 +101,12 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
     setError(null);
     setSuccessMessage(null);
     try {
-      const emailAddress = await user.createEmailAddress({ email: trimmed });
+      const created = await createEmailAddress(trimmed);
+      await user.reload();
+
+      const emailAddress =
+        user.emailAddresses.find((a) => a.id === created.id) ?? created;
+
       await emailAddress.prepareVerification({ strategy: "email_code" });
       setPendingEmailAddress(emailAddress);
       setFlow("verify-code");
@@ -115,11 +137,10 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
       }
 
       const oldPrimaryId = user.primaryEmailAddressId;
-      await user.update({ primaryEmailAddressId: pendingEmailAddress.id });
+      await setPrimaryEmailAddress(pendingEmailAddress.id);
 
-      const oldPrimary = user.emailAddresses.find((e) => e.id === oldPrimaryId);
-      if (oldPrimary && oldPrimary.id !== pendingEmailAddress.id) {
-        await oldPrimary.destroy();
+      if (oldPrimaryId && oldPrimaryId !== pendingEmailAddress.id) {
+        await destroyEmailAddress(oldPrimaryId);
       }
 
       await user.reload();
@@ -178,6 +199,9 @@ export function EmailChangeSection({ fallbackEmail }: Props) {
 
       {flow === "enter-email" ? (
         <div className="mt-1 space-y-3">
+          <p className="text-xs text-text-muted">
+            You may be asked to confirm your identity before we can add a new email.
+          </p>
           <input
             id="account-new-email"
             type="email"

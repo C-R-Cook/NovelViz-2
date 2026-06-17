@@ -36,6 +36,7 @@ Account menu → **Sign out** → Clerk session cleared → `/`.
 
 Users change email inline on **Profile** via Clerk (`createEmailAddress` → verify code → promote primary → remove old). Neon `User.email` syncs on the `user.updated` webhook (not via `/api/account` PATCH).
 
+- **Reverification:** Sensitive steps use Clerk `useReverification()` — a Clerk modal confirms identity (e.g. code to current email). Without it, `createEmailAddress` returns **403**.
 - **Component:** [`components/account/email-change-section.tsx`](../components/account/email-change-section.tsx)
 - **Dev role switcher:** UI visible; **Change email** disabled until signed in with Clerk
 

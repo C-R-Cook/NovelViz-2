@@ -81,7 +81,7 @@ export async function queryAdminFeatureImagesPage(args: {
       ? { isFeatured: true }
       : args.filter === "book" && args.bookId
         ? { bookId: args.bookId }
-        : {};
+        : { isFeatured: false };
 
   const rows = await prisma.generatedImage.findMany({
     where,

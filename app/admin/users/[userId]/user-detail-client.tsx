@@ -306,7 +306,7 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
         return;
       }
       setDeleteOpen(false);
-      router.push("/admin/users");
+      router.push("/dashboard?tab=all-users");
       router.refresh();
     } catch {
       setDeleteErr("Could not delete user");
@@ -373,14 +373,6 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
 
   return (
     <div className="space-y-6">
-      <nav className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
-        <Link href="/admin/users" className="hover:text-accent-text hover:underline">
-          All users
-        </Link>
-        <span aria-hidden>/</span>
-        <span className="text-text-primary">{loading ? "…" : displayName}</span>
-      </nav>
-
       {betaMode ? (
         <div
           role="status"

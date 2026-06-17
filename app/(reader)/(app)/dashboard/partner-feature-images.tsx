@@ -51,15 +51,17 @@ function PartnerFeatureImageCard({
   image,
   busy,
   onRequest,
+  isAdminViewer,
 }: {
   image: PartnerFeatureImageRow;
   busy: boolean;
   onRequest: (imageId: string) => void;
+  isAdminViewer?: boolean;
 }) {
   const pending = image.featureRequest?.status === "PENDING";
   const rejected = image.featureRequest?.status === "REJECTED";
   const featured = image.isFeatured;
-  const canRequestFeature = image.isPublic && !featured && !pending;
+  const canRequestFeature = !isAdminViewer && image.isPublic && !featured && !pending;
 
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border border-border/80 bg-bg-base/60">
@@ -116,7 +118,7 @@ function PartnerFeatureImageCard({
               {busy ? "…" : "Request feature"}
             </button>
           ) : null}
-          {rejected && image.isPublic ? (
+          {rejected && image.isPublic && !isAdminViewer ? (
             <button
               type="button"
               disabled={busy}
@@ -146,6 +148,7 @@ export function PartnerFeatureImages({
   initialQueries,
   initialQueriesHasMore,
   queriesPageSize,
+  isAdminViewer = false,
   className,
 }: {
   ownFeatureRequests: OwnFeatureRequest[];
@@ -155,6 +158,7 @@ export function PartnerFeatureImages({
   initialQueries: PartnerQueryRow[];
   initialQueriesHasMore: boolean;
   queriesPageSize: number;
+  isAdminViewer?: boolean;
   className?: string;
 }) {
   const [images, setImages] = useState(initialImages);
@@ -272,6 +276,7 @@ export function PartnerFeatureImages({
                   image={img}
                   busy={busyImageId === img.id}
                   onRequest={(id) => void submitRequest(id)}
+                  isAdminViewer={isAdminViewer}
                 />
               ))}
             </ul>

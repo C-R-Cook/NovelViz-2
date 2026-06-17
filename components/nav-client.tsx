@@ -4,7 +4,6 @@ import { NotificationsBell } from "@/components/notifications-bell";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { useAuth, useClerk } from "@clerk/nextjs";
-import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -164,13 +163,6 @@ export function NavChrome({
           Dashboard
         </Link>
       ) : null}
-      {isLoggedIn && userRole === "admin" ? (
-        <AdminHelpersNav
-          variant="top"
-          navLinkClass={navLinkClass}
-          onNavigate={() => setMenuOpen(false)}
-        />
-      ) : null}
     </>
   );
 
@@ -179,8 +171,8 @@ export function NavChrome({
 
   return (
     <header className="fixed inset-x-0 top-0 z-[100] border-b border-border bg-bg-base/95 shadow-lg shadow-bg-overlay backdrop-blur-md">
-      <div className="mx-auto flex min-h-14 max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="mx-auto flex min-h-14 max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center">
           <Link
             href="/"
             className={`shrink-0 font-serif text-lg font-semibold tracking-tight sm:text-xl ${
@@ -192,15 +184,16 @@ export function NavChrome({
           >
             NovelViz
           </Link>
-          <nav
-            className="hidden min-w-0 flex-1 flex-wrap items-center justify-center gap-1 md:flex lg:justify-start lg:pl-4"
-            aria-label="Main"
-          >
-            {links}
-          </nav>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <nav
+          className="hidden shrink-0 items-center justify-center gap-1 md:flex"
+          aria-label="Main"
+        >
+          {links}
+        </nav>
+
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
           <ThemeSwitcher />
           {isLoggedIn && userRole ? (
             <>

@@ -41,6 +41,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only public images can be featured" }, { status: 400 });
   }
 
+  if (user.role === "admin") {
+    return NextResponse.json(
+      {
+        error:
+          "Admins can feature images directly from Manage Featured Images — feature requests are for partners only.",
+      },
+      { status: 403 },
+    );
+  }
+
   if (user.role === "partner") {
     if (!image.book.ownerId || image.book.ownerId !== user.id) {
       return NextResponse.json({ error: "You can only request features for images on your own books" }, { status: 403 });

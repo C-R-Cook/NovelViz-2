@@ -228,6 +228,7 @@ export function FeatureImagesAdmin({
   pageSize,
   actionRequestId,
   onDecision,
+  onPendingRequestResolved,
   className,
 }: {
   featureRequests: FeatureRequestQueueItem[];
@@ -236,6 +237,7 @@ export function FeatureImagesAdmin({
   pageSize: number;
   actionRequestId: string | null;
   onDecision: (requestId: string, action: "approve" | "reject") => void;
+  onPendingRequestResolved?: (imageId: string) => void;
   className?: string;
 }) {
   const [featuredImages, setFeaturedImages] = useState(initialFeatured);
@@ -267,14 +269,6 @@ export function FeatureImagesAdmin({
     setFeaturedHasMore(initialFeaturedHasMore);
     setFeaturedSkip(initialFeatured.length);
   }, [initialFeatured, initialFeaturedHasMore]);
-
-  const patchImageInLists = useCallback((imageId: string, patch: Partial<AdminFeatureImageRow>) => {
-    const updater = (rows: AdminFeatureImageRow[]) =>
-      rows.map((row) => (row.id === imageId ? { ...row, ...patch } : row));
-    setFeaturedImages((rows) => updater(rows));
-    setAllImages((rows) => updater(rows));
-    setBookImages((rows) => updater(rows));
-  }, []);
 
   const fetchImages = useCallback(
     async (filter: "featured" | "all" | "book", skip: number, bookId?: string) => {
@@ -382,14 +376,37 @@ export function FeatureImagesAdmin({
       const snapFeatured = featuredImages.find((r) => r.id === imageId);
       const snapAll = allImages.find((r) => r.id === imageId);
       const snapBook = bookImages.find((r) => r.id === imageId);
+      const snap = snapAll ?? snapBook ?? snapFeatured;
+      const nextFeatureRequest = nextFeatured
+        ? snap?.featureRequest?.status === "PENDING"
+          ? { ...snap.featureRequest, status: "APPROVED" as const }
+          : snap?.featureRequest ?? null
+        : null;
+
       setBusyImageId(imageId);
-      patchImageInLists(imageId, { isFeatured: nextFeatured });
-      if (nextFeatured && snapFeatured == null && snapAll) {
-        setFeaturedImages((rows) => [{ ...snapAll, isFeatured: true }, ...rows]);
-      }
-      if (!nextFeatured) {
+
+      if (nextFeatured) {
+        setAllImages((rows) => rows.filter((r) => r.id !== imageId));
+        setBookImages((rows) => rows.filter((r) => r.id !== imageId));
+        const source = snapAll ?? snapBook ?? snapFeatured;
+        if (source) {
+          setFeaturedImages((rows) => [
+            { ...source, isFeatured: true, featureRequest: nextFeatureRequest },
+            ...rows.filter((r) => r.id !== imageId),
+          ]);
+        }
+      } else {
         setFeaturedImages((rows) => rows.filter((r) => r.id !== imageId));
+        const restored = snapFeatured ?? snap;
+        if (restored) {
+          const row = { ...restored, isFeatured: false, featureRequest: null };
+          setAllImages((rows) => [row, ...rows.filter((r) => r.id !== imageId)]);
+          if (selectedBook && row.bookId === selectedBook.id) {
+            setBookImages((rows) => [row, ...rows.filter((r) => r.id !== imageId)]);
+          }
+        }
       }
+
       try {
         const res = await fetch(`/api/admin/images/${imageId}/feature`, {
           method: "PATCH",
@@ -399,26 +416,64 @@ export function FeatureImagesAdmin({
         if (!res.ok) {
           const j = (await res.json()) as { error?: string };
           window.alert(j.error ?? "Update failed");
-          if (snapFeatured) setFeaturedImages((rows) => rows.map((r) => (r.id === imageId ? snapFeatured : r)));
-          if (snapAll) patchImageInLists(imageId, { isFeatured: snapAll.isFeatured });
-          if (snapBook) patchImageInLists(imageId, { isFeatured: snapBook.isFeatured });
+          setFeaturedImages((rows) => {
+            if (snapFeatured) return rows.map((r) => (r.id === imageId ? snapFeatured : r));
+            if (nextFeatured) return rows.filter((r) => r.id !== imageId);
+            return snapFeatured ? [snapFeatured, ...rows] : rows;
+          });
+          if (snapAll) {
+            setAllImages((rows) =>
+              rows.some((r) => r.id === imageId) ? rows : [snapAll, ...rows],
+            );
+          }
+          if (snapBook) {
+            setBookImages((rows) =>
+              rows.some((r) => r.id === imageId) ? rows : [snapBook, ...rows],
+            );
+          }
           return;
         }
-        const data = (await res.json()) as { id: string; isFeatured: boolean };
-        patchImageInLists(imageId, { isFeatured: data.isFeatured });
+        const data = (await res.json()) as {
+          id: string;
+          isFeatured: boolean;
+          featureRequest: AdminFeatureImageRow["featureRequest"];
+        };
         if (data.isFeatured) {
+          setAllImages((rows) => rows.filter((r) => r.id !== imageId));
+          setBookImages((rows) => rows.filter((r) => r.id !== imageId));
           const source = snapAll ?? snapBook ?? snapFeatured;
-          if (source && !featuredImages.some((r) => r.id === imageId)) {
-            setFeaturedImages((rows) => [{ ...source, isFeatured: true }, ...rows.filter((r) => r.id !== imageId)]);
+          if (source) {
+            setFeaturedImages((rows) => [
+              { ...source, isFeatured: true, featureRequest: data.featureRequest },
+              ...rows.filter((r) => r.id !== imageId),
+            ]);
+          }
+          if (data.featureRequest?.status === "APPROVED") {
+            onPendingRequestResolved?.(imageId);
           }
         } else {
           setFeaturedImages((rows) => rows.filter((r) => r.id !== imageId));
+          const source = snapFeatured ?? snap;
+          if (source) {
+            const row = { ...source, isFeatured: false, featureRequest: data.featureRequest };
+            setAllImages((rows) => [row, ...rows.filter((r) => r.id !== imageId)]);
+            if (selectedBook && row.bookId === selectedBook.id) {
+              setBookImages((rows) => [row, ...rows.filter((r) => r.id !== imageId)]);
+            }
+          }
+          onPendingRequestResolved?.(imageId);
         }
       } finally {
         setBusyImageId(null);
       }
     },
-    [allImages, bookImages, featuredImages, patchImageInLists],
+    [
+      allImages,
+      bookImages,
+      featuredImages,
+      onPendingRequestResolved,
+      selectedBook,
+    ],
   );
 
   const loadMoreFeatured = useCallback(async () => {
@@ -471,7 +526,7 @@ export function FeatureImagesAdmin({
       <ImageGridSection
         sectionId="all-images-heading"
         title="All images"
-        description="Every generated image, newest first. Feature any image directly — no partner request required."
+        description="Public images not yet on the Discover strip, newest first. Feature any image directly — no partner request required."
         images={allImages}
         loading={allLoading}
         hasMore={allHasMore}

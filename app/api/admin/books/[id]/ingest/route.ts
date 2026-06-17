@@ -216,7 +216,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           });
           await prisma.book.update({
             where: { id: bookId },
-            data: { coverImageUrl: result.secure_url },
+            data: { coverImageUrl: result.secure_url, coverIsAiGenerated: false },
           });
         }
       } catch (e) {

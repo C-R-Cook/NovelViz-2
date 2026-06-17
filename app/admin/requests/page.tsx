@@ -5,7 +5,6 @@ import {
 } from "@/lib/admin-book-requests";
 import { formatActivityAtUtc } from "@/lib/format-activity-at";
 import { UserRole } from "@db";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export const metadata = {
@@ -29,13 +28,7 @@ export default async function AdminBookRequestsPage() {
   return (
     <div className="space-y-10">
       <div>
-        <Link
-          href="/dashboard?tab=admin-stats"
-          className="text-sm font-medium text-accent-text underline-offset-2 hover:underline"
-        >
-          ← Dashboard (Admin Stats)
-        </Link>
-        <h1 className="mt-4 font-serif text-2xl font-semibold text-text-primary">Book requests</h1>
+        <h1 className="font-serif text-2xl font-semibold text-text-primary">Book requests</h1>
         <p className="mt-2 text-sm text-text-secondary">
           Reader demand signals from the Discover page, including guest submissions.
         </p>

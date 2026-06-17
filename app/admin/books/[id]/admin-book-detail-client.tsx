@@ -304,7 +304,21 @@ export function AdminBookDetailClient({
     const snap = publicImages.find((r) => r.id === imageId);
     if (!snap) return;
     setImageBusyId(imageId);
-    setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...row, isFeatured } : row)));
+    setPublicImages((rows) =>
+      rows.map((row) =>
+        row.id === imageId
+          ? {
+              ...row,
+              isFeatured,
+              featureRequest: isFeatured
+                ? row.featureRequest?.status === "PENDING"
+                  ? { ...row.featureRequest, status: "APPROVED" }
+                  : row.featureRequest
+                : null,
+            }
+          : row,
+      ),
+    );
     try {
       const res = await fetch(`/api/admin/images/${imageId}/feature`, {
         method: "PATCH",
@@ -315,9 +329,17 @@ export function AdminBookDetailClient({
         const j = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error || res.statusText);
       }
-      const data = (await res.json()) as { id: string; isFeatured: boolean };
+      const data = (await res.json()) as {
+        id: string;
+        isFeatured: boolean;
+        featureRequest: AdminBookPublicImageRow["featureRequest"];
+      };
       setPublicImages((rows) =>
-        rows.map((row) => (row.id === data.id ? { ...row, isFeatured: data.isFeatured } : row)),
+        rows.map((row) =>
+          row.id === data.id
+            ? { ...row, isFeatured: data.isFeatured, featureRequest: data.featureRequest }
+            : row,
+        ),
       );
     } catch {
       setPublicImages((rows) => rows.map((row) => (row.id === imageId ? { ...snap } : row)));

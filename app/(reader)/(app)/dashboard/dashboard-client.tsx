@@ -12,26 +12,20 @@ import {
 } from "@/app/(reader)/(app)/dashboard/for-review-queue";
 import type { AdminFeatureImageRow } from "@/lib/admin-feature-images";
 import { FOR_REVIEW_QUEUE_PAGE_SIZE, type AdminBookRow } from "@/lib/admin-books-shared";
-import { FlaggedCommentsQueue } from "@/app/(reader)/(app)/dashboard/flagged-comments-queue";
-import { SpoilerCommentsQueue } from "@/app/(reader)/(app)/dashboard/spoiler-comments-queue";
+import { CommentModerationQueue } from "@/app/(reader)/(app)/dashboard/comment-moderation-queue";
 import type { AdminFlaggedCommentRow } from "@/lib/admin-flagged-comments-queue";
 import type { AdminSpoilerCommentRow } from "@/lib/admin-spoiler-comments-queue";
 import { PartnerDashboardBooksClient } from "@/app/(partner)/partner/dashboard/partner-dashboard-books-client";
 import { AdminBooksClient } from "@/app/admin/books/admin-books-client";
 import { UsersAdminClient } from "@/app/admin/users/users-client";
-import { AdminHelpersNav } from "@/components/admin/admin-helpers-nav";
 import { AdminStatsClient } from "@/components/admin/admin-stats-client";
-import { gutenbergNavLinkIsActive } from "@/lib/gutenberg-admin-nav";
+import { DashboardShell } from "@/components/dashboard/dashboard-shell";
+import type { DashboardNavBadgeCounts } from "@/lib/dashboard-data";
 import { PartnerDashboardAnalytics } from "@/components/partner/partner-dashboard-analytics";
 import type { AdminStatsPayload } from "@/lib/admin-stats";
 import {
-  dashboardNavForRole,
   dashboardPageTitle,
-  dashboardTabLabel,
-  defaultDashboardTab,
   parseDashboardTab,
-  type DashboardNavBadge,
-  type DashboardNavEntry,
   type DashboardTabSlug,
   type DashboardUserRole,
 } from "@/lib/dashboard-tab";
@@ -42,29 +36,8 @@ import type { PartnerFeatureImageRow } from "@/lib/partner-feature-images";
 import type { PartnerQueryRow } from "@/lib/partner-queries";
 import type { FeatureRequestStatus } from "@db";
 import Link from "next/link";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-
-import "./dashboard-redesign.css";
-
-const DASHBOARD_SIDEBAR_COLLAPSED_KEY = "dashboard_sidebar_collapsed";
-
-function readSidebarCollapsedPreference(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-function writeSidebarCollapsedPreference(collapsed: boolean) {
-  try {
-    window.localStorage.setItem(DASHBOARD_SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
-  } catch {
-    /* ignore quota / private mode */
-  }
-}
 
 const REJECT_REASON =
   "This book has been rejected during admin moderation review. The publisher may revise and resubmit after addressing the feedback provided.";
@@ -223,20 +196,6 @@ function ActivityTimestamp({ ms }: { ms: number }) {
   return <span className="font-mono text-[8px] tracking-wide text-text-muted">{text}</span>;
 }
 
-function navBadgeValue(
-  badge: DashboardNavBadge | undefined,
-  admin: DashboardClientProps["admin"],
-  partner: DashboardClientProps["partner"],
-): number {
-  if (!badge) return 0;
-  if (badge === "forReview") return admin?.pendingReviewCount ?? 0;
-  if (badge === "featureApprovals") return admin?.featureRequestsPendingCount ?? 0;
-  if (badge === "spoilerComments") return admin?.spoilerCommentsPendingCount ?? 0;
-  if (badge === "flaggedComments") return admin?.flaggedCommentsPendingCount ?? 0;
-  if (badge === "partnerFeatReq") return partner?.ownFeatureRequestsPendingCount ?? 0;
-  return 0;
-}
-
 function SectionLabel({ label, right }: { label: string; right?: string }) {
   return (
     <div className="dashboard-slabel-row">
@@ -269,14 +228,23 @@ export function DashboardClient({
   account,
 }: DashboardClientProps) {
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const navEntries = useMemo(() => dashboardNavForRole(role), [role]);
   const reducedMotion = useReducedMotion();
 
   const tab = useMemo(
     () => parseDashboardTab(role, searchParams.get("tab") ?? undefined),
     [role, searchParams],
+  );
+
+  const badgeCounts = useMemo(
+    (): DashboardNavBadgeCounts => ({
+      forReview: admin?.pendingReviewCount ?? 0,
+      featureApprovals: admin?.featureRequestsPendingCount ?? 0,
+      commentModeration:
+        (admin?.spoilerCommentsPendingCount ?? 0) + (admin?.flaggedCommentsPendingCount ?? 0),
+      partnerFeatReq: partner?.ownFeatureRequestsPendingCount ?? 0,
+    }),
+    [admin, partner],
   );
 
   const [pendingBooks, setPendingBooks] = useState(admin?.pendingBooks ?? []);
@@ -291,22 +259,6 @@ export function DashboardClient({
   }, [admin?.featureRequestsQueue]);
   const [actionId, setActionId] = useState<string | null>(null);
   const [featureActionId, setFeatureActionId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-
-  useEffect(() => {
-    setSidebarCollapsed(readSidebarCollapsedPreference());
-  }, []);
-
-  const toggleSidebarCollapsed = useCallback(() => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      writeSidebarCollapsedPreference(next);
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     const server = admin?.pendingBooks ?? [];
@@ -325,47 +277,6 @@ export function DashboardClient({
       setFeatureRequestQueue(admin?.featureRequestsQueue ?? []);
     });
   }, [admin]);
-
-  useEffect(() => {
-    closeSidebar();
-  }, [tab, closeSidebar]);
-
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") closeSidebar();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [sidebarOpen, closeSidebar]);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    function onChange() {
-      if (mq.matches) closeSidebar();
-    }
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [closeSidebar]);
-
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [sidebarOpen]);
-
-  function pushTab(next: DashboardTabSlug) {
-    const def = defaultDashboardTab(role);
-    const params = new URLSearchParams(searchParams.toString());
-    if (next === def) params.delete("tab");
-    else params.set("tab", next);
-    const q = params.toString();
-    const href = q ? `${pathname}?${q}` : pathname ?? "/dashboard";
-    router.replace(href, { scroll: false });
-  }
 
   const runModeration = useCallback(
     async (
@@ -471,85 +382,6 @@ export function DashboardClient({
     },
     [router],
   );
-
-  function renderNavRow(entry: DashboardNavEntry) {
-    if (entry.kind === "divider") {
-      return <div key={entry.id} className="dashboard-nav-divider" />;
-    }
-    if (entry.kind === "group-label") {
-      return <div key={entry.id} className="dashboard-nav-group-label">{entry.label}</div>;
-    }
-    if (entry.kind === "helpers") {
-      return <AdminHelpersNav key={entry.id} variant="sidebar" onNavigate={closeSidebar} />;
-    }
-    if (entry.kind === "link") {
-      const active =
-        entry.href.startsWith("/admin/gutenberg") || entry.href.startsWith("/admin/books")
-          ? gutenbergNavLinkIsActive(pathname ?? "", searchParams.get("tab"), entry.href)
-          : pathname === entry.href || pathname.startsWith(`${entry.href}/`);
-      return (
-        <Link
-          key={entry.id}
-          href={entry.href}
-          className="dashboard-nav-btn no-underline"
-          data-active={active ? "true" : "false"}
-          onClick={closeSidebar}
-        >
-          <span className="dashboard-nav-icon" aria-hidden>
-            {entry.icon}
-          </span>
-          <span className="dashboard-nav-label">{entry.label}</span>
-        </Link>
-      );
-    }
-    const { tab: slug, icon, badge } = entry;
-    const n = navBadgeValue(badge, admin, partner);
-    return (
-      <button
-        key={slug}
-        type="button"
-        className="dashboard-nav-btn"
-        data-active={tab === slug ? "true" : "false"}
-        onClick={() => {
-          pushTab(slug);
-          closeSidebar();
-        }}
-      >
-        <span className="dashboard-nav-icon" aria-hidden>
-          {icon}
-        </span>
-        <span className="dashboard-nav-label">{dashboardTabLabel(slug)}</span>
-        {badge && n > 0 ? <span className="dashboard-nav-badge">{n > 99 ? "99+" : n}</span> : null}
-      </button>
-    );
-  }
-
-  function SidebarCollapseIcon({ collapsed }: { collapsed: boolean }) {
-    return (
-      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.25} stroke="currentColor" aria-hidden>
-        {collapsed ? (
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        ) : (
-          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-        )}
-      </svg>
-    );
-  }
-
-  function SidebarToggleIcon({ open }: { open: boolean }) {
-    if (open) {
-      return (
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      );
-    }
-    return (
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    );
-  }
 
   function librarySettingsSection() {
     return (
@@ -736,6 +568,7 @@ export function DashboardClient({
             initialQueries={partner.initialPartnerQueries}
             initialQueriesHasMore={partner.initialPartnerQueriesHasMore}
             queriesPageSize={partner.partnerQueriesPageSize}
+            isAdminViewer={role === "admin"}
             className="dashboard-partner-feature-wrap"
           />
         ) : null;
@@ -764,21 +597,20 @@ export function DashboardClient({
             pageSize={adminFeatureImages.pageSize}
             actionRequestId={featureActionId}
             onDecision={(requestId, action) => void runFeatureRequestDecision(requestId, action)}
+            onPendingRequestResolved={(imageId) =>
+              setFeatureRequestQueue((prev) => prev.filter((r) => r.imageId !== imageId))
+            }
             className="dashboard-feature-queue-wrap dashboard-admin-queue-wrap"
           />
         ) : null;
-      case "spoiler-comments":
+      case "comment-moderation":
         return admin ? (
-          <SpoilerCommentsQueue
-            items={admin.spoilerCommentsQueue}
-            className="dashboard-spoiler-comments-wrap dashboard-admin-queue-wrap"
-          />
-        ) : null;
-      case "flagged-comments":
-        return admin ? (
-          <FlaggedCommentsQueue
-            items={admin.flaggedCommentsQueue}
-            className="dashboard-flagged-comments-wrap"
+          <CommentModerationQueue
+            spoilerItems={admin.spoilerCommentsQueue}
+            flaggedItems={admin.flaggedCommentsQueue}
+            spoilerCount={admin.spoilerCommentsPendingCount}
+            flaggedCount={admin.flaggedCommentsPendingCount}
+            className="dashboard-comment-moderation-wrap dashboard-admin-queue-wrap"
           />
         ) : null;
       case "all-books":
@@ -804,111 +636,16 @@ export function DashboardClient({
   }
 
   return (
-    <div className="dashboard-root">
-      <div className="dashboard-root-inner">
-        <div className="dashboard-body">
-          {sidebarOpen ? (
-            <button
-              type="button"
-              className="dashboard-sidebar-backdrop"
-              aria-label="Close menu"
-              onClick={closeSidebar}
-            />
-          ) : null}
-          <div
-            className="dashboard-sidebar-shell"
-            data-collapsed={sidebarCollapsed ? "true" : "false"}
-          >
-            <aside
-              id="dashboard-sidebar"
-              className="dashboard-sidebar"
-              data-open={sidebarOpen ? "true" : "false"}
-            >
-              <div className="dashboard-sidebar-user">
-                <div className="dashboard-sidebar-role">{roleDisplayLabel}</div>
-                <div className="dashboard-sidebar-name">{reader.displayName}</div>
-              </div>
-              {/* Dynamic CTA: partners/admins get Upload New Book; readers get Become a partner */}
-              <div className="dashboard-sidebar-cta-wrap">
-                {role === "reader" ? (
-                  <button
-                    type="button"
-                    className="dashboard-sidebar-cta"
-                    onClick={() => { pushTab("partner-program"); closeSidebar(); }}
-                  >
-                    ✦ Become a partner
-                  </button>
-                ) : (
-                  <Link
-                    href="/partner/books/new"
-                    className="dashboard-sidebar-cta no-underline"
-                    onClick={closeSidebar}
-                  >
-                    ＋ Upload New Book
-                  </Link>
-                )}
-              </div>
-              {navEntries.map(renderNavRow)}
-            </aside>
-            <button
-              type="button"
-              className="dashboard-sidebar-collapse-btn"
-              aria-expanded={!sidebarCollapsed}
-              aria-controls="dashboard-sidebar"
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              onClick={toggleSidebarCollapsed}
-            >
-              <SidebarCollapseIcon collapsed={sidebarCollapsed} />
-            </button>
-          </div>
-
-          <main className="dashboard-main">
-            {tab === "partner-program" ? (
-              <div className="dashboard-section-head dashboard-section-head--partner-program">
-                <div className="dashboard-section-head-row">
-                  <button
-                    type="button"
-                    className="dashboard-sidebar-toggle"
-                    aria-expanded={sidebarOpen}
-                    aria-controls="dashboard-sidebar"
-                    onClick={() => setSidebarOpen((o) => !o)}
-                  >
-                    <SidebarToggleIcon open={sidebarOpen} />
-                    <span className="dashboard-sidebar-toggle-label">
-                      {sidebarOpen ? "Close" : "Menu"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div key={tab} className="dashboard-section-head dashboard-section-head--animate">
-                <div className="dashboard-section-head-row">
-                  <div className="dashboard-section-head-text">
-                    <div className="dashboard-section-eyebrow">
-                      {reader.displayName} · {roleDisplayLabel}
-                    </div>
-                    <h1 className="dashboard-section-title">{dashboardPageTitle(tab)}</h1>
-                  </div>
-                  <button
-                    type="button"
-                    className="dashboard-sidebar-toggle"
-                    aria-expanded={sidebarOpen}
-                    aria-controls="dashboard-sidebar"
-                    onClick={() => setSidebarOpen((o) => !o)}
-                  >
-                    <SidebarToggleIcon open={sidebarOpen} />
-                    <span className="dashboard-sidebar-toggle-label">
-                      {sidebarOpen ? "Close" : "Menu"}
-                    </span>
-                  </button>
-                </div>
-              </div>
-            )}
-            {mainInner()}
-          </main>
-        </div>
-      </div>
-    </div>
+    <DashboardShell
+      role={role}
+      roleDisplayLabel={roleDisplayLabel}
+      displayName={reader.displayName}
+      badgeCounts={badgeCounts}
+      sectionTitle={tab === "partner-program" ? undefined : dashboardPageTitle(tab)}
+      sectionEyebrow={`${reader.displayName} · ${roleDisplayLabel}`}
+      sectionHeadVariant={tab === "partner-program" ? "toggle-only" : "default"}
+    >
+      <div key={tab}>{mainInner()}</div>
+    </DashboardShell>
   );
 }

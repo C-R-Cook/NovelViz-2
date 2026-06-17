@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { deleteUserDataByClerkId } from "@/lib/delete-user";
 import { nameFromClerkParts } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
+import { isBetaModeEnabled } from "@/lib/subscription";
 
 export const runtime = "nodejs";
 
@@ -73,7 +74,7 @@ async function upsertUserFromClerk(data: ClerkUserPayload) {
     },
   });
 
-  if (process.env.BETA_MODE === "true") {
+  if (isBetaModeEnabled()) {
     try {
       await prisma.userBadge.create({
         data: {

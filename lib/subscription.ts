@@ -4,7 +4,15 @@ import { prisma } from "@/lib/prisma";
 import { getTierLimitConfig } from "@/lib/tier-limit-config";
 import { GrantSource, GrantType, SubscriptionTier, UserRole } from "@db";
 
-export const BETA_MODE: boolean = process.env.BETA_MODE === "true";
+/**
+ * Beta limit bypass is opt-in: only `BETA_MODE=true` enables it.
+ * When the variable is unset, empty, or any other value, beta mode is off (production-safe default).
+ */
+export function isBetaModeEnabled(): boolean {
+  return process.env.BETA_MODE === "true";
+}
+
+export const BETA_MODE: boolean = isBetaModeEnabled();
 
 export type EffectiveLimits = {
   queriesPerMonth: number | null;

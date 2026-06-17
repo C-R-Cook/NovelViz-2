@@ -125,6 +125,7 @@ export async function applyOpenLibraryCoverToBook(
     where: { id: book.id },
     data: {
       coverImageUrl,
+      coverIsAiGenerated: false,
       ...(ol.openLibraryKey ? { openLibraryKey: ol.openLibraryKey } : {}),
     },
   });

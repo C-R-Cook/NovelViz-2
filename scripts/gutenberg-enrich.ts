@@ -162,6 +162,7 @@ async function enrichBook(
         description: enrichment.description,
         publishedYear: enrichment.publishedYear,
         coverImageUrl: nextCoverUrl,
+        ...(coverChanged ? { coverIsAiGenerated: false } : {}),
       },
     });
 

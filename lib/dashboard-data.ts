@@ -486,8 +486,9 @@ export async function loadAdminDashboardData(
           }),
         ])
       : Promise.resolve(null),
-    activeTab === "spoiler-comments" ? queryAdminSpoilerCommentsQueue(80) : Promise.resolve(null),
-    activeTab === "flagged-comments" ? queryAdminFlaggedCommentsQueue(80) : Promise.resolve(null),
+    activeTab === "comment-moderation"
+      ? Promise.all([queryAdminSpoilerCommentsQueue(80), queryAdminFlaggedCommentsQueue(80)])
+      : Promise.resolve(null),
     activeTab === "all-books"
       ? queryAdminBooksPage({
           filter: "all",
@@ -502,14 +503,22 @@ export async function loadAdminDashboardData(
 
   const statsBundle = tabLoads[0];
   const featureBundle = tabLoads[1];
-  const spoilerQueue = tabLoads[2];
-  const flaggedQueue = tabLoads[3];
-  const allBooksPage = tabLoads[4];
+  const commentModerationBundle = tabLoads[2];
+  const allBooksPage = tabLoads[3];
 
   const featureRows =
     featureBundle && Array.isArray(featureBundle) ? featureBundle[0] : null;
   const featuredImagesPage =
     featureBundle && Array.isArray(featureBundle) ? featureBundle[1] : null;
+
+  const spoilerQueue =
+    commentModerationBundle && Array.isArray(commentModerationBundle)
+      ? commentModerationBundle[0]
+      : null;
+  const flaggedQueue =
+    commentModerationBundle && Array.isArray(commentModerationBundle)
+      ? commentModerationBundle[1]
+      : null;
 
   const topBooks =
     statsBundle && Array.isArray(statsBundle) ? statsBundle[1] : [];
@@ -547,5 +556,41 @@ export async function loadAdminDashboardData(
           pageSize: ADMIN_FEATURE_IMAGES_PAGE_SIZE,
         }
       : null,
+  };
+}
+
+export type DashboardNavBadgeCounts = {
+  forReview: number;
+  featureApprovals: number;
+  commentModeration: number;
+  partnerFeatReq: number;
+};
+
+/** Lightweight counts for dashboard sidebar badges (admin shell on `/admin/*`). */
+export async function loadDashboardNavBadgeCounts(userId: string): Promise<DashboardNavBadgeCounts> {
+  const [
+    pendingReviewCount,
+    featureRequestsPendingCount,
+    spoilerCommentsPendingCount,
+    flaggedCommentsPendingCount,
+    ownFeatureRequestsPendingCount,
+  ] = await Promise.all([
+    prisma.book.count({ where: { status: "pending_review", deletedAt: null } }),
+    prisma.featureRequest.count({ where: { status: FeatureRequestStatus.PENDING } }),
+    countPendingSpoilerComments(),
+    countPendingFlaggedComments(),
+    prisma.featureRequest.count({
+      where: {
+        status: FeatureRequestStatus.PENDING,
+        image: { userId },
+      },
+    }),
+  ]);
+
+  return {
+    forReview: pendingReviewCount,
+    featureApprovals: featureRequestsPendingCount,
+    commentModeration: spoilerCommentsPendingCount + flaggedCommentsPendingCount,
+    partnerFeatReq: ownFeatureRequestsPendingCount,
   };
 }

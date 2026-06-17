@@ -60,8 +60,21 @@ export async function PATCH(request: Request, context: RouteContext) {
       });
     }
 
+    if (!isFeatured && existing.featureRequest) {
+      await tx.featureRequest.delete({ where: { id: existing.featureRequest.id } });
+    }
+
     return updated;
   });
 
-  return NextResponse.json({ id: image.id, isFeatured: image.isFeatured });
+  const featureRequest = await prisma.featureRequest.findUnique({
+    where: { imageId },
+    select: { id: true, status: true },
+  });
+
+  return NextResponse.json({
+    id: image.id,
+    isFeatured: image.isFeatured,
+    featureRequest,
+  });
 }

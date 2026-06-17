@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { CommentStatus } from "@db";
 import { safeAdminReturnTo } from "@/lib/admin-book-navigation";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 type PageProps = {
@@ -102,12 +101,6 @@ export default async function AdminBookDetailPage({ params, searchParams }: Page
 
   return (
     <div className="space-y-8">
-      <Link
-        href={returnTo}
-        className="inline-flex text-sm font-medium text-text-secondary transition hover:text-accent-text/90"
-      >
-        ← Back to books
-      </Link>
       <AdminBookDetailClient book={book} publicImages={publicImages} returnTo={returnTo} />
     </div>
   );

@@ -165,7 +165,7 @@ export async function POST(_request: Request, context: RouteContext) {
         value: `${sessionUser.username ?? sessionUser.id} (${sessionUser.email ?? "no email"})`,
       },
       { label: "Public Gallery", value: absoluteAppUrl(link) },
-      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=flagged-comments") },
+      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=comment-moderation&filter=flagged") },
     ],
   });
 

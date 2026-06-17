@@ -1,4 +1,4 @@
-import { GUTENBERG_ADMIN_NAV_LINKS } from "@/lib/gutenberg-admin-nav";
+import { ADMIN_STANDALONE_NAV_LINKS } from "@/lib/admin-helpers-nav";
 
 /** Matches `UserRole` string values from Prisma — kept here so client components never import `@db` (avoids bundling Prisma in the browser). */
 export type DashboardUserRole = "reader" | "partner" | "admin";
@@ -15,25 +15,25 @@ export type DashboardTabSlug =
   | "feature-requests"
   | "for-review"
   | "feature-approvals"
-  | "spoiler-comments"
-  | "flagged-comments"
+  | "comment-moderation"
   | "all-books"
   | "all-users"
   | "admin-stats";
 
+export type CommentModerationFilter = "all" | "spoiler" | "flagged";
+
 export type DashboardNavBadge =
   | "forReview"
   | "featureApprovals"
-  | "spoilerComments"
-  | "flaggedComments"
+  | "commentModeration"
   | "partnerFeatReq";
 
 export type DashboardNavEntry =
   | { kind: "divider"; id: string }
   | { kind: "group-label"; id: string; label: string }
   | { kind: "tab"; tab: DashboardTabSlug; icon: string; badge?: DashboardNavBadge }
-  | { kind: "helpers"; id: string }
-  | { kind: "link"; id: string; href: string; label: string; icon: string };
+  | { kind: "link"; id: string; href: string; label: string; icon: string }
+  | { kind: "dev-tools"; id: string; label: string; icon: string };
 
 const READER_TABS: DashboardTabSlug[] = [
   "reading",
@@ -48,8 +48,7 @@ const PARTNER_EXTRA: DashboardTabSlug[] = ["my-books", "stats", "feature-request
 const ADMIN_EXTRA: DashboardTabSlug[] = [
   "for-review",
   "feature-approvals",
-  "spoiler-comments",
-  "flagged-comments",
+  "comment-moderation",
   "all-books",
   "all-users",
   "admin-stats",
@@ -81,25 +80,26 @@ const PARTNER_NAV: DashboardNavEntry[] = [
 ];
 
 const ADMIN_NAV: DashboardNavEntry[] = [
-  { kind: "group-label", id: "gl-admin-settings", label: "Admin Settings" },
+  { kind: "group-label", id: "gl-admin", label: "Admin" },
   { kind: "tab", tab: "for-review", icon: "✅", badge: "forReview" },
   { kind: "tab", tab: "feature-approvals", icon: "⭐", badge: "featureApprovals" },
-  { kind: "tab", tab: "spoiler-comments", icon: "⚠️", badge: "spoilerComments" },
-  { kind: "tab", tab: "flagged-comments", icon: "🚩", badge: "flaggedComments" },
+  { kind: "tab", tab: "comment-moderation", icon: "💬", badge: "commentModeration" },
   { kind: "tab", tab: "all-books", icon: "📋" },
   { kind: "tab", tab: "all-users", icon: "👥" },
   { kind: "tab", tab: "admin-stats", icon: "📈" },
-  { kind: "link", id: "admin-book-requests", href: "/admin/requests", label: "Book requests", icon: "📖" },
-  { kind: "divider", id: "d-helpers" },
-  { kind: "helpers", id: "admin-helpers" },
-  { kind: "divider", id: "d-gutenberg" },
-  ...GUTENBERG_ADMIN_NAV_LINKS.map((link) => ({
+  ...ADMIN_STANDALONE_NAV_LINKS.map((link) => ({
     kind: "link" as const,
     id: link.id,
     href: link.href,
     label: link.label,
     icon: link.icon,
   })),
+  {
+    kind: "dev-tools",
+    id: "admin-dev-tools",
+    label: "Developer tools",
+    icon: "⚙",
+  },
 ];
 
 /** Sidebar structure: account first, then role-scoped setting sections. */
@@ -123,10 +123,20 @@ export function defaultDashboardTab(role: DashboardUserRole): DashboardTabSlug {
   return "reading";
 }
 
+const COMMENT_MODERATION_FILTER_SET = new Set<string>(["all", "spoiler", "flagged"]);
+
+export function parseCommentModerationFilter(raw: string | null | undefined): CommentModerationFilter {
+  if (raw && COMMENT_MODERATION_FILTER_SET.has(raw)) {
+    return raw as CommentModerationFilter;
+  }
+  return "all";
+}
+
 function normalizeRawTab(role: DashboardUserRole, raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   if (raw === "reader" || raw === "overview") return "reading";
   if (raw === "analytics") return "stats";
+  if (raw === "spoiler-comments" || raw === "flagged-comments") return "comment-moderation";
   return raw;
 }
 
@@ -163,10 +173,8 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
       return "For Review";
     case "feature-approvals":
       return "Manage Featured Images";
-    case "spoiler-comments":
-      return "Spoiler Comments";
-    case "flagged-comments":
-      return "Flagged comments";
+    case "comment-moderation":
+      return "Comment Moderation";
     case "all-books":
       return "All Books";
     case "all-users":
@@ -181,4 +189,23 @@ export function dashboardTabLabel(tab: DashboardTabSlug): string {
 /** Main heading per active section (matches reference PAGE_TITLES). */
 export function dashboardPageTitle(tab: DashboardTabSlug): string {
   return dashboardTabLabel(tab);
+}
+
+export function dashboardTabHref(slug: DashboardTabSlug, role: DashboardUserRole): string {
+  const def = defaultDashboardTab(role);
+  if (slug === def) return "/dashboard";
+  return `/dashboard?tab=${slug}`;
+}
+
+/** Sidebar highlight for dashboard tabs (includes related `/admin/*` routes). */
+export function isDashboardTabNavActive(
+  pathname: string,
+  rawTab: string | null | undefined,
+  role: DashboardUserRole,
+  slug: DashboardTabSlug,
+): boolean {
+  if (slug === "all-users" && pathname.startsWith("/admin/users")) return true;
+  if (slug === "all-books" && pathname.startsWith("/admin/books")) return true;
+  if (pathname !== "/dashboard") return false;
+  return parseDashboardTab(role, rawTab ?? undefined) === slug;
 }

@@ -1,5 +1,6 @@
 import { UserDetailClient } from "./user-detail-client";
 import { prisma } from "@/lib/prisma";
+import { isBetaModeEnabled } from "@/lib/subscription";
 import { notFound } from "next/navigation";
 
 type Props = { params: Promise<{ userId: string }> };
@@ -12,7 +13,7 @@ export default async function AdminUserDetailPage({ params }: Props) {
   });
   if (!exists) notFound();
 
-  const betaMode = process.env.BETA_MODE === "true";
+  const betaMode = isBetaModeEnabled();
 
   return <UserDetailClient userId={userId} betaMode={betaMode} />;
 }

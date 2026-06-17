@@ -215,7 +215,7 @@ export async function scanCommentForSpoilers(commentId: string): Promise<Comment
       { label: "Comment author", value: row.user.username ?? row.userId },
       { label: "Comment", value: row.content },
       { label: "Public Gallery", value: absoluteAppUrl(link) },
-      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=spoiler-comments") },
+      { label: "Moderation queue", value: absoluteAppUrl("/dashboard?tab=comment-moderation&filter=spoiler") },
     ],
   });
 

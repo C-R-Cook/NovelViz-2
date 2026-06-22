@@ -2,7 +2,7 @@ import { NavChrome } from "@/components/nav-client";
 import { getCurrentUser } from "@/lib/auth";
 import { userInitials } from "@/lib/user-initials";
 
-export async function Nav() {
+export async function Nav({ hideThemeSwitcher = false }: { hideThemeSwitcher?: boolean }) {
   const user = await getCurrentUser();
   const initialUserId = user?.id ?? null;
   const isLoggedIn = !!user;
@@ -18,6 +18,7 @@ export async function Nav() {
       userEmail={user?.email ?? ""}
       userRole={user?.role ?? null}
       isProduction={process.env.NODE_ENV === "production"}
+      hideThemeSwitcher={hideThemeSwitcher}
     />
   );
 }

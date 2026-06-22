@@ -17,6 +17,7 @@ export type NavChromeProps = {
   userEmail: string;
   userRole: "reader" | "partner" | "admin" | null;
   isProduction: boolean;
+  hideThemeSwitcher?: boolean;
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -115,6 +116,7 @@ export function NavChrome({
   userEmail,
   userRole,
   isProduction,
+  hideThemeSwitcher = false,
 }: NavChromeProps) {
   void initialUserId;
   const pathname = usePathname();
@@ -194,7 +196,7 @@ export function NavChrome({
         </nav>
 
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2 sm:gap-3">
-          <ThemeSwitcher />
+          {hideThemeSwitcher ? null : <ThemeSwitcher />}
           {isLoggedIn && userRole ? (
             <>
               <NotificationsBell />

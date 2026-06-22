@@ -16,11 +16,16 @@ function norm(p){
   // aged-parchment removed; legacy dark themes all map to candle-light
   return"candle-light";
 }
+var path=window.location.pathname;
 var id="candle-light";
+if(path==="/"||path===""){
+  id="candle-light";
+}else{
 var s=localStorage.getItem(SK);
 if(s&&V.indexOf(s)>=0)id=s;
 else if(s)id=norm(s);
 else{var leg=localStorage.getItem(LK);if(leg)id=norm(leg);}
+}
 document.documentElement.setAttribute("data-theme",id);
-localStorage.setItem(SK,id);
+if(path!=="/"&&path!==""){localStorage.setItem(SK,id);}
 }catch(e){}})();`;

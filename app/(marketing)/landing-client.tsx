@@ -7,19 +7,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-const MARQUEE_TITLES = [
-  "Dracula",
-  "Jane Eyre",
-  "Frankenstein",
-  "Alice in Wonderland",
-  "Moby Dick",
-  "Pride & Prejudice",
-  "The Picture of Dorian Gray",
-  "Wuthering Heights",
-  "The Wizard of Oz",
-  "Treasure Island",
-];
-
 const PRIMARY_FEATURES = [
   {
     icon: "🔒",
@@ -201,7 +188,6 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
 
   const startHref = isLoggedIn ? "/library" : "/register";
   const joinBetaHref = isLoggedIn ? "/library" : "/register";
-  const marqueeItems = [...MARQUEE_TITLES, ...MARQUEE_TITLES];
 
   const exploreGallery = useCallback(() => {
     try {
@@ -253,8 +239,6 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
           <DiscoverParticleField count={65} opacity={0.4} linkDistance={90} />
         ) : null}
 
-        <p className="landing-eyebrow">Public Domain · AI Companion · Spoiler-Free</p>
-
         <h1 className="landing-hero-title">
           Every Chapter,
           <br />
@@ -280,22 +264,8 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
           ) : null}
         </div>
 
-        <div className="landing-scroll-cue" aria-hidden>
-          <span className="landing-scroll-label">Scroll</span>
-          <div className="landing-scroll-line" />
-        </div>
+        <GemDivider />
       </section>
-
-      <div className="landing-marquee-wrap" aria-hidden>
-        <div className="landing-marquee-track">
-          {marqueeItems.map((title, i) => (
-            <span key={`${title}-${i}`} className="landing-marquee-item">
-              {title}
-              <span className="landing-marquee-gem">✦</span>
-            </span>
-          ))}
-        </div>
-      </div>
 
       <section
         ref={problemRef}

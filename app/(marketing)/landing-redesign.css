@@ -173,34 +173,19 @@
 /* Hero */
 .landing-hero {
   position: relative;
-  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 7.5rem 1.5rem 5rem;
+  justify-content: flex-start;
+  padding: calc(3.875rem + max(2rem, 6vh)) 1.5rem 2.5rem;
   text-align: center;
   overflow: hidden;
 }
 
 @media (min-width: 640px) {
   .landing-hero {
-    padding: 7.5rem 3rem 5rem;
+    padding: calc(3.875rem + max(2rem, 6vh)) 3rem 2.5rem;
   }
-}
-
-.landing-eyebrow {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.5625rem;
-  letter-spacing: 0.35em;
-  color: color-mix(in srgb, var(--accent) 55%, transparent);
-  text-transform: uppercase;
-  margin-bottom: 1.75rem;
-  position: relative;
-  z-index: 1;
-  transition:
-    opacity 0.8s ease,
-    transform 0.8s ease;
 }
 
 .landing-hero-title {
@@ -255,16 +240,13 @@
     transform 1s ease 0.4s;
 }
 
-.landing-hero-in .landing-eyebrow,
 .landing-hero-in .landing-hero-title,
 .landing-hero-in .landing-hero-sub,
-.landing-hero-in .landing-hero-ctas,
-.landing-hero-in .landing-scroll-cue {
+.landing-hero-in .landing-hero-ctas {
   opacity: 1;
   transform: none;
 }
 
-.landing-eyebrow,
 .landing-hero-title,
 .landing-hero-sub,
 .landing-hero-ctas {
@@ -318,67 +300,6 @@
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
 }
 
-.landing-scroll-cue {
-  position: absolute;
-  bottom: 2.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity 1s ease 1s;
-  animation: landing-pulse 2.5s ease infinite;
-}
-
-.landing-scroll-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.4375rem;
-  letter-spacing: 0.2em;
-  color: color-mix(in srgb, var(--accent) 35%, transparent);
-  text-transform: uppercase;
-}
-
-.landing-scroll-line {
-  width: 1px;
-  height: 2rem;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 40%, transparent), transparent);
-}
-
-/* Marquee */
-.landing-marquee-wrap {
-  overflow: hidden;
-  white-space: nowrap;
-  border-top: 1px solid color-mix(in srgb, var(--accent) 10%, transparent);
-  border-bottom: 1px solid color-mix(in srgb, var(--accent) 10%, transparent);
-  padding: 0.6875rem 0;
-  background: color-mix(in srgb, var(--accent) 3%, transparent);
-  position: relative;
-  z-index: 1;
-}
-
-.landing-marquee-track {
-  display: inline-block;
-  animation: landing-marquee 32s linear infinite;
-}
-
-.landing-marquee-item {
-  display: inline-block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.5625rem;
-  letter-spacing: 0.2em;
-  color: color-mix(in srgb, var(--accent) 35%, transparent);
-  text-transform: uppercase;
-  margin-right: 2.5rem;
-}
-
-.landing-marquee-gem {
-  color: color-mix(in srgb, var(--accent) 15%, transparent);
-  margin-left: 2.5rem;
-}
-
 /* Sections */
 .landing-section {
   position: relative;
@@ -399,6 +320,10 @@
 .landing-section--narrow {
   max-width: 56.25rem;
   text-align: center;
+}
+
+.landing-hero + .landing-section {
+  padding-top: 3rem;
 }
 
 .landing-section-label {
@@ -431,10 +356,13 @@
 .landing-gem {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  margin: 0 auto;
-  max-width: 10rem;
+  gap: 14px;
+  margin: 2.75rem auto;
+  width: 100%;
+  max-width: 68.75rem;
   padding: 0 1.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 @media (min-width: 640px) {
@@ -443,15 +371,31 @@
   }
 }
 
+.landing-hero .landing-gem {
+  margin-top: 2.5rem;
+  margin-bottom: 0;
+}
+
 .landing-gem-line {
   flex: 1;
   height: 1px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  min-height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-default, var(--border)) 15%,
+    var(--border-default, var(--border)) 85%,
+    transparent
+  );
+  opacity: 0.85;
 }
 
 .landing-gem-icon {
-  color: color-mix(in srgb, var(--accent) 25%, transparent);
-  font-size: 0.8125rem;
+  font-size: 12px;
+  color: var(--accent);
+  opacity: 0.55;
+  flex-shrink: 0;
+  line-height: 1;
 }
 
 .landing-reveal {
@@ -1112,43 +1056,14 @@
   }
 }
 
-@keyframes landing-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-@keyframes landing-pulse {
-  0%,
-  100% {
-    opacity: 0.4;
-  }
-  50% {
-    opacity: 0.8;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .landing-hero-title {
     animation: none;
   }
 
-  .landing-marquee-track {
-    animation: none;
-  }
-
-  .landing-scroll-cue {
-    animation: none;
-  }
-
-  .landing-eyebrow,
   .landing-hero-title,
   .landing-hero-sub,
   .landing-hero-ctas,
-  .landing-scroll-cue,
   .landing-reveal,
   .landing-step,
   .landing-mock-panel,

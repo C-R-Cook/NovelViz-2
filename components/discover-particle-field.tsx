@@ -42,20 +42,48 @@ export function DiscoverParticleField({
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
     const resize = () => {
-      canvas.width = canvas.offsetWidth;
-      canvas.height = canvas.offsetHeight;
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      if (w === 0 || h === 0) return;
+
+      const prevW = canvas.width;
+      const prevH = canvas.height;
+
+      canvas.width = w;
+      canvas.height = h;
+
+      if (prevW > 0 && prevH > 0 && (prevW !== w || prevH !== h)) {
+        const scaleX = w / prevW;
+        const scaleY = h / prevH;
+        for (const p of pts) {
+          p.x *= scaleX;
+          p.y *= scaleY;
+        }
+      }
     };
-    resize();
-    window.addEventListener("resize", resize);
 
     const pts = Array.from({ length: count }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
+      x: 0,
+      y: 0,
       vx: (Math.random() - 0.5) * 0.3,
       vy: (Math.random() - 0.5) * 0.3,
       r: Math.random() * 1.5 + 0.3,
       a: Math.random(),
     }));
+
+    const seedParticles = () => {
+      for (const p of pts) {
+        p.x = Math.random() * canvas.width;
+        p.y = Math.random() * canvas.height;
+      }
+    };
+
+    resize();
+    seedParticles();
+
+    const resizeObserver = new ResizeObserver(() => resize());
+    resizeObserver.observe(canvas);
+    window.addEventListener("resize", resize);
 
     const draw = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -97,6 +125,7 @@ export function DiscoverParticleField({
 
     return () => {
       cancelAnimationFrame(animId);
+      resizeObserver.disconnect();
       window.removeEventListener("resize", resize);
       observer.disconnect();
     };

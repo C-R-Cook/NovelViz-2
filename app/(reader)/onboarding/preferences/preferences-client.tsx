@@ -3,7 +3,7 @@
 import { clearPlanStepCompleteCookie } from "@/lib/onboarding-cookies";
 import { DISPLAY_NAME_MAX, DISPLAY_NAME_MIN } from "@/lib/display-name";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
-import { GENDERS, ONBOARDING_AGE_RANGE_OPTIONS } from "@/lib/user-profile-options";
+import { GENDERS, USER_AGE_RANGE_OPTIONS } from "@/lib/user-profile-options";
 import { isValidUsernameFormat } from "@/lib/username";
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
@@ -304,9 +304,8 @@ export function PreferencesClient({
             onChange={(e) => setAgeRange(e.target.value)}
             className="onboarding-preferences__input"
           >
-            <option value="">Prefer not to say</option>
-            {ONBOARDING_AGE_RANGE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
+            {USER_AGE_RANGE_OPTIONS.map((o) => (
+              <option key={o.value || "prefer-not-to-say"} value={o.value}>
                 {o.label}
               </option>
             ))}

@@ -304,6 +304,13 @@ model User {
   quotaOverrides         UserQuotaOverride[]
   aiServiceFailures      AiServiceFailure[]
 
+  /// Server-recorded signup legal attestations (timestamps are the audit trail).
+  over18ConfirmedAt      DateTime?
+  termsAcceptedAt        DateTime?
+  privacyAcceptedAt      DateTime?
+  termsDocumentVersion   String?
+  privacyDocumentVersion String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

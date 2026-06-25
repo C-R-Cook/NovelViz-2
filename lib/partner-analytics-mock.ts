@@ -56,14 +56,13 @@ export function mockPartnerAnalyticsPayload(): import("./partner-analytics").Par
   });
 
   const ageBuckets: import("./partner-analytics").PartnerBarRow[] = [
-    { label: "Under 18", count: 28 },
     { label: "18–24", count: 96 },
     { label: "25–34", count: 142 },
     { label: "35–44", count: 74 },
     { label: "45–54", count: 41 },
     { label: "55+", count: 18 },
     { label: "Prefer not to say", count: 12 },
-    { label: "Not specified", count: 34 },
+    { label: "Not specified", count: 62 },
   ];
 
   const genreBuckets: import("./partner-analytics").PartnerBarRow[] = [

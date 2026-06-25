@@ -32,6 +32,12 @@ export function PublicFooter() {
           <Link href="/terms" className={linkClass}>
             Terms of Service
           </Link>
+          <span className="text-border" aria-hidden>
+            |
+          </span>
+          <Link href="/acceptable-use" className={linkClass}>
+            Acceptable Use
+          </Link>
         </nav>
         <p className="text-center text-xs text-text-muted sm:text-right">
           © 2026 NovelViz. All rights reserved.

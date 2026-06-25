@@ -1,3 +1,4 @@
+import { parseUserAgeRange } from "@/lib/age-range";
 import { getCurrentUser } from "@/lib/auth";
 import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
 import { parseDisplayName } from "@/lib/display-name";
@@ -16,14 +17,6 @@ function parseGenrePreferences(raw: unknown): string[] {
     if (!out.includes(item)) out.push(item);
   }
   return out;
-}
-
-function parseAgeRange(raw: unknown): AgeRange | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  if (typeof raw !== "string") return null;
-  const v = raw as AgeRange;
-  if (Object.values(AgeRange).includes(v)) return v;
-  return null;
 }
 
 function parseGender(raw: unknown): Gender | null {
@@ -116,7 +109,7 @@ export async function PATCH(request: Request) {
   }
 
   if ("ageRange" in b) {
-    data.ageRange = parseAgeRange(b.ageRange);
+    data.ageRange = parseUserAgeRange(b.ageRange);
     if (b.ageRange !== null && b.ageRange !== undefined && b.ageRange !== "" && data.ageRange === null) {
       return NextResponse.json({ error: "Invalid ageRange" }, { status: 400 });
     }

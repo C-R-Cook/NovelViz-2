@@ -3,7 +3,7 @@
 import { MultiSelectListbox } from "@/components/ui/multi-select-listbox";
 import { MultiSelectPills } from "@/components/ui/multi-select-pills";
 import { formatGenre } from "@/lib/genre";
-import { AGE_RANGES, GENDERS, GENRE_OPTIONS } from "@/lib/user-profile-options";
+import { AGE_RANGES, GENDERS, GENRE_OPTIONS, sanitizeTargetingAgeRanges } from "@/lib/user-profile-options";
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -36,7 +36,10 @@ export function BookAudienceTargeting({
   showPreview = false,
   editingLabel,
 }: Props) {
-  const [targeting, setTargeting] = useState<BookTargetingState>(initial);
+  const [targeting, setTargeting] = useState<BookTargetingState>(() => ({
+    ...initial,
+    featuredTargetAgeRanges: sanitizeTargetingAgeRanges(initial.featuredTargetAgeRanges),
+  }));
   const [savedFlash, setSavedFlash] = useState(false);
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<{
@@ -52,7 +55,10 @@ export function BookAudienceTargeting({
   const flashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setTargeting(initial);
+    setTargeting({
+      ...initial,
+      featuredTargetAgeRanges: sanitizeTargetingAgeRanges(initial.featuredTargetAgeRanges),
+    });
   }, [initial]);
 
   const persist = useCallback(

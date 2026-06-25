@@ -1,9 +1,20 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { DEV_USER_COOKIE, hasDevIdentityCookie } from "@/lib/dev-users";
 import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 
 /** Next.js 16 Clerk middleware entry (this file replaces the legacy `middleware.ts` name). */
+
+function withPathnameHeader(req: NextRequest): Headers {
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-pathname", req.nextUrl.pathname);
+  return requestHeaders;
+}
+
+function continueWithPathname(req: NextRequest) {
+  return NextResponse.next({ request: { headers: withPathnameHeader(req) } });
+}
 
 const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
@@ -30,7 +41,7 @@ function hasDevSession(req: { cookies: { get: (name: string) => { value?: string
 export default clerkMiddleware(async (auth, req) => {
   // Webhooks must bypass Clerk auth entirely — POST bodies are not replayed on redirects.
   if (isPublicRoute(req)) {
-    return NextResponse.next();
+    return continueWithPathname(req);
   }
 
   if (isProtectedAppRoute(req)) {
@@ -38,9 +49,12 @@ export default clerkMiddleware(async (auth, req) => {
     if (guestPreview) {
       return NextResponse.redirect(new URL("/discover", req.url));
     }
-    if (hasDevSession(req)) return;
+    if (hasDevSession(req)) return continueWithPathname(req);
     await auth.protect();
+    return continueWithPathname(req);
   }
+
+  return continueWithPathname(req);
 });
 
 export const config = {

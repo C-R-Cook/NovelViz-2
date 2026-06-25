@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import {
   isGeneratedImageChapterLockedForViewer,
   parseLikeRequestSessionUnlockIds,
@@ -13,6 +14,9 @@ export async function POST(request: Request, context: RouteContext) {
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const enforcementBlock = await accountEnforcementApiGuard(user.id);
+  if (enforcementBlock) return enforcementBlock;
 
   const { imageId } = await context.params;
   const bodyUnknown = await request.json().catch(() => ({}));

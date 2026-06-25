@@ -3,6 +3,7 @@ import "./admin-mobile.css";
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { Nav } from "@/components/nav";
 import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
+import { enforceAccountAccessForPage } from "@/lib/account-status-routing";
 import { loadDashboardNavBadgeCounts } from "@/lib/dashboard-data";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
@@ -13,6 +14,8 @@ export default async function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await enforceAccountAccessForPage();
+
   const user = await getCurrentUser();
   if (!user) {
     redirect("/library");

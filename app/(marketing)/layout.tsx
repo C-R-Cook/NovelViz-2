@@ -1,12 +1,15 @@
 import { Nav } from "@/components/nav";
 import { LandingThemeLock } from "@/components/landing-theme-lock";
 import { getCurrentUser } from "@/lib/auth";
+import { enforceAccountAccessForPage } from "@/lib/account-status-routing";
 
 export default async function MarketingLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  await enforceAccountAccessForPage();
+
   const user = await getCurrentUser();
   const isLoggedIn = !!user;
 

@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { scanCommentForSpoilers, setCommentSpoilerScanPending } from "@/lib/comment-scan";
 import {
   isCommentSpoilerScanDebugEnabled,
@@ -184,13 +185,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const dbUser = await prisma.user.findUnique({
-    where: { clerkId: sessionUser.clerkId },
-    select: { id: true, role: true },
-  });
+  const dbUser = await resolveDbUserFromSession(sessionUser);
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const enforcementBlock = await accountEnforcementApiGuard(dbUser.id);
+  if (enforcementBlock) return enforcementBlock;
 
   let body: unknown;
   try {

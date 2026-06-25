@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
+import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import {
   AdminEmailCategory,
   absoluteAppUrl,
@@ -29,6 +30,9 @@ export async function POST(_request: Request, context: RouteContext) {
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const enforcementBlock = await accountEnforcementApiGuard(dbUser.id);
+  if (enforcementBlock) return enforcementBlock;
 
   const { commentId } = await context.params;
 

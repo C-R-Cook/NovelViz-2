@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@/lib/auth";
+import { findLegalConsentForSession, userHasRequiredLegalConsent } from "@/lib/legal-consent";
 import { prisma } from "@/lib/prisma";
 
 export type SessionProfileRow = {
@@ -78,9 +79,19 @@ export function getOnboardingRedirectUrl(
   }
 }
 
-/** Where to send someone after Clerk sign-in / sign-up. */
+/** Where to send someone after Clerk sign-in / sign-up (onboarding only — no consent gate). */
 export function getPostAuthRedirectUrl(profile: SessionProfileRow | null): string {
   return getOnboardingRedirectUrl(profile, { planStepComplete: false });
+}
+
+/** Full post-auth routing: legal consent first, then onboarding or library. */
+export async function resolvePostAuthRedirect(session: CurrentUser): Promise<string> {
+  const consent = await findLegalConsentForSession(session);
+  if (!consent || !userHasRequiredLegalConsent(consent)) {
+    return "/auth/consent";
+  }
+  const profile = await findDbProfileForSession(session);
+  return getPostAuthRedirectUrl(profile);
 }
 
 export { ONBOARDING_PLAN_COOKIE } from "@/lib/onboarding-cookies";

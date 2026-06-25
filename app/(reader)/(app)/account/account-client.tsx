@@ -3,7 +3,7 @@
 import { useAuth, useClerk } from "@clerk/nextjs";
 import { HelpCircle } from "lucide-react";
 import { EmailChangeSection } from "@/components/account/email-change-section";
-import { AGE_RANGE_OPTIONS, type AgeRange } from "@/lib/age-range";
+import { ageRangeToSelectValue, USER_AGE_RANGE_OPTIONS, type AgeRange } from "@/lib/age-range";
 import { accountInputClass, accountLabelClass } from "@/lib/account-form-styles";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { COUNTRY_CODES, COUNTRY_OPTIONS } from "@/lib/countries";
@@ -63,7 +63,7 @@ export function AccountPageClient({
   const [publicUsername, setPublicUsername] = useState(initialUser.username ?? "");
   const [usernameCheck, setUsernameCheck] = useState<"idle" | "checking" | "ok" | "bad">("idle");
   const [country, setCountry] = useState(initialUser.country ?? "");
-  const [ageRange, setAgeRange] = useState<string>(initialUser.ageRange ?? "");
+  const [ageRange, setAgeRange] = useState<string>(ageRangeToSelectValue(initialUser.ageRange));
   const [gender, setGender] = useState<string>(initialUser.gender ?? "");
   const [subscribedToMailingList, setSubscribedToMailingList] = useState(
     initialUser.subscribedToMailingList,
@@ -91,7 +91,7 @@ export function AccountPageClient({
     setName(initialUser.name ?? "");
     setPublicUsername(initialUser.username ?? "");
     setCountry(initialUser.country ?? "");
-    setAgeRange(initialUser.ageRange ?? "");
+    setAgeRange(ageRangeToSelectValue(initialUser.ageRange));
     setGender(initialUser.gender ?? "");
     setSubscribedToMailingList(initialUser.subscribedToMailingList);
     setGenrePreferences(initialUser.genrePreferences);
@@ -424,9 +424,8 @@ export function AccountPageClient({
                   setAboutOk(false);
                 }}
               >
-                <option value="">Prefer not to say</option>
-                {AGE_RANGE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
+                {USER_AGE_RANGE_OPTIONS.map((o) => (
+                  <option key={o.value || "prefer-not-to-say"} value={o.value}>
                     {o.label}
                   </option>
                 ))}

@@ -1,6 +1,6 @@
 import { ClerkThemedSignIn } from "@/components/clerk-themed-auth";
 import { ensureCurrentUser } from "@/lib/auth";
-import { findDbProfileForSession, getPostAuthRedirectUrl } from "@/lib/session-profile";
+import { resolvePostAuthRedirect } from "@/lib/session-profile";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
@@ -9,8 +9,7 @@ export default async function LoginPage() {
   if (userId) {
     const session = await ensureCurrentUser();
     if (session) {
-      const profile = await findDbProfileForSession(session);
-      redirect(getPostAuthRedirectUrl(profile));
+      redirect(await resolvePostAuthRedirect(session));
     }
     redirect("/auth/after");
   }

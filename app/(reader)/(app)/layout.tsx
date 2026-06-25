@@ -1,5 +1,6 @@
 import { Nav } from "@/components/nav";
 import { getCurrentUser } from "@/lib/auth";
+import { getLegalConsentRedirectIfNeeded } from "@/lib/legal-consent";
 import {
   findDbProfileForSession,
   getOnboardingRedirectUrl,
@@ -20,6 +21,11 @@ export default async function ReaderAppShellLayout({
   const session = await getCurrentUser();
   if (!session) {
     redirect("/sign-in");
+  }
+
+  const consentRedirect = await getLegalConsentRedirectIfNeeded(session);
+  if (consentRedirect) {
+    redirect(consentRedirect);
   }
 
   const profile = await findDbProfileForSession(session);

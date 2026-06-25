@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { devLegalConsentUpdate } from "@/lib/legal-consent";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { BookGenre, BookStatus, PrismaClient, UserRole } from "@db";
 
@@ -86,6 +87,8 @@ const books = [
   },
 ] as const;
 
+const seededLegalConsent = devLegalConsentUpdate();
+
 async function seedDevUser() {
   await prisma.user.upsert({
     where: { clerkId: "user_dev_clerk_local" },
@@ -96,12 +99,14 @@ async function seedDevUser() {
       name: "Dev Reader",
       username: "dev_local",
       role: UserRole.admin,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev@novelviz.local",
       name: "Dev Reader",
       username: "dev_local",
       role: UserRole.admin,
+      ...seededLegalConsent,
     },
   });
 }
@@ -116,12 +121,14 @@ async function seedDevRoleUsers() {
       name: "Dev Reader",
       username: "dev_reader",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_reader@novelviz.local",
       name: "Dev Reader",
       username: "dev_reader",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
   });
 
@@ -134,12 +141,14 @@ async function seedDevRoleUsers() {
       name: "Dev Reader 2",
       username: "dev_reader2",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_reader2@novelviz.local",
       name: "Dev Reader 2",
       username: "dev_reader2",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
   });
 
@@ -152,12 +161,14 @@ async function seedDevRoleUsers() {
       name: "Dev Reader 3",
       username: "dev_reader3",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_reader3@novelviz.local",
       name: "Dev Reader 3",
       username: "dev_reader3",
       role: UserRole.reader,
+      ...seededLegalConsent,
     },
   });
 
@@ -170,12 +181,14 @@ async function seedDevRoleUsers() {
       name: "Dev Partner",
       username: "dev_partner",
       role: UserRole.partner,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_partner@novelviz.local",
       name: "Dev Partner",
       username: "dev_partner",
       role: UserRole.partner,
+      ...seededLegalConsent,
     },
   });
 
@@ -188,12 +201,14 @@ async function seedDevRoleUsers() {
       name: "Dev Partner 2",
       username: "dev_partner2",
       role: UserRole.partner,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_partner2@novelviz.local",
       name: "Dev Partner 2",
       username: "dev_partner2",
       role: UserRole.partner,
+      ...seededLegalConsent,
     },
   });
 
@@ -206,12 +221,14 @@ async function seedDevRoleUsers() {
       name: "Dev Admin",
       username: "dev_admin",
       role: UserRole.admin,
+      ...seededLegalConsent,
     },
     update: {
       email: "dev_admin@novelviz.local",
       name: "Dev Admin",
       username: "dev_admin",
       role: UserRole.admin,
+      ...seededLegalConsent,
     },
   });
 }

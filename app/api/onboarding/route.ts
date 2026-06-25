@@ -1,9 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
+import { parseUserAgeRange } from "@/lib/age-range";
 import { parseDisplayName } from "@/lib/display-name";
 import { findDbProfileForSession } from "@/lib/session-profile";
 import { prisma } from "@/lib/prisma";
 import { isValidUsernameFormat } from "@/lib/username";
-import { AgeRange, BookGenre, Gender } from "@db";
+import { BookGenre, Gender } from "@db";
 import { NextResponse } from "next/server";
 
 const BOOK_GENRE_VALUES = new Set<string>(Object.values(BookGenre));
@@ -33,14 +34,6 @@ function parseGender(raw: unknown): Gender | null {
   if (typeof raw !== "string") return null;
   const v = raw as Gender;
   if (Object.values(Gender).includes(v)) return v;
-  return null;
-}
-
-function parseAgeRange(raw: unknown): AgeRange | null {
-  if (raw === null || raw === undefined || raw === "") return null;
-  if (typeof raw !== "string") return null;
-  const v = raw as AgeRange;
-  if (Object.values(AgeRange).includes(v)) return v;
   return null;
 }
 
@@ -75,7 +68,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid gender" }, { status: 400 });
   }
 
-  const ageRange = parseAgeRange(b.ageRange);
+  const ageRange = parseUserAgeRange(b.ageRange);
   if (b.ageRange !== null && b.ageRange !== undefined && b.ageRange !== "" && ageRange === null) {
     return NextResponse.json({ error: "Invalid age range" }, { status: 400 });
   }

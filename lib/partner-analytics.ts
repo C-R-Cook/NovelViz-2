@@ -1,4 +1,5 @@
 import { CommentStatus } from "@db";
+import { ANALYTICS_AGE_LABELS, ANALYTICS_AGE_ORDER, analyticsAgeBucketKey } from "@/lib/age-range";
 import { formatGenre } from "@/lib/genre";
 import type { EngagementTimePoint, PartnerGalleryStats } from "@/lib/partner-book-analytics";
 import { mockPartnerAnalyticsPayload, USE_PARTNER_ANALYTICS_MOCK } from "@/lib/partner-analytics-mock";
@@ -14,26 +15,6 @@ function endOfUtcMonth(year: number, month0: number): Date {
   return new Date(Date.UTC(year, month0 + 1, 0, 23, 59, 59, 999));
 }
 
-const AGE_ORDER = [
-  "UNDER_18",
-  "EIGHTEEN_24",
-  "TWENTY5_34",
-  "THIRTY5_44",
-  "FORTY5_54",
-  "FIFTY5_PLUS",
-  "PREFER_NOT_TO_SAY",
-] as const;
-
-const AGE_LABELS: Record<string, string> = {
-  UNDER_18: "Under 18",
-  EIGHTEEN_24: "18–24",
-  TWENTY5_34: "25–34",
-  THIRTY5_44: "35–44",
-  FORTY5_54: "45–54",
-  FIFTY5_PLUS: "55+",
-  PREFER_NOT_TO_SAY: "Prefer not to say",
-  UNKNOWN: "Not specified",
-};
 
 export type PartnerTimePoint = { monthKey: string; label: string; cumulativeReaders: number };
 export type PartnerBarRow = { label: string; count: number };
@@ -211,15 +192,15 @@ export async function fetchPartnerAnalytics(ownerId: string): Promise<PartnerAna
       : [];
 
   const ageCounts = new Map<string, number>();
-  for (const k of AGE_ORDER) ageCounts.set(k, 0);
+  for (const k of ANALYTICS_AGE_ORDER) ageCounts.set(k, 0);
   ageCounts.set("UNKNOWN", 0);
   for (const u of users) {
-    const key = u.ageRange ?? "UNKNOWN";
+    const key = analyticsAgeBucketKey(u.ageRange);
     ageCounts.set(key, (ageCounts.get(key) ?? 0) + 1);
   }
 
-  const ageBuckets: PartnerBarRow[] = [...AGE_ORDER, "UNKNOWN"].map((key) => ({
-    label: AGE_LABELS[key] ?? key,
+  const ageBuckets: PartnerBarRow[] = [...ANALYTICS_AGE_ORDER, "UNKNOWN"].map((key) => ({
+    label: ANALYTICS_AGE_LABELS[key] ?? key,
     count: ageCounts.get(key) ?? 0,
   }));
 

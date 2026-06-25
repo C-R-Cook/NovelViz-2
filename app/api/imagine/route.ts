@@ -1,5 +1,6 @@
 import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
 import fal from "@/lib/fal";
+import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { getAnthropicTextResponse } from "@/lib/anthropic-text";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
@@ -106,6 +107,9 @@ export async function POST(request: Request) {
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const enforcementBlock = await accountEnforcementApiGuard(dbUser.id);
+  if (enforcementBlock) return enforcementBlock;
 
   const [limitCheck, effectiveLimits] = await Promise.all([
     checkUsageLimit(dbUser.id, "image"),

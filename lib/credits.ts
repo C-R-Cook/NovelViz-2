@@ -64,6 +64,22 @@ export async function addCreditTransaction(params: {
   });
 }
 
+/** Zero credit balance via immutable ledger entry when account is permanently terminated. */
+export async function forfeitCreditsOnTermination(
+  userId: string,
+  note?: string | null,
+): Promise<void> {
+  const balance = await getCreditBalance(userId);
+  if (balance <= 0) return;
+
+  await addCreditTransaction({
+    userId,
+    amount: -balance,
+    reason: CreditTransactionReason.FORFEITED_TERMINATION,
+    note: note ?? "Credits forfeited on permanent account termination",
+  });
+}
+
 export async function spendCreditsIfNeeded(params: {
   userId: string;
   type: "query" | "image";

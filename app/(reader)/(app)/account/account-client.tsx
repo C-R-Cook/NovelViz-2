@@ -43,6 +43,8 @@ export type AccountPageClientProps = {
   };
   memberSinceLabel: string;
   isProduction: boolean;
+  accountStatus: "active" | "suspended" | "terminated";
+  creditBalance: number;
   /** When true, omits page title (e.g. dashboard account tab). */
   embedded?: boolean;
 };
@@ -53,6 +55,8 @@ export function AccountPageClient({
   stats,
   memberSinceLabel,
   isProduction,
+  accountStatus,
+  creditBalance,
   embedded = false,
 }: AccountPageClientProps) {
   const router = useRouter();
@@ -583,19 +587,31 @@ export function AccountPageClient({
           <h2 id="danger-heading" className="text-lg font-semibold text-error">
             Danger zone
           </h2>
-          <p className="mt-2 text-sm text-text-secondary">
-            Permanently delete your NovelViz account and associated reading data.
-          </p>
-          <button
-            type="button"
-            className="mt-4 rounded-md border border-error/40 bg-transparent px-4 py-2 text-sm font-medium text-error transition hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30"
-            onClick={() => {
-              setDeleteError(null);
-              setDeleteOpen(true);
-            }}
-          >
-            Delete account
-          </button>
+          {accountStatus !== "active" ? (
+            <p className="mt-2 text-sm text-text-secondary">
+              Your account is {accountStatus} and cannot be deleted through self-service.{" "}
+              <a href="/contact" className="text-accent-text underline-offset-2 hover:underline">
+                Contact support
+              </a>{" "}
+              if you need help.
+            </p>
+          ) : (
+            <>
+              <p className="mt-2 text-sm text-text-secondary">
+                Permanently delete your NovelViz account and associated reading data.
+              </p>
+              <button
+                type="button"
+                className="mt-4 rounded-md border border-error/40 bg-transparent px-4 py-2 text-sm font-medium text-error transition hover:bg-error/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-error/30"
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteOpen(true);
+                }}
+              >
+                Delete account
+              </button>
+            </>
+          )}
         </section>
       </div>
 
@@ -618,6 +634,12 @@ export function AccountPageClient({
             <p className="mt-3 text-sm leading-relaxed text-text-secondary">
               Are you sure? This will permanently delete your account and all your data. This cannot be undone.
             </p>
+            {creditBalance > 0 ? (
+              <p className="mt-3 text-sm leading-relaxed text-amber-400/90">
+                You have {creditBalance} unused credit{creditBalance === 1 ? "" : "s"}. Deleting your
+                account forfeits them with no refund.
+              </p>
+            ) : null}
             {deleteError ? (
               <p className="mt-3 text-sm text-error" role="alert">
                 {deleteError}

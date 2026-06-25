@@ -1,4 +1,5 @@
 import { Nav } from "@/components/nav";
+import { redirectIfAccountEnforced } from "@/lib/account-status-routing";
 import { getCurrentUser } from "@/lib/auth";
 import { getLegalConsentRedirectIfNeeded } from "@/lib/legal-consent";
 import {
@@ -53,6 +54,8 @@ export default async function ReaderAppShellLayout({
   if (profileNeedsOnboarding(resolvedProfile, { planStepComplete })) {
     redirect(getOnboardingRedirectUrl(resolvedProfile, { planStepComplete }));
   }
+
+  await redirectIfAccountEnforced(session.id);
 
   return (
     <>

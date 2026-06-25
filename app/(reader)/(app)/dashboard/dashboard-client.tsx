@@ -164,7 +164,7 @@ export type DashboardClientProps = {
   } | null;
   account: Pick<
     AccountPageClientProps,
-    "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction"
+    "viewerId" | "user" | "stats" | "memberSinceLabel" | "isProduction" | "accountStatus" | "creditBalance"
   >;
 };
 
@@ -550,6 +550,8 @@ export function DashboardClient({
               stats={account.stats}
               memberSinceLabel={account.memberSinceLabel}
               isProduction={account.isProduction}
+              accountStatus={account.accountStatus}
+              creditBalance={account.creditBalance}
               embedded
             />
           </div>

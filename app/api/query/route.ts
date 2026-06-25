@@ -1,4 +1,5 @@
 import anthropic from "@/lib/anthropic";
+import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { getCurrentUser } from "@/lib/auth";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +41,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const enforcementBlock = await accountEnforcementApiGuard(dbUser.id);
+  if (enforcementBlock) return enforcementBlock;
+
   const { searchParams } = new URL(request.url);
   const bookId = searchParams.get("bookId");
   if (!bookId || bookId.trim() === "") {
@@ -73,6 +77,9 @@ export async function POST(request: Request) {
   if (!dbUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const enforcementBlock = await accountEnforcementApiGuard(dbUser.id);
+  if (enforcementBlock) return enforcementBlock;
 
   const [limitCheck, effectiveLimits] = await Promise.all([
     checkUsageLimit(dbUser.id, "query"),

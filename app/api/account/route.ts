@@ -1,3 +1,4 @@
+import { assertCanSelfDelete, AccountEnforcementError } from "@/lib/account-enforcement";
 import { parseUserAgeRange } from "@/lib/age-range";
 import { getCurrentUser } from "@/lib/auth";
 import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
@@ -169,8 +170,12 @@ export async function DELETE() {
   }
 
   try {
+    await assertCanSelfDelete(session.id);
     await deleteUserCompletely(session.id, { preventLastAdmin: true });
   } catch (err) {
+    if (err instanceof AccountEnforcementError) {
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 403 });
+    }
     if (err instanceof DeleteUserError) {
       const status =
         err.code === "not_found" ? 404 : err.code === "last_admin" ? 403 : 400;

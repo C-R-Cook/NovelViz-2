@@ -7,6 +7,7 @@ import {
 } from "@/lib/dashboard-data";
 import { normalizeVendorWindowDays } from "@/lib/admin-stats";
 import { parseDashboardTab, type DashboardUserRole } from "@/lib/dashboard-tab";
+import { getCreditBalance } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { redirect } from "next/navigation";
@@ -63,6 +64,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       subscribedToMailingList: true,
       globalSpoilerProtection: true,
       createdAt: true,
+      accountStatus: true,
     },
   });
   if (!dbUser) {
@@ -82,10 +84,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const isPartnerOrAdmin = role === UserRole.partner || role === UserRole.admin;
   const isAdmin = role === UserRole.admin;
 
-  const [reader, partner, adminBundle] = await Promise.all([
+  const [reader, partner, adminBundle, creditBalance] = await Promise.all([
     loadReaderDashboardData(userId),
     isPartnerOrAdmin ? loadPartnerDashboardData(userId) : Promise.resolve(null),
     isAdmin ? loadAdminDashboardData(activeTab, vendorWindowDays) : Promise.resolve(null),
+    getCreditBalance(userId),
   ]);
 
   return (
@@ -123,6 +126,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         stats: reader.stats,
         memberSinceLabel,
         isProduction: process.env.NODE_ENV === "production",
+        accountStatus: dbUser.accountStatus,
+        creditBalance,
       }}
     />
   );

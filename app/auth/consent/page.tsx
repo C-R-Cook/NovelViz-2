@@ -1,5 +1,6 @@
 import { AuthConsentClient } from "@/app/auth/consent/consent-client";
 import { ensureCurrentUser } from "@/lib/auth";
+import { DEV_USERS_BY_ID } from "@/lib/dev-users";
 import {
   clearLegalConsentIntentCookie,
   findLegalConsentForSession,
@@ -8,30 +9,31 @@ import {
   recordLegalConsent,
   userHasRequiredLegalConsent,
 } from "@/lib/legal-consent";
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
-export default async function AuthConsentPage() {
-  const { userId } = await auth();
-  if (!userId) {
-    redirect("/register");
+function redirectAfterConsent(session: { id: string }) {
+  if (process.env.NODE_ENV !== "production" && DEV_USERS_BY_ID[session.id]) {
+    redirect("/library");
   }
+  redirect("/auth/after");
+}
 
+export default async function AuthConsentPage() {
   const session = await ensureCurrentUser();
   if (!session) {
-    redirect("/auth/after");
+    redirect("/login");
   }
 
   const consent = await findLegalConsentForSession(session);
   if (consent && userHasRequiredLegalConsent(consent)) {
-    redirect("/auth/after");
+    redirectAfterConsent(session);
   }
 
   const intent = await readLegalConsentIntentCookie();
   if (isLegalConsentIntentValid(intent)) {
     await recordLegalConsent(session.id);
     await clearLegalConsentIntentCookie();
-    redirect("/auth/after");
+    redirectAfterConsent(session);
   }
 
   return (

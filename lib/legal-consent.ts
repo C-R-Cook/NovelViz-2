@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@/lib/auth";
+import { DEV_USERS_BY_ID } from "@/lib/dev-users";
 import {
   LEGAL_CONSENT_INTENT_COOKIE,
   LEGAL_CONSENT_INTENT_MAX_AGE_SECONDS,
@@ -183,6 +184,10 @@ export async function clearLegalConsentIntentCookie(): Promise<void> {
 export async function getLegalConsentRedirectIfNeeded(
   session: CurrentUser,
 ): Promise<string | null> {
+  if (process.env.NODE_ENV !== "production" && DEV_USERS_BY_ID[session.id]) {
+    return null;
+  }
+
   const consent = await findLegalConsentForSession(session);
   if (!consent || !userHasRequiredLegalConsent(consent)) {
     return "/auth/consent";

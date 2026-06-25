@@ -1,5 +1,6 @@
 import { requireAdminApi } from "@/lib/admin-auth";
 import { BADGES, getBadgeDefinition } from "@/lib/badges";
+import { getModerationLogsForUser } from "@/lib/account-enforcement";
 import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
 import { prisma } from "@/lib/prisma";
 import { getCreditBalance, getCreditTransactions } from "@/lib/credits";
@@ -36,6 +37,10 @@ export async function GET(_request: Request, context: RouteContext) {
       imagesLimitFloor: true,
       queriesUnlimitedFloor: true,
       createdAt: true,
+      accountStatus: true,
+      suspendedAt: true,
+      terminatedAt: true,
+      statusReason: true,
     },
   });
 
@@ -46,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { periodStart, resetDate } = await resolveBillingPeriod(userId);
   const limitSnapshot = await checkUsageLimit(userId, "query");
 
-  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits, creditBalance, creditTransactions, quotaOverrides, allTimeQueries, allTimeImages, ownedBooks] =
+  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits, creditBalance, creditTransactions, quotaOverrides, allTimeQueries, allTimeImages, ownedBooks, moderationLogs, pendingAppealCount] =
     await Promise.all([
       prisma.userGrant.findMany({
         where: {
@@ -73,6 +78,10 @@ export async function GET(_request: Request, context: RouteContext) {
         where: { ownerId: userId, deletedAt: null },
         select: { id: true, title: true, author: true, status: true },
         orderBy: { title: "asc" },
+      }),
+      getModerationLogsForUser(userId, 20),
+      prisma.moderationAppeal.count({
+        where: { userId, status: "pending" },
       }),
     ]);
 
@@ -128,6 +137,28 @@ export async function GET(_request: Request, context: RouteContext) {
       createdAt: o.createdAt.toISOString(),
     })),
     ownedBooks,
+    enforcement: {
+      accountStatus: user.accountStatus,
+      suspendedAt: user.suspendedAt?.toISOString() ?? null,
+      terminatedAt: user.terminatedAt?.toISOString() ?? null,
+      statusReason: user.statusReason,
+      strikeCount: moderationLogs.length,
+      pendingAppeal: pendingAppealCount > 0,
+      moderationLogs: moderationLogs.map((log) => ({
+        id: log.id,
+        source: log.source,
+        aupCategory: log.aupCategory,
+        summary: log.summary,
+        createdAt: log.createdAt.toISOString(),
+        flaggedBy: log.flaggedBy
+          ? {
+              id: log.flaggedBy.id,
+              username: log.flaggedBy.username,
+              email: log.flaggedBy.email,
+            }
+          : null,
+      })),
+    },
   });
 }
 

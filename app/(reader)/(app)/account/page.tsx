@@ -1,6 +1,7 @@
 import { AccountPageClient } from "./account-client";
 import { AccountUsageSection } from "@/components/subscription/account-usage-section";
 import { getCurrentUser } from "@/lib/auth";
+import { getCreditBalance } from "@/lib/credits";
 import { prisma } from "@/lib/prisma";
 import { getUserUsageSummary } from "@/lib/subscription";
 import { redirect } from "next/navigation";
@@ -24,6 +25,7 @@ export default async function AccountPage() {
       subscribedToMailingList: true,
       globalSpoilerProtection: true,
       createdAt: true,
+      accountStatus: true,
     },
   });
 
@@ -36,11 +38,13 @@ export default async function AccountPage() {
     year: "numeric",
   }).format(user.createdAt);
 
-  const [libraryBookCount, queryCount, generatedImageCount, usageSummary] = await Promise.all([
+  const [libraryBookCount, queryCount, generatedImageCount, usageSummary, creditBalance] =
+    await Promise.all([
     prisma.userBook.count({ where: { userId: session.id, isActive: true } }),
     prisma.query.count({ where: { userId: session.id } }),
     prisma.generatedImage.count({ where: { userId: session.id } }),
     getUserUsageSummary(session.id),
+    getCreditBalance(session.id),
   ]);
 
   return (
@@ -48,6 +52,8 @@ export default async function AccountPage() {
       <AccountPageClient
         viewerId={session.id}
         user={user}
+        accountStatus={user.accountStatus}
+        creditBalance={creditBalance}
         stats={{ libraryBookCount, queryCount, generatedImageCount }}
         memberSinceLabel={memberSinceLabel}
         isProduction={process.env.NODE_ENV === "production"}

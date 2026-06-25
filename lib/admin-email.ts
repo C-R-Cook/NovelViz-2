@@ -8,6 +8,7 @@ export const AdminEmailCategory = {
   FEATURE_REQUEST: "FEATURE-REQUEST",
   PARTNER_REQUEST: "PARTNER-REQUEST",
   COVER_AI_REQUEST: "COVER-AI-REQUEST",
+  ACCOUNT_APPEAL: "ACCOUNT-APPEAL",
 } as const;
 
 export type AdminEmailCategory = (typeof AdminEmailCategory)[keyof typeof AdminEmailCategory];

@@ -85,6 +85,22 @@ type DetailPayload = {
     author: string;
     status: string;
   }>;
+  enforcement: {
+    accountStatus: string;
+    suspendedAt: string | null;
+    terminatedAt: string | null;
+    statusReason: string | null;
+    strikeCount: number;
+    pendingAppeal: boolean;
+    moderationLogs: Array<{
+      id: string;
+      source: string;
+      aupCategory: string | null;
+      summary: string | null;
+      createdAt: string;
+      flaggedBy: { id: string; username: string | null; email: string } | null;
+    }>;
+  };
 };
 
 type Tab = "account" | "subscription" | "badges";
@@ -183,6 +199,11 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
+  const [enforcementReason, setEnforcementReason] = useState("");
+  const [enforcementBusy, setEnforcementBusy] = useState(false);
+  const [enforcementErr, setEnforcementErr] = useState<string | null>(null);
+  const [enforcementMsg, setEnforcementMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -291,6 +312,37 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
       setError("Failed to revoke grant");
     } finally {
       setRevokeBusy(false);
+    }
+  }
+
+  async function runEnforcement(
+    action: "suspend" | "terminate" | "restore" | "approve_appeal" | "deny_appeal",
+  ) {
+    setEnforcementErr(null);
+    setEnforcementMsg(null);
+    setEnforcementBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/enforcement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          reason: enforcementReason.trim() || undefined,
+          resolutionNote: enforcementReason.trim() || undefined,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setEnforcementErr(body.error ?? "Enforcement action failed");
+        return;
+      }
+      setEnforcementMsg(`Action "${action}" completed.`);
+      setEnforcementReason("");
+      await load();
+    } catch {
+      setEnforcementErr("Enforcement action failed");
+    } finally {
+      setEnforcementBusy(false);
     }
   }
 
@@ -562,6 +614,123 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
               )}
             </section>
           ) : null}
+
+          <section className="rounded-lg border border-border-subtle bg-bg-surface p-5">
+            <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
+              Account enforcement
+            </h2>
+            <dl className="grid gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-text-muted">Account status</dt>
+                <dd className="font-medium capitalize text-text-primary">
+                  {data.enforcement.accountStatus}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Strikes</dt>
+                <dd className="text-text-primary">{data.enforcement.strikeCount}</dd>
+              </div>
+              {data.enforcement.statusReason ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-text-muted">Status reason</dt>
+                  <dd className="text-text-primary">{data.enforcement.statusReason}</dd>
+                </div>
+              ) : null}
+              {data.enforcement.pendingAppeal ? (
+                <div className="sm:col-span-2">
+                  <dd className="text-sm font-medium text-amber-400">Pending appeal</dd>
+                </div>
+              ) : null}
+            </dl>
+
+            {data.enforcement.moderationLogs.length > 0 ? (
+              <ul className="mt-4 space-y-2 text-sm">
+                {data.enforcement.moderationLogs.map((log) => (
+                  <li key={log.id} className="rounded border border-border/60 px-3 py-2">
+                    <p className="font-medium text-text-primary">
+                      {new Date(log.createdAt).toLocaleString()} · {log.source}
+                      {log.aupCategory ? ` · ${log.aupCategory}` : ""}
+                    </p>
+                    {log.summary ? <p className="text-text-muted">{log.summary}</p> : null}
+                    {log.flaggedBy ? (
+                      <p className="text-xs text-text-muted">
+                        Flagged by: {log.flaggedBy.username ?? log.flaggedBy.email}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <label className="mt-4 block text-sm">
+              <span className="text-text-muted">Reason / resolution note (optional)</span>
+              <input
+                type="text"
+                value={enforcementReason}
+                onChange={(e) => setEnforcementReason(e.target.value)}
+                className="mt-1 w-full rounded-md border border-border bg-bg-base px-3 py-2 text-sm"
+                disabled={enforcementBusy}
+              />
+            </label>
+            {enforcementErr ? <p className="mt-2 text-sm text-error">{enforcementErr}</p> : null}
+            {enforcementMsg ? <p className="mt-2 text-sm text-success">{enforcementMsg}</p> : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {data.enforcement.accountStatus !== "suspended" &&
+              data.enforcement.accountStatus !== "terminated" ? (
+                <button
+                  type="button"
+                  disabled={enforcementBusy}
+                  onClick={() => void runEnforcement("suspend")}
+                  className="rounded-md border border-amber-500/50 px-3 py-1.5 text-sm text-amber-400 hover:bg-amber-500/10"
+                >
+                  Suspend
+                </button>
+              ) : null}
+              {data.enforcement.accountStatus !== "terminated" ? (
+                <button
+                  type="button"
+                  disabled={enforcementBusy}
+                  onClick={() => void runEnforcement("terminate")}
+                  className="rounded-md border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10"
+                >
+                  Terminate
+                </button>
+              ) : null}
+              {data.enforcement.accountStatus === "suspended" ? (
+                <button
+                  type="button"
+                  disabled={enforcementBusy}
+                  onClick={() => void runEnforcement("restore")}
+                  className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-bg-base"
+                >
+                  Restore active
+                </button>
+              ) : null}
+              {data.enforcement.pendingAppeal ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={enforcementBusy}
+                    onClick={() => void runEnforcement("approve_appeal")}
+                    className="rounded-md border border-success/50 px-3 py-1.5 text-sm text-success hover:bg-success/10"
+                  >
+                    Approve appeal
+                  </button>
+                  <button
+                    type="button"
+                    disabled={enforcementBusy}
+                    onClick={() => void runEnforcement("deny_appeal")}
+                    className="rounded-md border border-error/50 px-3 py-1.5 text-sm text-error hover:bg-error/10"
+                  >
+                    Deny appeal
+                  </button>
+                </>
+              ) : null}
+            </div>
+            <p className="mt-3 text-xs text-text-muted">
+              Termination forfeits unused credits via the ledger. Suspension leaves credits untouched.
+            </p>
+          </section>
 
           <section className="rounded-lg border border-error/40 bg-bg-surface p-5">
             <h2 className="mb-2 font-mono text-[10px] uppercase tracking-widest text-error">
@@ -1098,6 +1267,12 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
               This removes <span className="font-medium text-text-primary">{data.user.email}</span> from
               Clerk and deletes all of their NovelViz data. Type their email to confirm.
             </p>
+            {data.enforcement.accountStatus !== "active" ? (
+              <p className="mt-2 text-sm leading-relaxed text-amber-400/90">
+                This account is {data.enforcement.accountStatus} for enforcement. Deleting will remove
+                the ban and free this email for a new registration. Use this to reset test accounts.
+              </p>
+            ) : null}
             <label className="mt-4 block text-sm">
               <span className="text-text-muted">Email confirmation</span>
               <input

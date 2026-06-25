@@ -29,7 +29,7 @@ function isKnownUserId(s: string | null | undefined): s is string {
 }
 
 type Props = {
-  /** True when Clerk has an active session (dev cookie is ignored server-side unless guest preview). */
+  /** True when Clerk has an active session (dev cookie takes precedence server-side when set). */
   clerkSignedIn: boolean;
   /** Dev cookie value from the server — must match client initial state to avoid hydration errors. */
   devCookieUserId: string | null;
@@ -73,14 +73,13 @@ function DevRoleSwitcherInner({ clerkSignedIn, devCookieUserId, devGuestMode }: 
 
   const applyUser = useCallback(
     (nextId: string) => {
-      if (clerkSignedIn) return;
       if (!isKnownUserId(nextId)) return;
       setUserId(nextId);
       localStorage.setItem(DEV_USER_STORAGE_KEY, nextId);
       writeDevUserCookie(nextId);
       navigateAfterIdentityChange("/library");
     },
-    [clerkSignedIn, navigateAfterIdentityChange],
+    [navigateAfterIdentityChange],
   );
 
   return (
@@ -88,7 +87,7 @@ function DevRoleSwitcherInner({ clerkSignedIn, devCookieUserId, devGuestMode }: 
       <span className="text-[10px] font-bold uppercase tracking-wide text-warning">Dev user</span>
       {clerkSignedIn ? (
         <span className="max-w-[14rem] text-[10px] leading-snug text-text-muted">
-          Choose Unregistered for guest preview, or sign out of Clerk to impersonate dev users
+          Dev user overrides the Clerk session locally
         </span>
       ) : null}
       <select
@@ -107,21 +106,21 @@ function DevRoleSwitcherInner({ clerkSignedIn, devCookieUserId, devGuestMode }: 
         <option value={DEV_GUEST_SELECT_VALUE}>Unregistered (guest)</option>
         <optgroup label="Readers">
           {READER_IDS.map((id) => (
-            <option key={id} value={id} disabled={clerkSignedIn}>
+            <option key={id} value={id}>
               {DEV_USERS_BY_ID[id].name ?? id}
             </option>
           ))}
         </optgroup>
         <optgroup label="Partners">
           {PARTNER_IDS.map((id) => (
-            <option key={id} value={id} disabled={clerkSignedIn}>
+            <option key={id} value={id}>
               {DEV_USERS_BY_ID[id].name ?? id}
             </option>
           ))}
         </optgroup>
         <optgroup label="Admin">
           {ADMIN_IDS.map((id) => (
-            <option key={id} value={id} disabled={clerkSignedIn}>
+            <option key={id} value={id}>
               {DEV_USERS_BY_ID[id].name ?? id}
             </option>
           ))}

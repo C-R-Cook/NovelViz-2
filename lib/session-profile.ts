@@ -1,4 +1,5 @@
 import type { CurrentUser } from "@/lib/auth";
+import { getEnforcementRedirectPath } from "@/lib/account-enforcement";
 import { findLegalConsentForSession, userHasRequiredLegalConsent } from "@/lib/legal-consent";
 import { prisma } from "@/lib/prisma";
 
@@ -90,6 +91,14 @@ export async function resolvePostAuthRedirect(session: CurrentUser): Promise<str
   if (!consent || !userHasRequiredLegalConsent(consent)) {
     return "/auth/consent";
   }
+
+  const account = await prisma.user.findUnique({
+    where: { id: session.id },
+    select: { accountStatus: true },
+  });
+  const enforcementPath = account ? getEnforcementRedirectPath(account.accountStatus) : null;
+  if (enforcementPath) return enforcementPath;
+
   const profile = await findDbProfileForSession(session);
   return getPostAuthRedirectUrl(profile);
 }

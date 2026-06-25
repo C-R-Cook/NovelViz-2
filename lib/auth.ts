@@ -19,7 +19,7 @@ import type { UserRole } from "@db";
  *
  * - **Production:** Clerk `auth()` → `User` row by `clerkId` (synced via Clerk webhook).
  * - **Development:** `dev_user_id` / legacy `dev_role` cookie when set (role switcher);
- *   otherwise same Clerk path so real sign-in works locally.
+ *   otherwise Clerk path. Dev cookie takes precedence over Clerk when both are present.
  */
 export type CurrentUser = DevIdentityUser;
 
@@ -145,9 +145,9 @@ async function getCurrentUserUncached(): Promise<CurrentUser | null> {
     if (hasDevGuestMode(store.get(DEV_GUEST_COOKIE)?.value)) {
       return null;
     }
-    const clerkUser = await getClerkUser();
-    if (clerkUser) return clerkUser;
-    return getDevUserFromCookies();
+    const dev = await getDevUserFromCookies();
+    if (dev) return dev;
+    return getClerkUser();
   }
 
   return getClerkUser();

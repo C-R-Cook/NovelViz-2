@@ -761,7 +761,8 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                   Terminate
                 </button>
               ) : null}
-              {data.enforcement.accountStatus === "suspended" ? (
+              {data.enforcement.accountStatus === "suspended" &&
+              !data.enforcement.pendingAppeal ? (
                 <button
                   type="button"
                   disabled={enforcementBusy}
@@ -779,7 +780,7 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                     onClick={() => void runEnforcement("approve_appeal")}
                     className="rounded-md border border-success/50 px-3 py-1.5 text-sm text-success hover:bg-success/10"
                   >
-                    Approve appeal
+                    Approve &amp; restore
                   </button>
                   <button
                     type="button"

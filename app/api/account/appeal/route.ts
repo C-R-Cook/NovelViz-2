@@ -7,7 +7,7 @@ import {
 import {
   absoluteAppUrl,
   AdminEmailCategory,
-  sendAdminEmail,
+  sendAdminEmailAsync,
 } from "@/lib/admin-email";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
           })
           .join("\n");
 
-  sendAdminEmail({
+  const emailSent = await sendAdminEmailAsync({
     category: AdminEmailCategory.ACCOUNT_APPEAL,
     subjectDetail: user?.username ?? user?.email ?? session.id,
     replyTo: user?.email,
@@ -75,6 +75,12 @@ export async function POST(request: Request) {
       { label: "Admin user page", value: absoluteAppUrl(`/admin/users/${session.id}`) },
     ],
   });
+
+  if (!emailSent) {
+    console.warn("[api/account/appeal] appeal saved but admin email was not sent", {
+      userId: session.id,
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

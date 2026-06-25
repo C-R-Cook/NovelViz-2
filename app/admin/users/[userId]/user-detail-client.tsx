@@ -92,6 +92,13 @@ type DetailPayload = {
     statusReason: string | null;
     strikeCount: number;
     pendingAppeal: boolean;
+    appeals: Array<{
+      id: string;
+      status: string;
+      userMessage: string;
+      createdAt: string;
+      resolvedAt: string | null;
+    }>;
     moderationLogs: Array<{
       id: string;
       source: string;
@@ -642,6 +649,36 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                 </div>
               ) : null}
             </dl>
+
+            {data.enforcement.appeals.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
+                  User explanation
+                </h3>
+                {data.enforcement.appeals.map((appeal) => (
+                  <div
+                    key={appeal.id}
+                    className="rounded border border-border/60 bg-bg-base/40 px-3 py-3 text-sm"
+                  >
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+                      <span>{new Date(appeal.createdAt).toLocaleString()}</span>
+                      <span
+                        className={`font-medium capitalize ${
+                          appeal.status === "pending"
+                            ? "text-amber-400"
+                            : appeal.status === "approved"
+                              ? "text-success"
+                              : "text-error"
+                        }`}
+                      >
+                        {appeal.status}
+                      </span>
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap text-text-primary">{appeal.userMessage}</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
 
             {data.enforcement.moderationLogs.length > 0 ? (
               <ul className="mt-4 space-y-2 text-sm">

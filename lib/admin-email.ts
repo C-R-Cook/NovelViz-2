@@ -89,7 +89,7 @@ export const CONTACT_SUBJECT_LABELS: Record<string, string> = {
   issue: "Report an issue",
 };
 
-async function sendAdminEmailNow(input: SendAdminEmailInput): Promise<void> {
+async function sendAdminEmailNow(input: SendAdminEmailInput): Promise<boolean> {
   const to = getAdminNotificationEmail();
   const from = getEmailFrom();
   const subject = buildAdminEmailSubject(input.category, input.subjectDetail);
@@ -102,7 +102,7 @@ async function sendAdminEmailNow(input: SendAdminEmailInput): Promise<void> {
       to: to ?? "(unset)",
       from: from ?? "(unset)",
     });
-    return;
+    return false;
   }
 
   const resend = getResendClient();
@@ -114,7 +114,7 @@ async function sendAdminEmailNow(input: SendAdminEmailInput): Promise<void> {
       replyTo: input.replyTo,
       text,
     });
-    return;
+    return false;
   }
 
   const { error } = await resend.emails.send({
@@ -127,7 +127,10 @@ async function sendAdminEmailNow(input: SendAdminEmailInput): Promise<void> {
 
   if (error) {
     console.error("[admin-email] send failed", { category: input.category, error });
+    return false;
   }
+
+  return true;
 }
 
 /** Fire-and-forget admin notification. Never throws to callers. */
@@ -135,4 +138,14 @@ export function sendAdminEmail(input: SendAdminEmailInput): void {
   void sendAdminEmailNow(input).catch((err) => {
     console.error("[admin-email] unexpected error", { category: input.category, err });
   });
+}
+
+/** Await delivery — use when the caller must finish sending before the request ends (e.g. serverless). */
+export async function sendAdminEmailAsync(input: SendAdminEmailInput): Promise<boolean> {
+  try {
+    return await sendAdminEmailNow(input);
+  } catch (err) {
+    console.error("[admin-email] unexpected error", { category: input.category, err });
+    return false;
+  }
 }

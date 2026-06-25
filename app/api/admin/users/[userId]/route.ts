@@ -51,7 +51,7 @@ export async function GET(_request: Request, context: RouteContext) {
   const { periodStart, resetDate } = await resolveBillingPeriod(userId);
   const limitSnapshot = await checkUsageLimit(userId, "query");
 
-  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits, creditBalance, creditTransactions, quotaOverrides, allTimeQueries, allTimeImages, ownedBooks, moderationLogs, pendingAppealCount] =
+  const [activeGrants, badgeRows, queriesThisPeriod, imagesThisPeriod, effectiveLimits, creditBalance, creditTransactions, quotaOverrides, allTimeQueries, allTimeImages, ownedBooks, moderationLogs, pendingAppealCount, moderationAppeals] =
     await Promise.all([
       prisma.userGrant.findMany({
         where: {
@@ -82,6 +82,18 @@ export async function GET(_request: Request, context: RouteContext) {
       getModerationLogsForUser(userId, 20),
       prisma.moderationAppeal.count({
         where: { userId, status: "pending" },
+      }),
+      prisma.moderationAppeal.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          status: true,
+          userMessage: true,
+          createdAt: true,
+          resolvedAt: true,
+        },
       }),
     ]);
 
@@ -144,6 +156,13 @@ export async function GET(_request: Request, context: RouteContext) {
       statusReason: user.statusReason,
       strikeCount: moderationLogs.length,
       pendingAppeal: pendingAppealCount > 0,
+      appeals: moderationAppeals.map((appeal) => ({
+        id: appeal.id,
+        status: appeal.status,
+        userMessage: appeal.userMessage,
+        createdAt: appeal.createdAt.toISOString(),
+        resolvedAt: appeal.resolvedAt?.toISOString() ?? null,
+      })),
       moderationLogs: moderationLogs.map((log) => ({
         id: log.id,
         source: log.source,

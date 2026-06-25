@@ -12,6 +12,7 @@ type UserRow = {
   role: string;
   subscriptionTier: string;
   subscriptionStatus: string;
+  accountStatus: string;
   createdAt: string;
   hasOgBadge: boolean;
   imageCount: number;
@@ -28,6 +29,8 @@ function tierBadgeClass(tier: string): string {
 
 function statusBadgeClass(status: string): string {
   if (status === "active") return "text-success";
+  if (status === "suspended") return "text-amber-400";
+  if (status === "terminated") return "text-error";
   if (status === "past_due") return "text-amber-400";
   if (status === "cancelled") return "text-error";
   if (status === "trialing") return "text-accent-text";
@@ -175,8 +178,8 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
                 </div>
                 <div>
                   <dt className="text-text-muted">Status</dt>
-                  <dd className={`capitalize ${statusBadgeClass(u.subscriptionStatus)}`}>
-                    {u.subscriptionStatus.replace("_", " ")}
+                  <dd className={`capitalize ${statusBadgeClass(u.accountStatus)}`}>
+                    {u.accountStatus.replace("_", " ")}
                   </dd>
                 </div>
                 <div>
@@ -282,8 +285,8 @@ export function UsersAdminClient({ variant = "page" }: { variant?: "page" | "emb
                       {u.subscriptionTier}
                     </span>
                   </td>
-                  <td className={`px-3 py-2.5 text-xs capitalize ${statusBadgeClass(u.subscriptionStatus)}`}>
-                    {u.subscriptionStatus.replace("_", " ")}
+                  <td className={`px-3 py-2.5 text-xs capitalize ${statusBadgeClass(u.accountStatus)}`}>
+                    {u.accountStatus.replace("_", " ")}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-text-primary">{u.imageCount.toLocaleString()}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-text-primary">{u.queryCount.toLocaleString()}</td>

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { auth } from "@clerk/nextjs/server";
+import { Analytics } from "@vercel/analytics/next";
 import { cookies } from "next/headers";
 import { DevRoleSwitcher } from "@/components/dev-role-switcher";
 import { ConditionalPublicFooter } from "@/components/conditional-public-footer";
@@ -64,6 +65,7 @@ export default async function RootLayout({
               />
             </div>
           ) : null}
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

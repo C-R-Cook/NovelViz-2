@@ -1,13 +1,13 @@
 "use client";
 
 import { SignIn, SignUp } from "@clerk/nextjs";
-import type { Appearance } from "@clerk/types";
 import type { ComponentProps } from "react";
 
 type SignInProps = ComponentProps<typeof SignIn>;
 type SignUpProps = ComponentProps<typeof SignUp>;
+type ClerkAppearance = NonNullable<SignUpProps["appearance"]>;
 
-const embeddedSignUpAppearance: Appearance = {
+const embeddedSignUpAppearance: ClerkAppearance = {
   baseTheme: "dark",
   elements: {
     rootBox: "w-full",

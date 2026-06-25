@@ -626,78 +626,106 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
             <h2 className="mb-3 font-mono text-[10px] uppercase tracking-widest text-text-muted">
               Account enforcement
             </h2>
-            <dl className="grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-text-muted">Account status</dt>
-                <dd className="font-medium capitalize text-text-primary">
-                  {data.enforcement.accountStatus}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-text-muted">Strikes</dt>
-                <dd className="text-text-primary">{data.enforcement.strikeCount}</dd>
-              </div>
-              {data.enforcement.statusReason ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-text-muted">Status reason</dt>
-                  <dd className="text-text-primary">{data.enforcement.statusReason}</dd>
+            <div className="rounded-lg border border-border/60 bg-bg-base/40 p-4">
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt className="text-text-muted">Account status</dt>
+                  <dd className="font-medium capitalize text-text-primary">
+                    {data.enforcement.accountStatus}
+                  </dd>
                 </div>
-              ) : null}
-              {data.enforcement.pendingAppeal ? (
-                <div className="sm:col-span-2">
-                  <dd className="text-sm font-medium text-amber-400">Pending appeal</dd>
+                <div>
+                  <dt className="text-text-muted">Strikes</dt>
+                  <dd className="text-text-primary">{data.enforcement.strikeCount}</dd>
                 </div>
-              ) : null}
-            </dl>
-
-            {data.enforcement.appeals.length > 0 ? (
-              <div className="mt-4 space-y-3">
-                <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
-                  User explanation
-                </h3>
-                {data.enforcement.appeals.map((appeal) => (
-                  <div
-                    key={appeal.id}
-                    className="rounded border border-border/60 bg-bg-base/40 px-3 py-3 text-sm"
-                  >
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-                      <span>{new Date(appeal.createdAt).toLocaleString()}</span>
-                      <span
-                        className={`font-medium capitalize ${
-                          appeal.status === "pending"
-                            ? "text-amber-400"
-                            : appeal.status === "approved"
-                              ? "text-success"
-                              : "text-error"
-                        }`}
-                      >
-                        {appeal.status}
-                      </span>
-                    </p>
-                    <p className="mt-2 whitespace-pre-wrap text-text-primary">{appeal.userMessage}</p>
+                {data.enforcement.suspendedAt ? (
+                  <div>
+                    <dt className="text-text-muted">Suspended at</dt>
+                    <dd className="text-text-primary">
+                      {new Date(data.enforcement.suspendedAt).toLocaleString()}
+                    </dd>
                   </div>
-                ))}
-              </div>
-            ) : null}
+                ) : null}
+                {data.enforcement.terminatedAt ? (
+                  <div>
+                    <dt className="text-text-muted">Terminated at</dt>
+                    <dd className="text-text-primary">
+                      {new Date(data.enforcement.terminatedAt).toLocaleString()}
+                    </dd>
+                  </div>
+                ) : null}
+                {data.enforcement.statusReason ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-text-muted">Status reason</dt>
+                    <dd className="whitespace-pre-wrap text-text-primary">
+                      {data.enforcement.statusReason}
+                    </dd>
+                  </div>
+                ) : null}
+                {data.enforcement.pendingAppeal ? (
+                  <div className="sm:col-span-2">
+                    <dt className="text-text-muted">Appeal</dt>
+                    <dd className="text-sm font-medium text-amber-400">Pending review</dd>
+                  </div>
+                ) : null}
+              </dl>
 
-            {data.enforcement.moderationLogs.length > 0 ? (
-              <ul className="mt-4 space-y-2 text-sm">
-                {data.enforcement.moderationLogs.map((log) => (
-                  <li key={log.id} className="rounded border border-border/60 px-3 py-2">
-                    <p className="font-medium text-text-primary">
-                      {new Date(log.createdAt).toLocaleString()} · {log.source}
-                      {log.aupCategory ? ` · ${log.aupCategory}` : ""}
-                    </p>
-                    {log.summary ? <p className="text-text-muted">{log.summary}</p> : null}
-                    {log.flaggedBy ? (
-                      <p className="text-xs text-text-muted">
-                        Flagged by: {log.flaggedBy.username ?? log.flaggedBy.email}
-                      </p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
+              {data.enforcement.moderationLogs.length > 0 ? (
+                <div className="mt-4 border-t border-border/60 pt-4">
+                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
+                    Strike history
+                  </h3>
+                  <ul className="mt-3 space-y-2 text-sm">
+                    {data.enforcement.moderationLogs.map((log) => (
+                      <li key={log.id} className="rounded border border-border/40 bg-bg-surface/50 px-3 py-2">
+                        <p className="font-medium text-text-primary">
+                          {new Date(log.createdAt).toLocaleString()} · {log.source}
+                          {log.aupCategory ? ` · ${log.aupCategory}` : ""}
+                        </p>
+                        {log.summary ? <p className="text-text-muted">{log.summary}</p> : null}
+                        {log.flaggedBy ? (
+                          <p className="text-xs text-text-muted">
+                            Flagged by: {log.flaggedBy.username ?? log.flaggedBy.email}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {data.enforcement.appeals.length > 0 ? (
+                <div className="mt-4 border-t border-border/60 pt-4">
+                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
+                    User explanation
+                  </h3>
+                  <div className="mt-3 space-y-3">
+                    {data.enforcement.appeals.map((appeal) => (
+                      <div
+                        key={appeal.id}
+                        className="rounded border border-border/40 bg-bg-surface/50 px-3 py-3 text-sm"
+                      >
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+                          <span>{new Date(appeal.createdAt).toLocaleString()}</span>
+                          <span
+                            className={`font-medium capitalize ${
+                              appeal.status === "pending"
+                                ? "text-amber-400"
+                                : appeal.status === "approved"
+                                  ? "text-success"
+                                  : "text-error"
+                            }`}
+                          >
+                            {appeal.status}
+                          </span>
+                        </p>
+                        <p className="mt-2 whitespace-pre-wrap text-text-primary">{appeal.userMessage}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
             <label className="mt-4 block text-sm">
               <span className="text-text-muted">Reason / resolution note (optional)</span>

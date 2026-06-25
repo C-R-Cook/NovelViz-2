@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NovelViz — Imagine</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0908;
+    --surface: #111010;
+    --surface2: #1a1917;
+    --border: #2a2825;
+    --gold: #c9a84c;
+    --gold-dim: #8a6f32;
+    --cream: #f0e8d8;
+    --muted: #6b6560;
+    --text: #e8ddd0;
+    --accent: #c9a84c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.4;
+  }
+
+  /* NAV */
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 48px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(10,9,8,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .nav-brand {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+    text-decoration: none;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover, .nav-links a.active {
+    color: var(--cream);
+  }
+
+  .nav-links a.active {
+    color: var(--gold);
+  }
+
+  /* MAIN LAYOUT */
+  .page {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* LEFT PANEL */
+  .left-panel {
+    border-right: 1px solid var(--border);
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    animation: fadeSlideIn 0.5s ease both;
+  }
+
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  /* Book context card */
+  .book-context {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    padding: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .book-cover-small {
+    width: 56px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 2px;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #1e1a16, #2d2520);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+  }
+
+  .book-meta {
+    flex: 1;
+  }
+
+  .book-meta-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .book-meta-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--cream);
+    line-height: 1.3;
+    margin-bottom: 2px;
+  }
+
+  .book-meta-author {
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .chapter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 4px 10px;
+    background: rgba(201, 168, 76, 0.1);
+    border: 1px solid rgba(201, 168, 76, 0.25);
+    border-radius: 2px;
+    font-size: 0.72rem;
+    color: var(--gold);
+    letter-spacing: 0.06em;
+  }
+
+  .chapter-badge::before {
+    content: '◆';
+    font-size: 0.5rem;
+  }
+
+  /* Section label */
+  .section-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* Prompt area */
+  .prompt-section { display: flex; flex-direction: column; }
+
+  .prompt-textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--cream);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 300;
+    padding: 16px;
+    resize: none;
+    height: 120px;
+    line-height: 1.6;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .prompt-textarea:focus {
+    border-color: var(--gold-dim);
+  }
+
+  .prompt-textarea::placeholder { color: var(--muted); }
+
+  .prompt-hint {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* Style chips */
+  .style-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chip {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.04em;
+    background: transparent;
+  }
+
+  .chip:hover { border-color: var(--gold-dim); color: var(--cream); }
+  .chip.active { border-color: var(--gold); color: var(--gold); background: rgba(201,168,76,0.08); }
+
+  /* Advanced toggle */
+  .advanced-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+  }
+
+  .advanced-toggle:hover { color: var(--cream); }
+
+  .advanced-toggle .arrow {
+    font-size: 0.6rem;
+    transition: transform 0.2s;
+  }
+
+  /* Generate button */
+  .generate-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--gold);
+    color: #0a0908;
+    border: none;
+    border-radius: 3px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: auto;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .generate-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  }
+
+  .generate-btn:hover {
+    background: #d4b45a;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 24px rgba(201, 168, 76, 0.2);
+  }
+
+  /* RIGHT PANEL */
+  .right-panel {
+    padding: 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    animation: fadeIn 0.6s ease 0.1s both;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .right-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .right-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--cream);
+    font-weight: 400;
+  }
+
+  .right-subtitle {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .view-toggle {
+    display: flex;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 3px;
+  }
+
+  .view-btn {
+    padding: 6px 12px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 2px;
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  .view-btn.active {
+    background: var(--surface2);
+    color: var(--cream);
+  }
+
+  /* Result area — currently generating state */
+  .result-area {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 24px;
+  }
+
+  /* Featured / generating image */
+  .image-featured {
+    grid-column: 1 / -1;
+    aspect-ratio: 16/9;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Shimmer animation for generating state */
+  .shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(201, 168, 76, 0.04) 50%,
+      transparent 60%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .generating-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    z-index: 1;
+  }
+
+  .generating-icon {
+    width: 48px;
+    height: 48px;
+    border: 1px solid var(--gold-dim);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .generating-label {
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .generating-prompt {
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--gold-dim);
+    text-align: center;
+    max-width: 400px;
+    line-height: 1.6;
+  }
+
+  /* Past generations grid */
+  .past-grid-label {
+    grid-column: 1 / -1;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .past-image-card {
+    aspect-ratio: 3/4;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .past-image-card:hover {
+    border-color: var(--gold-dim);
+    transform: translateY(-2px);
+  }
+
+  .past-image-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+
+  .past-image-card:hover img { opacity: 1; }
+
+  .past-image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 12px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+    font-size: 0.75rem;
+    color: var(--cream);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .past-image-card:hover .past-image-overlay { opacity: 1; }
+
+  .past-image-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .past-image-card:hover .past-image-actions { opacity: 1; }
+
+  .icon-btn {
+    width: 30px;
+    height: 30px;
+    background: rgba(10,9,8,0.7);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.75rem;
+    color: var(--cream);
+    backdrop-filter: blur(4px);
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover { background: rgba(201,168,76,0.2); border-color: var(--gold-dim); }
+
+  /* Chapter gating notice */
+  .gating-notice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(201, 168, 76, 0.06);
+    border: 1px solid rgba(201, 168, 76, 0.2);
+    border-radius: 3px;
+    font-size: 0.78rem;
+    color: var(--gold-dim);
+    line-height: 1.5;
+  }
+
+  .gating-notice-icon { font-size: 1rem; flex-shrink: 0; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="nav-brand">NovelViz</a>
+  <ul class="nav-links">
+    <li><a href="#">Books</a></li>
+    <li><a href="#">My Library</a></li>
+    <li><a href="#" class="active">Imagine</a></li>
+    <li><a href="#">Ask</a></li>
+  </ul>
+</nav>
+
+<div class="page">
+
+  <!-- LEFT: Controls -->
+  <aside class="left-panel">
+
+    <!-- Book context -->
+    <div class="book-context">
+      <div class="book-cover-small">📖</div>
+      <div class="book-meta">
+        <div class="book-meta-label">Currently reading</div>
+        <div class="book-meta-title">Dracula</div>
+        <div class="book-meta-author">Bram Stoker</div>
+        <div class="chapter-badge">Up to Chapter 12</div>
+      </div>
+    </div>
+
+    <!-- Prompt -->
+    <div class="prompt-section">
+      <div class="section-label">Describe your scene</div>
+      <textarea class="prompt-textarea" placeholder="Count Dracula standing at the window of his castle, moonlight casting long shadows across the stone floor..."></textarea>
+      <p class="prompt-hint">Only characters and places from chapters you've reached will be included.</p>
+    </div>
+
+    <!-- Style -->
+    <div>
+      <div class="section-label">Visual style</div>
+      <div class="style-chips">
+        <button class="chip active">Oil painting</button>
+        <button class="chip">Ink sketch</button>
+        <button class="chip">Cinematic</button>
+        <button class="chip">Watercolour</button>
+        <button class="chip">Dark fantasy</button>
+        <button class="chip">Victorian etching</button>
+      </div>
+    </div>
+
+    <!-- Advanced -->
+    <div class="advanced-toggle" onclick="this.querySelector('.arrow').style.transform = this.querySelector('.arrow').style.transform === 'rotate(90deg)' ? '' : 'rotate(90deg)'">
+      <span class="arrow">▶</span>
+      Advanced options
+    </div>
+
+    <!-- Chapter gating notice -->
+    <div class="gating-notice">
+      <span class="gating-notice-icon">◆</span>
+      Images are generated only from context within your current reading progress. No spoilers, ever.
+    </div>
+
+    <button class="generate-btn">Generate Image</button>
+
+  </aside>
+
+  <!-- RIGHT: Output -->
+  <main class="right-panel">
+
+    <div class="right-header">
+      <div>
+        <h1 class="right-title">Imagine</h1>
+        <p class="right-subtitle">Bring scenes from your book to life</p>
+      </div>
+      <div class="view-toggle">
+        <button class="view-btn active">Current</button>
+        <button class="view-btn">History</button>
+        <button class="view-btn">Gallery</button>
+      </div>
+    </div>
+
+    <div class="result-area">
+
+      <!-- Currently generating -->
+      <div class="image-featured">
+        <div class="shimmer"></div>
+        <div class="generating-text">
+          <div class="generating-icon"></div>
+          <div class="generating-label">Rendering your scene</div>
+          <div class="generating-prompt">"Count Dracula standing at the window of his castle, moonlight casting long shadows..."</div>
+        </div>
+      </div>
+
+      <div class="past-grid-label">Previous generations — Dracula</div>
+
+      <!-- Past image 1 -->
+      <div class="past-image-card">
+        <img src="https://picsum.photos/400/533?random=10" alt="Generated scene" />
+        <div class="past-image-actions">
+          <div class="icon-btn" title="Make public">⌖</div>
+          <div class="icon-btn" title="Download">↓</div>
+        </div>
+        <div class="past-image-overlay">Jonathan Harker arriving at the castle gates · Ch. 3</div>
+      </div>
+
+      <!-- Past image 2 -->
+      <div class="past-image-card">
+        <img src="https://picsum.photos/400/533?random=22" alt="Generated scene" />
+        <div class="past-image-actions">
+          <div class="icon-btn" title="Make public">⌖</div>
+          <div class="icon-btn" title="Download">↓</div>
+        </div>
+        <div class="past-image-overlay">Mina writing in her journal by candlelight · Ch. 8</div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // Style chip toggle
+  document.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  });
+
+  // View toggle
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>

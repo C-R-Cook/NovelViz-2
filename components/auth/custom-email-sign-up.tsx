@@ -1,6 +1,16 @@
 "use client";
 
 import {
+  AUTH_SSO_CALLBACK_PATH,
+  AUTH_SSO_COMPLETE_PATH,
+  authInputClass,
+  clerkErrorMessage,
+  isValidEmail,
+  waitForSessionReady,
+} from "@/components/auth/auth-form-utils";
+import { AuthOAuthDivider, GoogleOAuthButton } from "@/components/auth/google-oauth-button";
+import { PasswordInput } from "@/components/auth/password-input";
+import {
   allLegalConsentChecksComplete,
   SignUpLegalConsentFields,
   type LegalConsentChecks,
@@ -19,37 +29,8 @@ const initialChecks: LegalConsentChecks = {
   privacyAccepted: false,
 };
 
-const inputClass =
-  "mt-1 w-full rounded-md border border-border-default bg-bg-elevated/80 px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent/50 focus:outline-none focus:ring-1 focus:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-60";
-
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
 function isValidPassword(password: string): boolean {
   return password.length >= 8;
-}
-
-function clerkErrorMessage(err: unknown, fallback: string): string {
-  if (err && typeof err === "object" && "errors" in err) {
-    const errors = (err as { errors?: Array<{ longMessage?: string; message?: string }> }).errors;
-    if (errors?.[0]?.longMessage) return errors[0].longMessage;
-    if (errors?.[0]?.message) return errors[0].message;
-  }
-  if (err instanceof Error && err.message) return err.message;
-  return fallback;
-}
-
-async function waitForSessionReady(): Promise<string> {
-  for (let attempt = 0; attempt < 30; attempt++) {
-    const res = await fetch("/api/auth/session-ready", { cache: "no-store" });
-    if (res.ok) {
-      const data = (await res.json()) as { ready?: boolean; redirectTo?: string };
-      if (data.ready && data.redirectTo) return data.redirectTo;
-    }
-    await new Promise((resolve) => setTimeout(resolve, Math.min(500 + attempt * 100, 2000)));
-  }
-  return "/onboarding/plan";
 }
 
 export function CustomEmailSignUp() {
@@ -62,14 +43,45 @@ export function CustomEmailSignUp() {
   const [code, setCode] = useState("");
   const [checks, setChecks] = useState<LegalConsentChecks>(initialChecks);
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const consentComplete = allLegalConsentChecksComplete(checks);
   const canSubmitForm =
     isLoaded &&
     isValidEmail(email) &&
     isValidPassword(password) &&
-    allLegalConsentChecksComplete(checks) &&
-    !busy;
+    consentComplete &&
+    !busy &&
+    !oauthBusy;
+
+  async function handleGoogleSignUp() {
+    if (!isLoaded || !signUp || !consentComplete || oauthBusy || busy) return;
+
+    setError(null);
+    setOauthBusy(true);
+    try {
+      const intentRes = await fetch("/api/legal-consent-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(checks),
+      });
+      if (!intentRes.ok) {
+        const body = (await intentRes.json().catch(() => ({}))) as { error?: string };
+        setError(body.error ?? "Could not save your agreements. Please try again.");
+        return;
+      }
+
+      await signUp.authenticateWithRedirect({
+        strategy: "oauth_google",
+        redirectUrl: AUTH_SSO_CALLBACK_PATH,
+        redirectUrlComplete: AUTH_SSO_COMPLETE_PATH,
+      });
+    } catch (err: unknown) {
+      setError(clerkErrorMessage(err, "Could not continue with Google. Please try again."));
+      setOauthBusy(false);
+    }
+  }
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -117,7 +129,7 @@ export function CustomEmailSignUp() {
         return;
       }
 
-      const redirectTo = await waitForSessionReady();
+      const redirectTo = await waitForSessionReady("/onboarding/plan");
       router.replace(redirectTo);
       router.refresh();
     } catch (err: unknown) {
@@ -139,57 +151,71 @@ export function CustomEmailSignUp() {
 
       <div className="register-flow__panel">
         {step === "form" ? (
-          <form onSubmit={(e) => void handleCreateAccount(e)} className="space-y-4">
-            <label className="block text-sm">
-              <span className="text-text-secondary">Email</span>
-              <input
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={busy}
-                className={inputClass}
-                placeholder="you@example.com"
-              />
-            </label>
-
-            <label className="block text-sm">
-              <span className="text-text-secondary">Password</span>
-              <input
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={busy}
-                className={inputClass}
-                placeholder="At least 8 characters"
-              />
-            </label>
-
-            <SignUpLegalConsentFields
-              variant="integrated"
-              value={checks}
-              onChange={setChecks}
-              disabled={busy}
+          <>
+            <GoogleOAuthButton
+              label="Continue with Google"
+              busy={oauthBusy}
+              disabled={!isLoaded || !consentComplete}
+              onClick={() => void handleGoogleSignUp()}
             />
-
-            {error ? (
-              <p className="text-sm text-error" role="alert">
-                {error}
+            {!consentComplete ? (
+              <p className="mt-2 text-center text-xs text-text-muted">
+                Accept the agreements below to use Google sign-up.
               </p>
             ) : null}
 
-            <button
-              type="submit"
-              disabled={!canSubmitForm}
-              className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-text-on-accent transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy ? "Creating account…" : "Create account"}
-            </button>
-          </form>
+            <AuthOAuthDivider />
+
+            <form onSubmit={(e) => void handleCreateAccount(e)} className="space-y-4">
+              <label className="block text-sm">
+                <span className="text-text-secondary">Email</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={busy || oauthBusy}
+                  className={authInputClass}
+                  placeholder="you@example.com"
+                />
+              </label>
+
+              <label className="block text-sm">
+                <span className="text-text-secondary">Password</span>
+                <PasswordInput
+                  value={password}
+                  onChange={setPassword}
+                  disabled={busy || oauthBusy}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  minLength={8}
+                  required
+                />
+              </label>
+
+              <SignUpLegalConsentFields
+                variant="integrated"
+                value={checks}
+                onChange={setChecks}
+                disabled={busy || oauthBusy}
+              />
+
+              {error ? (
+                <p className="text-sm text-error" role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={!canSubmitForm}
+                className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-text-on-accent transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy ? "Creating account…" : "Create account"}
+              </button>
+            </form>
+          </>
         ) : (
           <form onSubmit={(e) => void handleVerify(e)} className="space-y-4">
             <p className="text-sm text-text-secondary">
@@ -207,7 +233,7 @@ export function CustomEmailSignUp() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 disabled={busy}
-                className={inputClass}
+                className={authInputClass}
                 placeholder="Enter code from email"
               />
             </label>

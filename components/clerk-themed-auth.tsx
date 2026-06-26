@@ -7,7 +7,7 @@ type SignInProps = ComponentProps<typeof SignIn>;
 type SignUpProps = ComponentProps<typeof SignUp>;
 type ClerkAppearance = NonNullable<SignUpProps["appearance"]>;
 
-const embeddedSignUpAppearance: ClerkAppearance = {
+const embeddedAuthAppearance: ClerkAppearance = {
   baseTheme: "dark",
   elements: {
     rootBox: "w-full",
@@ -33,8 +33,28 @@ const embeddedSignUpAppearance: ClerkAppearance = {
   },
 };
 
-export function ClerkThemedSignIn(props: SignInProps) {
-  const { appearance, ...rest } = props;
+type ClerkThemedSignInProps = SignInProps & {
+  /** Strip Clerk card chrome — use inside NovelViz auth shell. */
+  embedded?: boolean;
+};
+
+export function ClerkThemedSignIn({ embedded = false, appearance, ...rest }: ClerkThemedSignInProps) {
+  if (embedded) {
+    return (
+      <SignIn
+        {...rest}
+        appearance={{
+          ...embeddedAuthAppearance,
+          ...appearance,
+          elements: {
+            ...embeddedAuthAppearance.elements,
+            ...appearance?.elements,
+          },
+        }}
+      />
+    );
+  }
+
   return (
     <SignIn
       {...rest}
@@ -57,10 +77,10 @@ export function ClerkThemedSignUp({ embedded = false, appearance, ...rest }: Cle
       <SignUp
         {...rest}
         appearance={{
-          ...embeddedSignUpAppearance,
+          ...embeddedAuthAppearance,
           ...appearance,
           elements: {
-            ...embeddedSignUpAppearance.elements,
+            ...embeddedAuthAppearance.elements,
             ...appearance?.elements,
           },
         }}

@@ -1,4 +1,4 @@
-import { ClerkThemedSignIn } from "@/components/clerk-themed-auth";
+import { CustomEmailSignIn } from "@/components/auth/custom-email-sign-in";
 import { ensureCurrentUser } from "@/lib/auth";
 import { resolvePostAuthRedirect } from "@/lib/session-profile";
 import { auth } from "@clerk/nextjs/server";
@@ -15,14 +15,8 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-bg-base p-6">
-      <ClerkThemedSignIn
-        path="/login"
-        routing="path"
-        signUpUrl="/register"
-        forceRedirectUrl="/auth/after"
-        fallbackRedirectUrl="/auth/after"
-      />
+    <div className="register-page bg-bg-base">
+      <CustomEmailSignIn />
     </div>
   );
 }

@@ -30,7 +30,7 @@
 
 **Sign-up** is a single, NovelViz-branded email/password flow. Users never see Clerk’s embedded sign-up widget. After email verification, legal agreements are saved to our database and the user goes directly to plan selection.
 
-**Sign-in** still uses Clerk’s sign-in widget at `/login` and routes through `/auth/after` for database provisioning and onboarding checks.
+**Sign-in** uses the same custom headless flow at `/login` (email/password via `useSignIn()`), then session-ready polling for provisioning and onboarding routing.
 
 **Account enforcement** uses three account states (`active`, `suspended`, `terminated`). Strikes are recorded in a moderation log. Suspensions can be appealed once per cycle; admins review appeals in the user detail panel. Suspended users are blocked from the app (gallery, library, comments, etc.) but can still reach the landing page, their suspension status page, and auth routes.
 
@@ -150,9 +150,9 @@ Clerk’s built-in “legal compliance” checkbox is **not** used; it cannot sa
 
 ### 2.5 Returning users (sign-in)
 
-1. `/login` → Clerk sign-in widget  
-2. `/auth/after` → provision DB user if needed, apply consent fallback, route via `resolvePostAuthRedirect()`  
-3. Destination: `/library` if onboarding complete, else `/onboarding/plan` or `/onboarding/preferences`
+1. `/login` → custom email/password form (`useSignIn()` headless, same shell as register)  
+2. If MFA is enabled, email verification code step  
+3. `/api/auth/session-ready` polling → same routing as sign-up (`resolvePostAuthRedirect()`)
 
 Provisioning uses fetch-based polling of `/api/auth/session-ready` (no full-page reload loop).
 

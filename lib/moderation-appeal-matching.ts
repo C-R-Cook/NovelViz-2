@@ -19,6 +19,11 @@ function isSuspensionRelatedLog(log: ModerationLogLike): boolean {
   return summary.includes("suspend") || summary.includes("terminated");
 }
 
+export function isTerminationLog(log: ModerationLogLike): boolean {
+  const summary = log.summary?.toLowerCase() ?? "";
+  return summary.includes("terminated");
+}
+
 function inferAppealLogId<TLog extends ModerationLogLike>(
   appeal: ModerationAppealLike,
   logs: TLog[],
@@ -64,4 +69,46 @@ export function groupAppealsByModerationLog<
   }
 
   return { byLogId, unmatched };
+}
+
+export type SuspensionEpisode<
+  TLog extends ModerationLogLike,
+  TAppeal extends ModerationAppealLike,
+> = {
+  id: string;
+  anchorLog: TLog;
+  precedingStrikes: TLog[];
+  appeals: TAppeal[];
+};
+
+/** Group moderation logs into suspension cycles for admin display (newest episode first). */
+export function buildSuspensionEpisodes<
+  TLog extends ModerationLogLike,
+  TAppeal extends ModerationAppealLike,
+>(
+  logs: TLog[],
+  appealsByLogId: Map<string, TAppeal[]>,
+): { episodes: SuspensionEpisode<TLog, TAppeal>[]; openStrikes: TLog[] } {
+  const sorted = [...logs].sort((a, b) => toTimestamp(a.createdAt) - toTimestamp(b.createdAt));
+  const episodes: SuspensionEpisode<TLog, TAppeal>[] = [];
+  let strikeBuffer: TLog[] = [];
+
+  for (const log of sorted) {
+    if (isSuspensionRelatedLog(log)) {
+      episodes.push({
+        id: log.id,
+        anchorLog: log,
+        precedingStrikes: strikeBuffer,
+        appeals: appealsByLogId.get(log.id) ?? [],
+      });
+      strikeBuffer = [];
+    } else {
+      strikeBuffer.push(log);
+    }
+  }
+
+  return {
+    episodes: episodes.reverse(),
+    openStrikes: [...strikeBuffer].reverse(),
+  };
 }

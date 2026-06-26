@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { EnforcementStrikeHistory } from "@/components/admin/enforcement-strike-history";
 import { groupAppealsByModerationLog } from "@/lib/moderation-appeal-matching";
 
 type GrantRow = {
@@ -169,33 +170,6 @@ function statusTextClass(status: string): string {
 }
 
 type EnforcementAppeal = DetailPayload["enforcement"]["appeals"][number];
-
-function appealStatusClass(status: string): string {
-  if (status === "pending") return "text-amber-400";
-  if (status === "approved") return "text-success";
-  return "text-error";
-}
-
-function StrikeAppeals({ appeals }: { appeals: EnforcementAppeal[] }) {
-  if (appeals.length === 0) return null;
-
-  return (
-    <div className="mt-3 space-y-2 border-t border-border/40 pt-3">
-      {appeals.map((appeal) => (
-        <div key={appeal.id} className="rounded border border-border/30 bg-bg-base/50 px-3 py-2">
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-            <span className="font-mono uppercase tracking-widest">User explanation</span>
-            <span>{new Date(appeal.createdAt).toLocaleString()}</span>
-            <span className={`font-medium capitalize ${appealStatusClass(appeal.status)}`}>
-              {appeal.status}
-            </span>
-          </p>
-          <p className="mt-2 whitespace-pre-wrap text-text-primary">{appeal.userMessage}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function UserDetailClient({ userId, betaMode }: { userId: string; betaMode: boolean }) {
   const router = useRouter();
@@ -708,55 +682,11 @@ export function UserDetailClient({ userId, betaMode }: { userId: string; betaMod
                 ) : null}
               </dl>
 
-              {data.enforcement.moderationLogs.length > 0 ? (
-                <div className="mt-4 border-t border-border/60 pt-4">
-                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
-                    Strike history
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm">
-                    {data.enforcement.moderationLogs.map((log) => (
-                      <li key={log.id} className="rounded border border-border/40 bg-bg-surface/50 px-3 py-2">
-                        <p className="font-medium text-text-primary">
-                          {new Date(log.createdAt).toLocaleString()} · {log.source}
-                          {log.aupCategory ? ` · ${log.aupCategory}` : ""}
-                        </p>
-                        {log.summary ? <p className="text-text-muted">{log.summary}</p> : null}
-                        {log.flaggedBy ? (
-                          <p className="text-xs text-text-muted">
-                            Flagged by: {log.flaggedBy.username ?? log.flaggedBy.email}
-                          </p>
-                        ) : null}
-                        <StrikeAppeals appeals={appealsByLog.byLogId.get(log.id) ?? []} />
-                      </li>
-                    ))}
-                    {appealsByLog.unmatched.map((appeal) => (
-                      <li
-                        key={appeal.id}
-                        className="rounded border border-border/40 bg-bg-surface/50 px-3 py-2"
-                      >
-                        <p className="text-xs text-text-muted">Appeal (no matching strike found)</p>
-                        <StrikeAppeals appeals={[appeal]} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : appealsByLog.unmatched.length > 0 ? (
-                <div className="mt-4 border-t border-border/60 pt-4">
-                  <h3 className="font-mono text-[10px] uppercase tracking-widest text-text-muted">
-                    Strike history
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm">
-                    {appealsByLog.unmatched.map((appeal) => (
-                      <li
-                        key={appeal.id}
-                        className="rounded border border-border/40 bg-bg-surface/50 px-3 py-2"
-                      >
-                        <StrikeAppeals appeals={[appeal]} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+              <EnforcementStrikeHistory
+                logs={data.enforcement.moderationLogs}
+                appealsByLogId={appealsByLog.byLogId}
+                unmatchedAppeals={appealsByLog.unmatched}
+              />
             </div>
 
             <label className="mt-4 block text-sm">

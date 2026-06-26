@@ -1,6 +1,6 @@
 import { Nav } from "@/components/nav";
 import { getCurrentUser, getRoleHomeUrl } from "@/lib/auth";
-import { enforceAccountAccessForPage } from "@/lib/account-status-routing";
+import { enforceAccountAccessForRestrictedPages } from "@/lib/account-status-routing";
 import { UserRole } from "@db";
 import { redirect } from "next/navigation";
 
@@ -9,7 +9,7 @@ export default async function PartnerLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await enforceAccountAccessForPage();
+  await enforceAccountAccessForRestrictedPages();
 
   const user = await getCurrentUser();
   if (!user) {

@@ -181,6 +181,18 @@ export async function clearLegalConsentIntentCookie(): Promise<void> {
   store.delete({ name: LEGAL_CONSENT_INTENT_COOKIE, path: "/" });
 }
 
+/** Apply register-page intent cookie to the DB user, if valid. Returns true when consent was recorded. */
+export async function tryApplyLegalConsentIntent(userId: string): Promise<boolean> {
+  const intent = await readLegalConsentIntentCookie();
+  if (!isLegalConsentIntentValid(intent)) {
+    return false;
+  }
+
+  await recordLegalConsent(userId);
+  await clearLegalConsentIntentCookie();
+  return true;
+}
+
 export async function getLegalConsentRedirectIfNeeded(
   session: CurrentUser,
 ): Promise<string | null> {

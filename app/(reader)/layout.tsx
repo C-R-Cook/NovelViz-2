@@ -1,5 +1,5 @@
 import { ensureCurrentUser } from "@/lib/auth";
-import { enforceAccountAccessForPage } from "@/lib/account-status-routing";
+import { enforceAccountAccessForRestrictedPages } from "@/lib/account-status-routing";
 import { auth } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { DEV_USER_COOKIE, hasDevIdentityCookie } from "@/lib/dev-users";
@@ -10,7 +10,7 @@ export default async function ReaderLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await enforceAccountAccessForPage();
+  await enforceAccountAccessForRestrictedPages();
 
   // In dev mode, skip the Clerk auth guard when a valid dev identity cookie is
   // present. This lets the role switcher work while signed out of Clerk locally.

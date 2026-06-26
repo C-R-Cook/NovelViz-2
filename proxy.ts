@@ -9,6 +9,7 @@ import { DEV_GUEST_COOKIE, hasDevGuestMode } from "@/lib/dev-guest-mode";
 function withPathnameHeader(req: NextRequest): Headers {
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-pathname", req.nextUrl.pathname);
+  requestHeaders.set("x-url", req.url);
   return requestHeaders;
 }
 

@@ -21,25 +21,60 @@ const initialChecks: LegalConsentChecks = {
 
 export function RegisterWithConsent() {
   const [checks, setChecks] = useState<LegalConsentChecks>(initialChecks);
-  const ready = allLegalConsentChecksComplete(checks);
+  const [intentReady, setIntentReady] = useState(false);
+  const [intentSaving, setIntentSaving] = useState(false);
+  const [intentError, setIntentError] = useState<string | null>(null);
+
+  const checksComplete = allLegalConsentChecksComplete(checks);
+  const clerkUnlocked = checksComplete && intentReady && !intentSaving;
 
   useEffect(() => {
-    if (!ready) return;
+    if (!checksComplete) {
+      setIntentReady(false);
+      setIntentSaving(false);
+      setIntentError(null);
+      return;
+    }
 
-    void fetch("/api/legal-consent-intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        over18Confirmed: true,
-        termsAccepted: true,
-        privacyAccepted: true,
-        termsDocumentVersion: TERMS_DOCUMENT_VERSION,
-        privacyDocumentVersion: PRIVACY_DOCUMENT_VERSION,
-      }),
-    }).catch(() => {
-      /* UX bridge only — /auth/consent fallback handles failures */
-    });
-  }, [ready]);
+    let cancelled = false;
+    setIntentSaving(true);
+    setIntentError(null);
+    setIntentReady(false);
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/legal-consent-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            over18Confirmed: true,
+            termsAccepted: true,
+            privacyAccepted: true,
+            termsDocumentVersion: TERMS_DOCUMENT_VERSION,
+            privacyDocumentVersion: PRIVACY_DOCUMENT_VERSION,
+          }),
+        });
+        if (cancelled) return;
+        if (!res.ok) {
+          setIntentError("Couldn\u2019t save your agreements \u2014 try again.");
+          return;
+        }
+        setIntentReady(true);
+      } catch {
+        if (!cancelled) {
+          setIntentError("Couldn\u2019t save your agreements \u2014 try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIntentSaving(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checksComplete]);
 
   return (
     <div className="register-flow">
@@ -57,7 +92,14 @@ export function RegisterWithConsent() {
           variant="integrated"
           value={checks}
           onChange={setChecks}
+          disabled={intentSaving}
         />
+
+        {intentError ? (
+          <p className="mt-3 text-sm text-error" role="alert">
+            {intentError}
+          </p>
+        ) : null}
 
         <div className="register-flow__divider" aria-hidden>
           Account details
@@ -65,15 +107,17 @@ export function RegisterWithConsent() {
 
         <div
           className={
-            ready
+            clerkUnlocked
               ? "register-flow__clerk-wrap"
               : "register-flow__clerk-wrap register-flow__clerk-wrap--locked"
           }
-          aria-hidden={!ready}
+          aria-hidden={!clerkUnlocked}
         >
-          {!ready ? (
+          {!clerkUnlocked ? (
             <p className="register-flow__lock-hint">
-              Confirm the agreements above to unlock email sign-up and social options.
+              {intentSaving
+                ? "Saving your agreements\u2026"
+                : "Confirm the agreements above to unlock email sign-up and social options."}
             </p>
           ) : null}
           <div className="register-flow__clerk-inner">

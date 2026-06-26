@@ -2,11 +2,8 @@ import { AuthConsentClient } from "@/app/auth/consent/consent-client";
 import { ensureCurrentUser } from "@/lib/auth";
 import { DEV_USERS_BY_ID } from "@/lib/dev-users";
 import {
-  clearLegalConsentIntentCookie,
   findLegalConsentForSession,
-  isLegalConsentIntentValid,
-  readLegalConsentIntentCookie,
-  recordLegalConsent,
+  tryApplyLegalConsentIntent,
   userHasRequiredLegalConsent,
 } from "@/lib/legal-consent";
 import { redirect } from "next/navigation";
@@ -29,10 +26,8 @@ export default async function AuthConsentPage() {
     redirectAfterConsent(session);
   }
 
-  const intent = await readLegalConsentIntentCookie();
-  if (isLegalConsentIntentValid(intent)) {
-    await recordLegalConsent(session.id);
-    await clearLegalConsentIntentCookie();
+  const applied = await tryApplyLegalConsentIntent(session.id);
+  if (applied) {
     redirectAfterConsent(session);
   }
 

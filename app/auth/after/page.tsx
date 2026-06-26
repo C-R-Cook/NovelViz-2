@@ -1,10 +1,7 @@
 import { AuthAfterProvisioning } from "@/app/auth/after/auth-after-provisioning";
 import { ensureCurrentUser } from "@/lib/auth";
-import { findLegalConsentForSession, userHasRequiredLegalConsent } from "@/lib/legal-consent";
-import {
-  findDbProfileForSession,
-  getPostAuthRedirectUrl,
-} from "@/lib/session-profile";
+import { findLegalConsentForSession, tryApplyLegalConsentIntent, userHasRequiredLegalConsent } from "@/lib/legal-consent";
+import { resolvePostAuthRedirect } from "@/lib/session-profile";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
@@ -20,11 +17,15 @@ export default async function AuthAfterPage() {
     return <AuthAfterProvisioning fullPage />;
   }
 
-  const consent = await findLegalConsentForSession(session);
+  let consent = await findLegalConsentForSession(session);
+  if (!consent || !userHasRequiredLegalConsent(consent)) {
+    await tryApplyLegalConsentIntent(session.id);
+    consent = await findLegalConsentForSession(session);
+  }
+
   if (!consent || !userHasRequiredLegalConsent(consent)) {
     redirect("/auth/consent");
   }
 
-  const profile = await findDbProfileForSession(session);
-  redirect(getPostAuthRedirectUrl(profile));
+  redirect(await resolvePostAuthRedirect(session));
 }

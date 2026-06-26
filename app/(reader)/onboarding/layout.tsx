@@ -1,5 +1,5 @@
 import { ensureCurrentUser } from "@/lib/auth";
-import { enforceAccountAccessForPage } from "@/lib/account-status-routing";
+import { enforceAccountAccessForRestrictedPages } from "@/lib/account-status-routing";
 import { getLegalConsentRedirectIfNeeded } from "@/lib/legal-consent";
 import { redirect } from "next/navigation";
 import "./onboarding.css";
@@ -9,7 +9,7 @@ export default async function OnboardingLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  await enforceAccountAccessForPage();
+  await enforceAccountAccessForRestrictedPages();
 
   const session = await ensureCurrentUser();
   if (session) {

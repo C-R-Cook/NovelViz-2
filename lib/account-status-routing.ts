@@ -55,7 +55,7 @@ export function isApiPathAllowedForEnforcedAccount(
   return isPathAllowedForEnforcedAccount(pathname, status);
 }
 
-async function getRequestPathname(): Promise<string> {
+async function getRequestPathname(): Promise<string | null> {
   const headerList = await headers();
   const fromHeader = headerList.get("x-pathname");
   if (fromHeader) return fromHeader;
@@ -69,7 +69,20 @@ async function getRequestPathname(): Promise<string> {
     }
   }
 
-  return "/";
+  return null;
+}
+
+async function redirectEnforcedSession(sessionId: string): Promise<void> {
+  const block = await getAccountEnforcementBlock(sessionId);
+  if (!block.blocked) return;
+  redirect(getEnforcementRedirectPath(block.status)!);
+}
+
+/** Redirect enforced accounts away from app routes that never include status/landing pages. */
+export async function enforceAccountAccessForRestrictedPages(): Promise<void> {
+  const session = await getCurrentUser();
+  if (!session) return;
+  await redirectEnforcedSession(session.id);
 }
 
 /** Redirect enforced accounts away from routes outside the landing/status allowlist. */
@@ -81,6 +94,10 @@ export async function enforceAccountAccessForPage(): Promise<void> {
   if (!block.blocked) return;
 
   const pathname = await getRequestPathname();
+  if (!pathname) {
+    redirect(getEnforcementRedirectPath(block.status)!);
+  }
+
   if (isPathAllowedForEnforcedAccount(pathname, block.status)) return;
 
   redirect(getEnforcementRedirectPath(block.status)!);

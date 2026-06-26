@@ -44,25 +44,33 @@ For a custom Clerk sign-up UI (`useSignUp()`), you could pass a `legalAccepted` 
 
 ### 1. Register page (`/register`)
 
-Before the Clerk sign-up widget is usable, the user must check all three agreements in a **“Before you join”** panel:
+Before the Clerk sign-up widget is usable, the user must check two agreement controls (18+ and combined Terms + Privacy):
 
 - Confirm 18+
-- Agree to Terms of Service (opens `/terms` in a new tab)
-- Agree to Privacy Policy (opens `/privacy` in a new tab)
+- Agree to Terms of Service and Privacy Policy (opens `/terms` and `/privacy` in new tabs)
 
-The Clerk widget stays **disabled** (non-interactive, reduced opacity) until all three are checked. This is **UX gating on our page** — Clerk itself does not enforce it.
+When both are checked, the client **awaits** `POST /api/legal-consent-intent`, which stores a short-lived httpOnly cookie (`legal_consent_intent`, 15 minutes). The Clerk widget stays **disabled** until that cookie is saved successfully. This is **UX gating on our page** — Clerk itself does not enforce it.
 
-**Implementation:** [`components/auth/register-with-consent.tsx`](../components/auth/register-with-consent.tsx), [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx)
+**Implementation:** [`components/auth/register-with-consent.tsx`](../components/auth/register-with-consent.tsx), [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx), [`app/api/legal-consent-intent/route.ts`](../app/api/legal-consent-intent/route.ts)
 
-### 2. Authoritative consent step (`/auth/consent`)
+### 2. Authoritative DB write (`/auth/after`)
 
-After Clerk creates the account and the DB user is provisioned, the user is sent to **`/auth/consent`** if consent is not yet recorded.
+After Clerk creates the account and the DB user is provisioned, **`/auth/after`** applies the intent cookie via `tryApplyLegalConsentIntent()` and writes **server-side timestamps** to the database. On the normal sign-up path the user is **not** asked to check the boxes again — they go straight to onboarding.
 
-They must submit the same three agreements again. On submit, the server writes **server-side timestamps** to the database. **This step is the audit record** — not the register-page checkboxes alone.
+**Implementation:** [`app/auth/after/page.tsx`](../app/auth/after/page.tsx), [`lib/legal-consent.ts`](../lib/legal-consent.ts) (`tryApplyLegalConsentIntent`, `recordLegalConsent`)
+
+### 3. Fallback consent page (`/auth/consent`)
+
+If the intent cookie is missing, expired, or invalid (e.g. OAuth edge case, login before this feature, intent save failed), the user is sent to **`/auth/consent`** to submit the agreements manually. This page auto-applies a valid intent cookie if present; otherwise it renders the checkbox form.
 
 **Implementation:** [`app/auth/consent/page.tsx`](../app/auth/consent/page.tsx), [`app/auth/consent/consent-client.tsx`](../app/auth/consent/consent-client.tsx)
 
-### 3. API
+### 4. API
+
+**`POST /api/legal-consent-intent`** (public, pre-auth)
+
+- Called from `/register` when agreements are checked.
+- Validates all three booleans and document versions; sets the bridge cookie.
 
 **`POST /api/legal-consent`**
 
@@ -74,13 +82,13 @@ They must submit the same three agreements again. On submit, the server writes *
 - Rejects the request if any are missing or false.
 - Writes a single server `DateTime` for all three acceptance fields (the moment of submission).
 
-**Implementation:** [`app/api/legal-consent/route.ts`](../app/api/legal-consent/route.ts), helpers in [`lib/legal-consent.ts`](../lib/legal-consent.ts)
+**Implementation:** [`app/api/legal-consent/route.ts`](../app/api/legal-consent/route.ts), [`app/api/legal-consent-intent/route.ts`](../app/api/legal-consent-intent/route.ts), helpers in [`lib/legal-consent.ts`](../lib/legal-consent.ts)
 
-### 4. Access gating
+### 5. Access gating
 
 Users cannot proceed to onboarding or the reader app until consent is recorded:
 
-- [`app/auth/after/page.tsx`](../app/auth/after/page.tsx) redirects to `/auth/consent` when consent is missing.
+- [`app/auth/after/page.tsx`](../app/auth/after/page.tsx) applies the intent cookie, then redirects to `/auth/consent` only if consent is still missing.
 - [`app/(reader)/onboarding/layout.tsx`](../app/(reader)/onboarding/layout.tsx) redirects to `/auth/consent` if someone navigates to onboarding directly.
 - [`app/(reader)/(app)/layout.tsx`](../app/(reader)/(app)/layout.tsx) redirects to `/auth/consent` before allowing library, account, dashboard, etc.
 
@@ -119,23 +127,26 @@ When you publish new Terms or Privacy Policy text, bump the corresponding consta
 
 ```mermaid
 flowchart TD
-  A["/register"] --> B["Check 3 agreements"]
+  A["/register"] --> B["Check agreements + save intent cookie"]
   B --> C["Clerk sign-up"]
   C --> D["/auth/after"]
   D --> E{"DB user ready?"}
   E -->|No| D
   E -->|Yes| F{"Consent in DB?"}
-  F -->|No| G["/auth/consent"]
-  G --> H["POST /api/legal-consent"]
-  H --> D
-  F -->|Yes| I["/onboarding/plan"]
-  I --> J["/onboarding/preferences"]
-  J --> K["/library"]
+  F -->|No| G{"Valid intent cookie?"}
+  G -->|Yes| H["recordLegalConsent in /auth/after"]
+  H --> I["/onboarding/plan"]
+  G -->|No| J["/auth/consent fallback"]
+  J --> K["POST /api/legal-consent or auto-apply intent"]
+  K --> D
+  F -->|Yes| I
+  I --> L["/onboarding/preferences"]
+  L --> M["/library"]
 ```
 
-1. **`/register`** — user checks all three boxes; Clerk sign-up unlocks; account is created in Clerk.
-2. **`/auth/after`** — provisioning wait until NovelViz `User` row exists (webhook or fallback).
-3. **`/auth/consent`** — user submits agreements; server timestamps are saved.
+1. **`/register`** — user checks agreements; intent cookie is saved; Clerk sign-up unlocks; account is created in Clerk.
+2. **`/auth/after`** — provisioning wait until NovelViz `User` row exists; apply intent cookie and write consent to DB.
+3. **`/auth/consent`** — fallback only when intent bridge failed; manual submit or server-side auto-apply.
 4. **Onboarding** — plan → preferences → library (unchanged; see [sign-up-onboarding.md](./sign-up-onboarding.md)).
 
 ### Returning users (sign-in)
@@ -185,6 +196,7 @@ Not implemented today; consider if legal counsel asks for a stronger audit trail
 | Area | Path |
 |---|---|
 | Consent helpers & document versions | [`lib/legal-consent.ts`](../lib/legal-consent.ts) |
+| Intent cookie API | [`app/api/legal-consent-intent/route.ts`](../app/api/legal-consent-intent/route.ts) |
 | Consent API | [`app/api/legal-consent/route.ts`](../app/api/legal-consent/route.ts) |
 | Checkbox UI (shared) | [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx) |
 | Register page wrapper | [`components/auth/register-with-consent.tsx`](../components/auth/register-with-consent.tsx) |

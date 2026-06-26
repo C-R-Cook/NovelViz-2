@@ -44,10 +44,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not submit appeal" }, { status: 500 });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.id },
-    select: { id: true, email: true, username: true, statusReason: true },
-  });
+  const [user, latestAppeal] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.id },
+      select: { id: true, email: true, username: true, statusReason: true },
+    }),
+    prisma.moderationAppeal.findFirst({
+      where: { userId: session.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        moderationLog: {
+          select: { id: true, summary: true, createdAt: true, source: true },
+        },
+      },
+    }),
+  ]);
+  const linkedStrike = latestAppeal?.moderationLog;
   const logs = await getModerationLogsForUser(session.id, 10);
   const strikeSummary =
     logs.length === 0
@@ -70,6 +82,14 @@ export async function POST(request: Request) {
       { label: "Email", value: user?.email ?? "—" },
       { label: "Username", value: user?.username ?? "—" },
       { label: "Suspension reason", value: user?.statusReason ?? "—" },
+      {
+        label: "Linked strike",
+        value: linkedStrike
+          ? `${new Date(linkedStrike.createdAt).toISOString()} · ${linkedStrike.source}${
+              linkedStrike.summary ? ` · ${linkedStrike.summary}` : ""
+            } (log ${linkedStrike.id})`
+          : "—",
+      },
       { label: "Strike history", value: strikeSummary },
       { label: "Appeal message", value: message.trim() },
       { label: "Admin user page", value: absoluteAppUrl(`/admin/users/${session.id}`) },

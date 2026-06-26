@@ -90,8 +90,8 @@ async function createModerationLog(
   userId: string,
   entry: ModerationLogInput,
   tx: Prisma.TransactionClient,
-): Promise<void> {
-  await tx.moderationLog.create({
+): Promise<string> {
+  const log = await tx.moderationLog.create({
     data: {
       userId,
       source: entry.source,
@@ -104,6 +104,7 @@ async function createModerationLog(
       flaggedByUserId: entry.flaggedByUserId ?? null,
     },
   });
+  return log.id;
 }
 
 export async function recordModerationLog(
@@ -143,18 +144,21 @@ export async function suspendAccount(
       );
     }
 
+    const resolvedLogEntry: ModerationLogInput = logEntry ?? {
+      source: ModerationLogSource.system,
+      summary: reason,
+    };
+    const logId = await createModerationLog(userId, resolvedLogEntry, tx);
+
     await tx.user.update({
       where: { id: userId },
       data: {
         accountStatus: AccountStatus.suspended,
         suspendedAt: new Date(),
         statusReason: reason,
+        activeSuspensionLogId: logId,
       },
     });
-
-    if (logEntry) {
-      await createModerationLog(userId, logEntry, tx);
-    }
   });
 }
 
@@ -177,6 +181,7 @@ export async function terminateAccount(
         accountStatus: AccountStatus.terminated,
         terminatedAt: new Date(),
         statusReason: reason,
+        activeSuspensionLogId: null,
       },
     });
 
@@ -213,6 +218,7 @@ export async function restoreAccount(
         suspendedAt: null,
         terminatedAt: null,
         statusReason: null,
+        activeSuspensionLogId: null,
       },
     });
 
@@ -283,7 +289,7 @@ export async function submitAccountAppeal(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { accountStatus: true, email: true, username: true },
+    select: { accountStatus: true, activeSuspensionLogId: true },
   });
   if (!user) throw new AccountEnforcementError("User not found", "not_found");
   if (user.accountStatus !== AccountStatus.suspended) {
@@ -303,11 +309,30 @@ export async function submitAccountAppeal(
     );
   }
 
+  if (!user.activeSuspensionLogId) {
+    throw new AccountEnforcementError(
+      "Cannot link appeal to a suspension record. Please contact support.",
+      "appeal_not_allowed",
+    );
+  }
+
+  const linkedLog = await prisma.moderationLog.findFirst({
+    where: { id: user.activeSuspensionLogId, userId },
+    select: { id: true },
+  });
+  if (!linkedLog) {
+    throw new AccountEnforcementError(
+      "Cannot link appeal to a suspension record. Please contact support.",
+      "appeal_not_allowed",
+    );
+  }
+
   await prisma.moderationAppeal.create({
     data: {
       userId,
       userMessage: trimmed,
       status: ModerationAppealStatus.pending,
+      moderationLogId: linkedLog.id,
     },
   });
 }

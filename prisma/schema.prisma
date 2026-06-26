@@ -308,6 +308,9 @@ model User {
   suspendedAt             DateTime?
   terminatedAt            DateTime?
   statusReason            String?
+  /// Moderation log for the user's current suspension (cleared on restore).
+  activeSuspensionLogId   String?            @unique
+  activeSuspensionLog     ModerationLog?     @relation("ActiveSuspension", fields: [activeSuspensionLogId], references: [id], onDelete: SetNull)
 
   userBooks       UserBook[]
   ownedBooks      Book[]    @relation("OwnedBooks")
@@ -479,6 +482,8 @@ model ModerationLog {
   flaggedByUserId String?
   flaggedBy       User?               @relation("ModerationFlagger", fields: [flaggedByUserId], references: [id], onDelete: SetNull)
   createdAt       DateTime            @default(now())
+  appeals         ModerationAppeal[]
+  activeSuspensionFor User?           @relation("ActiveSuspension")
 
   @@index([userId, createdAt])
   @@index([flaggedByUserId])
@@ -491,6 +496,9 @@ model ModerationAppeal {
   user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   status          ModerationAppealStatus @default(pending)
   userMessage     String
+  /// Strike/suspension log this appeal responds to.
+  moderationLogId String?
+  moderationLog   ModerationLog?         @relation(fields: [moderationLogId], references: [id], onDelete: Restrict)
   resolvedAt      DateTime?
   resolvedBy      String?
   resolutionNote  String?
@@ -498,6 +506,7 @@ model ModerationAppeal {
   updatedAt       DateTime               @updatedAt
 
   @@index([userId, status])
+  @@index([moderationLogId])
 }
 
 /// Per-user quota limit override (takes precedence over tier defaults).

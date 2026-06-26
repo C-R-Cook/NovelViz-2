@@ -5,20 +5,28 @@ import {
   AUTH_SSO_COMPLETE_PATH,
   authInputClass,
   clerkErrorMessage,
+  formatSignUpIncompleteMessage,
   isValidEmail,
+  isVerificationAlreadyVerified,
+  resolveSignUpMissingRequirements,
   waitForSessionReady,
 } from "@/components/auth/auth-form-utils";
 import { AuthOAuthDivider, GoogleOAuthButton } from "@/components/auth/google-oauth-button";
 import { PasswordInput } from "@/components/auth/password-input";
+import { UsernameField, type UsernameCheckState } from "@/components/auth/username-field";
 import {
   allLegalConsentChecksComplete,
   SignUpLegalConsentFields,
   type LegalConsentChecks,
 } from "@/components/auth/sign-up-legal-consent";
+import {
+  PRIVACY_DOCUMENT_VERSION,
+  TERMS_DOCUMENT_VERSION,
+} from "@/lib/legal-consent-constants";
 import { useSignUp } from "@clerk/nextjs/legacy";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import "./register-with-consent.css";
 
 type Step = "form" | "verify";
@@ -42,21 +50,46 @@ export function CustomEmailSignUp() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [checks, setChecks] = useState<LegalConsentChecks>(initialChecks);
+  const [username, setUsername] = useState("");
+  const [usernameReady, setUsernameReady] = useState(false);
+  const [normalizedUsername, setNormalizedUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [oauthBusy, setOauthBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const consentComplete = allLegalConsentChecksComplete(checks);
+  const handleUsernameAvailability = useCallback(
+    (state: { ready: boolean; normalized: string; checkState: UsernameCheckState }) => {
+      setUsernameReady(state.ready);
+      setNormalizedUsername(state.normalized);
+    },
+    [],
+  );
   const canSubmitForm =
     isLoaded &&
     isValidEmail(email) &&
     isValidPassword(password) &&
+    usernameReady &&
     consentComplete &&
     !busy &&
     !oauthBusy;
 
+  async function saveRegisterUsername(): Promise<string | null> {
+    const res = await fetch("/api/register/username", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: normalizedUsername }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(body.error ?? "Could not save your username.");
+      return null;
+    }
+    return normalizedUsername;
+  }
+
   async function handleGoogleSignUp() {
-    if (!isLoaded || !signUp || !consentComplete || oauthBusy || busy) return;
+    if (!isLoaded || !signUp || !consentComplete || !usernameReady || oauthBusy || busy) return;
 
     setError(null);
     setOauthBusy(true);
@@ -64,14 +97,21 @@ export function CustomEmailSignUp() {
       const intentRes = await fetch("/api/legal-consent-intent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(checks),
+        body: JSON.stringify({
+          ...checks,
+          termsDocumentVersion: TERMS_DOCUMENT_VERSION,
+          privacyDocumentVersion: PRIVACY_DOCUMENT_VERSION,
+          username: normalizedUsername,
+        }),
       });
       if (!intentRes.ok) {
         const body = (await intentRes.json().catch(() => ({}))) as { error?: string };
         setError(body.error ?? "Could not save your agreements. Please try again.");
+        setOauthBusy(false);
         return;
       }
 
+      await signUp.create({ username: normalizedUsername });
       await signUp.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: AUTH_SSO_CALLBACK_PATH,
@@ -93,6 +133,7 @@ export function CustomEmailSignUp() {
       await signUp.create({
         emailAddress: email.trim(),
         password,
+        username: normalizedUsername,
       });
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setStep("verify");
@@ -110,13 +151,27 @@ export function CustomEmailSignUp() {
     setError(null);
     setBusy(true);
     try {
-      const result = await signUp.attemptEmailAddressVerification({ code: code.trim() });
-      if (result.status !== "complete") {
-        setError("Verification incomplete. Please check the code and try again.");
+      let signUpState = signUp;
+
+      try {
+        signUpState = await signUp.attemptEmailAddressVerification({ code: code.trim() });
+      } catch (err: unknown) {
+        if (!isVerificationAlreadyVerified(err)) {
+          throw err;
+        }
+      }
+
+      signUpState = await resolveSignUpMissingRequirements(signUpState, {
+        consentComplete,
+        username: normalizedUsername,
+      });
+
+      if (signUpState.status !== "complete" || !signUpState.createdSessionId) {
+        setError(formatSignUpIncompleteMessage(signUpState));
         return;
       }
 
-      await setActive({ session: result.createdSessionId });
+      await setActive({ session: signUpState.createdSessionId });
 
       const consentRes = await fetch("/api/legal-consent", {
         method: "POST",
@@ -128,6 +183,8 @@ export function CustomEmailSignUp() {
         setError(body.error ?? "Could not save your agreements.");
         return;
       }
+
+      if (!(await saveRegisterUsername())) return;
 
       const redirectTo = await waitForSessionReady("/onboarding/plan");
       router.replace(redirectTo);
@@ -150,17 +207,20 @@ export function CustomEmailSignUp() {
       </header>
 
       <div className="register-flow__panel">
+        {/* Required by Clerk bot protection — must stay mounted through the verify step */}
+        <div id="clerk-captcha" className="register-flow__captcha" />
+
         {step === "form" ? (
           <>
             <GoogleOAuthButton
               label="Continue with Google"
               busy={oauthBusy}
-              disabled={!isLoaded || !consentComplete}
+              disabled={!isLoaded || !consentComplete || !usernameReady}
               onClick={() => void handleGoogleSignUp()}
             />
-            {!consentComplete ? (
+            {!consentComplete || !usernameReady ? (
               <p className="mt-2 text-center text-xs text-text-muted">
-                Accept the agreements below to use Google sign-up.
+                Choose an available username and accept the agreements below to use Google sign-up.
               </p>
             ) : null}
 
@@ -193,6 +253,14 @@ export function CustomEmailSignUp() {
                   required
                 />
               </label>
+
+              <UsernameField
+                variant="integrated"
+                value={username}
+                onChange={setUsername}
+                disabled={busy || oauthBusy}
+                onAvailabilityChange={handleUsernameAvailability}
+              />
 
               <SignUpLegalConsentFields
                 variant="integrated"

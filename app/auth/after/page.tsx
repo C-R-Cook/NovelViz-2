@@ -1,6 +1,7 @@
 import { AuthAfterProvisioning } from "@/app/auth/after/auth-after-provisioning";
 import { ensureCurrentUser } from "@/lib/auth";
 import { findLegalConsentForSession, tryApplyLegalConsentIntent, userHasRequiredLegalConsent } from "@/lib/legal-consent";
+import { tryApplyRegisterUsernameFromIntent } from "@/lib/register-intent";
 import { resolvePostAuthRedirect } from "@/lib/session-profile";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -29,6 +30,8 @@ export default async function AuthAfterPage() {
   if (!consent || !userHasRequiredLegalConsent(consent)) {
     redirect("/auth/consent");
   }
+
+  await tryApplyRegisterUsernameFromIntent(session.id, session.clerkId);
 
   redirect(await resolvePostAuthRedirect(session));
 }

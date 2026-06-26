@@ -1,9 +1,10 @@
 import { getCurrentUser } from "@/lib/auth";
 import { parseUserAgeRange } from "@/lib/age-range";
+import { claimUsername } from "@/lib/claim-username";
+import { syncClerkUsername } from "@/lib/clerk-user-sync";
 import { parseDisplayName } from "@/lib/display-name";
 import { findDbProfileForSession } from "@/lib/session-profile";
 import { prisma } from "@/lib/prisma";
-import { isValidUsernameFormat } from "@/lib/username";
 import { BookGenre, Gender } from "@db";
 import { NextResponse } from "next/server";
 
@@ -95,65 +96,42 @@ export async function POST(request: Request) {
   }
 
   const hasUsername = Boolean(me.username?.trim());
-  const legacyGenresOnly = hasUsername && me.genrePreferences.length === 0;
-
   if (hasUsername && me.genrePreferences.length > 0) {
     return NextResponse.json({ error: "Profile already completed" }, { status: 400 });
   }
 
-  if (!legacyGenresOnly) {
+  if (!hasUsername) {
     if (typeof b.username !== "string") {
       return NextResponse.json({ error: "Username is required" }, { status: 400 });
     }
 
-    const usernameRaw = b.username.trim().toLowerCase();
-    if (!isValidUsernameFormat(usernameRaw)) {
-      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    const claimed = await claimUsername(me.id, b.username);
+    if (!claimed.ok) {
+      return NextResponse.json({ error: claimed.error }, { status: claimed.status });
     }
 
-    const taken = await prisma.user.findFirst({
-      where: {
-        username: { equals: usernameRaw, mode: "insensitive" },
-        NOT: { id: me.id },
+    try {
+      await syncClerkUsername(session.clerkId, claimed.username);
+    } catch (err) {
+      console.error("[api/onboarding] clerk username sync failed", err);
+      return NextResponse.json({ error: "Could not save username" }, { status: 500 });
+    }
+  }
+
+  try {
+    await prisma.user.update({
+      where: { id: me.id },
+      data: {
+        gender,
+        ageRange,
+        subscribedToMailingList,
+        genrePreferences,
+        ...(nameParsed ? { name: nameParsed } : {}),
+        ...(countryParsed !== undefined ? { country: countryParsed } : {}),
       },
-      select: { id: true },
     });
-    if (taken) {
-      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
-    }
-
-    try {
-      await prisma.user.update({
-        where: { id: me.id },
-        data: {
-          username: usernameRaw,
-          gender,
-          ageRange,
-          subscribedToMailingList,
-          genrePreferences,
-          ...(nameParsed ? { name: nameParsed } : {}),
-          ...(countryParsed !== undefined ? { country: countryParsed } : {}),
-        },
-      });
-    } catch {
-      return NextResponse.json({ error: "Username already taken" }, { status: 409 });
-    }
-  } else {
-    try {
-      await prisma.user.update({
-        where: { id: me.id },
-        data: {
-          gender,
-          ageRange,
-          subscribedToMailingList,
-          genrePreferences,
-          ...(nameParsed ? { name: nameParsed } : {}),
-          ...(countryParsed !== undefined ? { country: countryParsed } : {}),
-        },
-      });
-    } catch {
-      return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
-    }
+  } catch {
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

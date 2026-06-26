@@ -3,7 +3,7 @@ import {
   canAccessBookCoverAi,
   isCoverAiDraftPublicIdForBook,
 } from "@/lib/cover-ai-access";
-import cloudinary from "@/lib/cloudinary";
+import cloudinary, { cloudinaryCoverAiFolder } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { resolveDbUserFromSession } from "@/lib/resolve-db-user-from-session";
 import { NextResponse } from "next/server";
@@ -85,7 +85,7 @@ export async function POST(request: Request, context: RouteContext) {
   let secureUrl: string;
   try {
     const result = await cloudinary.uploader.upload(chosenImageUrl, {
-      folder: "novelviz/covers",
+      folder: cloudinaryCoverAiFolder(),
       public_id: bookId,
       overwrite: true,
       transformation: [{ width: 400, height: 600, crop: "fit" }],

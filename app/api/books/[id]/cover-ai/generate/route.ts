@@ -13,6 +13,7 @@ import {
   getCoverAiAdminSettings,
 } from "@/lib/cover-ai-settings";
 import fal from "@/lib/fal";
+import { cloudinaryCoverDraftsFolder } from "@/lib/cloudinary";
 import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
 import { prisma } from "@/lib/prisma";
 import { resolveDbUserFromSession } from "@/lib/resolve-db-user-from-session";
@@ -32,7 +33,7 @@ async function uploadCoverDraftFromUrl(options: {
 }): Promise<{ publicId: string; secureUrl: string }> {
   return uploadFalImageUrlToCloudinary({
     imageUrl: options.imageUrl,
-    folder: `novelviz/cover-drafts/${options.bookId}`,
+    folder: cloudinaryCoverDraftsFolder(options.bookId),
     publicId: options.draftLeaf,
     overwrite: false,
   });

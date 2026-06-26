@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth";
-import cloudinary from "@/lib/cloudinary";
+import cloudinary, { cloudinaryCoverUserFolder } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { UserRole } from "@db";
 import { NextResponse } from "next/server";
@@ -61,7 +61,7 @@ export async function POST(request: Request, context: RouteContext) {
   let secureUrl: string;
   try {
     const result = await cloudinary.uploader.upload(dataUri, {
-      folder: "novelviz/covers",
+      folder: cloudinaryCoverUserFolder(),
       public_id: bookId,
       overwrite: true,
       transformation: [{ width: 400, height: 600, crop: "fit" }],

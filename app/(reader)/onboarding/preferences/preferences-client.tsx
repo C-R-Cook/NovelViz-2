@@ -1,24 +1,21 @@
 "use client";
 
+import { UsernameField } from "@/components/auth/username-field";
 import { clearPlanStepCompleteCookie } from "@/lib/onboarding-cookies";
 import { DISPLAY_NAME_MAX, DISPLAY_NAME_MIN } from "@/lib/display-name";
 import { formatGenre, GENRE_OPTIONS } from "@/lib/genre";
 import { GENDERS, USER_AGE_RANGE_OPTIONS } from "@/lib/user-profile-options";
-import { isValidUsernameFormat } from "@/lib/username";
 import countries from "i18n-iso-countries";
 import enLocale from "i18n-iso-countries/langs/en.json";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import "./preferences.css";
 
 countries.registerLocale(enLocale);
 
-type CheckState = "idle" | "checking" | "available" | "taken" | "invalid";
-
 type Props = {
   initialName: string;
-  initialUsername: string;
-  legacyGenresOnly: boolean;
+  showUsernameField: boolean;
   previewMode?: boolean;
 };
 
@@ -28,16 +25,14 @@ const COUNTRY_OPTIONS = Object.entries(countries.getNames("en", { select: "offic
 
 export function PreferencesClient({
   initialName,
-  initialUsername,
-  legacyGenresOnly,
+  showUsernameField,
   previewMode = false,
 }: Props) {
   const router = useRouter();
   const [fullName, setFullName] = useState(initialName);
-  const [username, setUsername] = useState(initialUsername);
-  const [checkState, setCheckState] = useState<CheckState>(
-    legacyGenresOnly ? "available" : "idle",
-  );
+  const [username, setUsername] = useState("");
+  const [usernameReady, setUsernameReady] = useState(!showUsernameField);
+  const [normalizedUsername, setNormalizedUsername] = useState("");
   const [genrePreferences, setGenrePreferences] = useState<string[]>([]);
   const [genreError, setGenreError] = useState<string | null>(null);
   const [ageRange, setAgeRange] = useState("");
@@ -51,49 +46,13 @@ export function PreferencesClient({
   const nameOk =
     trimmedName.length >= DISPLAY_NAME_MIN && trimmedName.length <= DISPLAY_NAME_MAX;
 
-  const trimmed = username.trim();
-  const normalized = trimmed.toLowerCase();
-  const formatOk = useMemo(
-    () => normalized.length > 0 && isValidUsernameFormat(normalized),
-    [normalized],
+  const handleUsernameAvailability = useCallback(
+    (state: { ready: boolean; normalized: string }) => {
+      setUsernameReady(state.ready);
+      setNormalizedUsername(state.normalized);
+    },
+    [],
   );
-
-  const runCheck = useCallback(async (value: string) => {
-    if (!isValidUsernameFormat(value)) {
-      setCheckState("invalid");
-      return;
-    }
-    setCheckState("checking");
-    try {
-      const res = await fetch(
-        `/api/onboarding/check-username?username=${encodeURIComponent(value)}`,
-      );
-      const data = (await res.json()) as { available?: boolean; valid?: boolean };
-      if (!data.valid) {
-        setCheckState("invalid");
-        return;
-      }
-      setCheckState(data.available ? "available" : "taken");
-    } catch {
-      setCheckState("idle");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (legacyGenresOnly) return;
-    if (!normalized) {
-      setCheckState("idle");
-      return;
-    }
-    if (!isValidUsernameFormat(normalized)) {
-      setCheckState("invalid");
-      return;
-    }
-    const t = window.setTimeout(() => {
-      void runCheck(normalized);
-    }, 500);
-    return () => window.clearTimeout(t);
-  }, [normalized, runCheck, legacyGenresOnly]);
 
   const toggleGenre = (value: string) => {
     setGenreError(null);
@@ -103,11 +62,7 @@ export function PreferencesClient({
   };
 
   const canSubmit =
-    nameOk &&
-    formatOk &&
-    (legacyGenresOnly || checkState === "available") &&
-    genrePreferences.length > 0 &&
-    !submitting;
+    nameOk && usernameReady && genrePreferences.length > 0 && !submitting;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,7 +83,7 @@ export function PreferencesClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: trimmedName,
-          username: normalized,
+          ...(showUsernameField ? { username: normalizedUsername } : {}),
           genrePreferences,
           ageRange: ageRange || null,
           gender: gender || null,
@@ -139,7 +94,6 @@ export function PreferencesClient({
       const data = (await res.json().catch(() => ({}))) as { error?: string; success?: boolean };
       if (!res.ok) {
         setSubmitErr(data.error ?? "Something went wrong");
-        if (res.status === 409) setCheckState("taken");
         return;
       }
       clearPlanStepCompleteCookie();
@@ -156,17 +110,14 @@ export function PreferencesClient({
         <h1 className="onboarding-preferences__headline">Setup your Profile</h1>
       </header>
 
-      <form
-        onSubmit={(e) => void onSubmit(e)}
-        className="onboarding-preferences__form"
-      >
+      <form onSubmit={(e) => void onSubmit(e)} className="onboarding-preferences__form">
         <div>
           <label htmlFor="onb-full-name" className="onboarding-preferences__label">
             Your full name <span className="text-accent-text">*</span>
           </label>
           <p className="onboarding-preferences__hint">
-            Your real name for account and partnership enquiries. This is private and never shown to other
-            users on NovelViz.
+            Your real name for account and partnership enquiries. This is private and never shown to
+            other users on NovelViz.
           </p>
           <input
             id="onb-full-name"
@@ -188,60 +139,16 @@ export function PreferencesClient({
           ) : null}
         </div>
 
-        <div>
-          <label htmlFor="onb-username" className="onboarding-preferences__label">
-            Choose a username <span className="text-accent-text">*</span>
-          </label>
-          <p className="onboarding-preferences__hint">
-            This is how you&apos;ll appear publicly in the gallery. 3–20 characters, letters,
-            numbers and underscores only.
-          </p>
-          <div className="relative mt-2">
-            <input
-              id="onb-username"
-              name="username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-              readOnly={legacyGenresOnly}
-              className="onboarding-preferences__input pr-10"
-              placeholder="novel_reader"
-              maxLength={20}
-              aria-invalid={checkState === "invalid" || checkState === "taken"}
-            />
-            {!legacyGenresOnly ? (
-              <span className="pointer-events-none absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center text-lg leading-none">
-                {checkState === "checking" ? (
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-border border-t-accent" />
-                ) : checkState === "available" ? (
-                  <span className="text-success" aria-label="Available">
-                    ✓
-                  </span>
-                ) : checkState === "taken" ? (
-                  <span className="text-error" aria-label="Taken">
-                    ✕
-                  </span>
-                ) : checkState === "invalid" ? (
-                  <span className="text-error/80" aria-label="Invalid">
-                    ✕
-                  </span>
-                ) : (
-                  <span className="text-text-muted" aria-hidden>
-                    ·
-                  </span>
-                )}
-              </span>
-            ) : null}
-          </div>
-          {checkState === "taken" ? (
-            <p className="mt-1.5 text-xs text-error/90">That username is already taken.</p>
-          ) : null}
-          {checkState === "invalid" && normalized.length > 0 ? (
-            <p className="mt-1.5 text-xs text-error/90">
-              Use 3–20 characters: letters, numbers, underscores only.
-            </p>
-          ) : null}
-        </div>
+        {showUsernameField ? (
+          <UsernameField
+            id="onb-username"
+            value={username}
+            onChange={setUsername}
+            inputClassName="onboarding-preferences__input pr-10"
+            hintClassName="onboarding-preferences__hint"
+            onAvailabilityChange={handleUsernameAvailability}
+          />
+        ) : null}
 
         <div>
           <span className="onboarding-preferences__label">

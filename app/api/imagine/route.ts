@@ -1,4 +1,5 @@
 import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
+import { cloudinaryGalleryFolder } from "@/lib/cloudinary";
 import fal from "@/lib/fal";
 import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { getAnthropicTextResponse } from "@/lib/anthropic-text";
@@ -375,7 +376,7 @@ Reader's request: ${userPrompt}`;
   try {
     const uploaded = await uploadFalImageUrlToCloudinary({
       imageUrl,
-      folder: "novelviz/gallery",
+      folder: cloudinaryGalleryFolder(),
       publicId: generatedImageId,
       overwrite: false,
     });

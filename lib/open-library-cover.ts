@@ -1,4 +1,4 @@
-import cloudinary from "@/lib/cloudinary";
+import cloudinary, { cloudinaryCoverUserFolder } from "@/lib/cloudinary";
 import { pickBestDescription } from "@/lib/book-description";
 import { fetchOpenLibraryMetadata } from "@/lib/open-library";
 
@@ -42,12 +42,12 @@ export async function fetchOpenLibraryCoverBuffer(
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Upload cover bytes to Cloudinary under `novelviz/covers/{bookId}`. */
+/** Upload cover bytes to Cloudinary under `novelviz/{dev|prod}/covers/user/{bookId}`. */
 export async function uploadBookCoverBuffer(bookId: string, coverBuf: Buffer): Promise<string> {
   const mime = sniffImageMimeType(coverBuf);
   const dataUri = `data:${mime};base64,${coverBuf.toString("base64")}`;
   const result = await cloudinary.uploader.upload(dataUri, {
-    folder: "novelviz/covers",
+    folder: cloudinaryCoverUserFolder(),
     public_id: bookId,
     overwrite: true,
     transformation: [{ width: 400, height: 600, crop: "fit" }],
@@ -67,7 +67,7 @@ async function uploadOpenLibraryCoverViaCloudinary(
     const remoteUrl = openLibraryCoverUrl(coverId, size);
     try {
       const result = await cloudinary.uploader.upload(remoteUrl, {
-        folder: "novelviz/covers",
+        folder: cloudinaryCoverUserFolder(),
         public_id: bookId,
         overwrite: true,
         transformation: [{ width: 400, height: 600, crop: "fit" }],

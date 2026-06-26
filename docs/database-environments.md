@@ -210,3 +210,56 @@ Local npm run dev →  .env.local             →  Neon development branch
 ```
 
 Related: [Authentication workflow](./auth-workflow.md).
+
+---
+
+## 10. Cloudinary folders (shared account, env prefixes)
+
+Dev and production share one Cloudinary account. Upload paths are prefixed by runtime environment:
+
+```text
+novelviz/
+  dev/
+    gallery/{imageId}
+    covers/user/{bookId}     ← manual upload, EPUB ingest, Open Library
+    covers/ai/{bookId}       ← Cover AI commit
+    cover-drafts/{bookId}/{uuid}
+  prod/
+    (same structure)
+```
+
+**Auto-detection** ([`lib/cloudinary.ts`](../lib/cloudinary.ts)):
+
+| Runtime | Folder root |
+|---------|-------------|
+| Vercel Production (`VERCEL_ENV=production`) | `novelviz/prod/…` |
+| Local `npm run dev`, Vercel Preview | `novelviz/dev/…` |
+
+**`NOVELVIZ_CLOUDINARY_ENV`** — optional override (`dev` or `prod`). Leave unset for normal Vercel/local use.
+
+### One-off: reorganize existing Cloudinary assets
+
+After deploying the folder layout, migrate legacy flat paths on the **production** DB:
+
+```bash
+# Uses DATABASE_URL + CLOUDINARY_URL from .env.local (point at production when ready)
+npx tsx scripts/cloudinary-reorganize-assets.ts --target prod --dry-run
+npx tsx scripts/cloudinary-reorganize-assets.ts --target prod --apply
+```
+
+### One-off: promote dev catalogue → production
+
+Copy all books owned by `dev_user_admin` on the **development** Neon branch to **production**, including chapters, embeddings, and Cloudinary covers under `novelviz/prod/…`. Target owner defaults to `cmpgiq4wj000004k361w2uwz7`.
+
+```bash
+SOURCE_DATABASE_URL="postgresql://...dev..." \
+TARGET_DATABASE_URL="postgresql://...prod..." \
+  npx tsx scripts/promote-catalogue-dev-to-prod.ts --dry-run
+
+SOURCE_DATABASE_URL="..." TARGET_DATABASE_URL="..." \
+  npx tsx scripts/promote-catalogue-dev-to-prod.ts --apply \
+  --owner-id cmpgiq4wj000004k361w2uwz7
+```
+
+Recommended order: deploy app → `promote-catalogue-dev-to-prod --apply` → `cloudinary-reorganize-assets --apply` if any legacy URLs remain on prod.
+

@@ -78,6 +78,16 @@
   box-shadow: 0 8px 32px color-mix(in srgb, var(--bg-overlay) 22%, transparent);
 }
 
+.register-flow__captcha:empty {
+  display: none;
+}
+
+.register-flow__captcha:not(:empty) {
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: center;
+}
+
 .register-flow__password-wrap {
   position: relative;
   margin-top: 0.25rem;

@@ -1,11 +1,11 @@
-import { prisma } from "@/lib/prisma";
-import { isValidUsernameFormat } from "@/lib/username";
+import { isUsernameAvailable } from "@/lib/claim-username";
+import { isValidUsernameFormat, normalizeUsername } from "@/lib/username";
 import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const raw = searchParams.get("username") ?? "";
-  const username = raw.trim();
+  const username = normalizeUsername(raw);
 
   if (!username) {
     return NextResponse.json({ available: false, valid: false });
@@ -16,17 +16,10 @@ export async function GET(request: Request) {
   }
 
   const excludeUserId = searchParams.get("excludeUserId")?.trim() || undefined;
-
-  const existing = await prisma.user.findFirst({
-    where: {
-      username: { equals: username, mode: "insensitive" },
-      ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
-    },
-    select: { id: true },
-  });
+  const available = await isUsernameAvailable(username, excludeUserId);
 
   return NextResponse.json({
-    available: !existing,
+    available,
     valid: true,
   });
 }

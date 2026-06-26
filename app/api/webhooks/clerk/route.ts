@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { deleteUserDataByClerkId } from "@/lib/delete-user";
 import { nameFromClerkParts } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
+import { isValidUsernameFormat, normalizeUsername } from "@/lib/username";
 import { isBetaModeEnabled } from "@/lib/subscription";
 
 export const runtime = "nodejs";
@@ -52,13 +53,21 @@ function deriveUserFields(data: ClerkUserPayload) {
     data.email_addresses?.[0];
   const email = primary?.email_address ?? null;
   const name = nameFromClerkParts(data);
-  return { email, name };
+  const rawUsername = data.username?.trim().toLowerCase() ?? "";
+  const username =
+    rawUsername && isValidUsernameFormat(rawUsername) ? normalizeUsername(rawUsername) : null;
+  return { email, name, username };
 }
 
 async function upsertUserFromClerk(data: ClerkUserPayload) {
-  const { email, name } = deriveUserFields(data);
+  const { email, name, username } = deriveUserFields(data);
   const signupDay = new Date().getDate();
   const anchorDay = Math.min(signupDay, 28);
+
+  const existing = await prisma.user.findUnique({
+    where: { clerkId: data.id },
+    select: { username: true },
+  });
 
   const user = await prisma.user.upsert({
     where: { clerkId: data.id },
@@ -66,11 +75,13 @@ async function upsertUserFromClerk(data: ClerkUserPayload) {
       clerkId: data.id,
       email: email ?? "",
       name,
+      ...(username ? { username } : {}),
       usagePeriodAnchor: anchorDay,
     },
     update: {
       ...(email ? { email } : {}),
       ...(name ? { name } : {}),
+      ...(username && !existing?.username?.trim() ? { username } : {}),
     },
   });
 
@@ -95,15 +106,15 @@ async function upsertUserFromClerk(data: ClerkUserPayload) {
 async function syncUserFromClerk(data: ClerkUserPayload) {
   const existing = await prisma.user.findUnique({
     where: { clerkId: data.id },
-    select: { id: true },
+    select: { id: true, username: true },
   });
   if (!existing) {
     await upsertUserFromClerk(data);
     return;
   }
 
-  const { email, name } = deriveUserFields(data);
-  const updateData: { email?: string; name?: string } = {};
+  const { email, name, username } = deriveUserFields(data);
+  const updateData: { email?: string; name?: string; username?: string } = {};
 
   if (email) {
     updateData.email = email;
@@ -115,6 +126,10 @@ async function syncUserFromClerk(data: ClerkUserPayload) {
 
   if (name) {
     updateData.name = name;
+  }
+
+  if (username && !existing.username?.trim()) {
+    updateData.username = username;
   }
 
   if (Object.keys(updateData).length === 0) {

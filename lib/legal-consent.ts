@@ -7,6 +7,7 @@ import {
   TERMS_DOCUMENT_VERSION,
 } from "@/lib/legal-consent-constants";
 import { prisma } from "@/lib/prisma";
+import { isValidUsernameFormat, normalizeUsername } from "@/lib/username";
 import { cookies } from "next/headers";
 
 export {
@@ -28,6 +29,8 @@ export type LegalConsentIntentPayload = {
   privacyAccepted: boolean;
   termsDocumentVersion: string;
   privacyDocumentVersion: string;
+  /** Gallery username chosen on /register (OAuth bridge). */
+  username?: string;
   checkedAt: string;
 };
 
@@ -93,12 +96,21 @@ export function parseLegalConsentIntentBody(body: unknown): LegalConsentIntentIn
   if (raw.privacyDocumentVersion !== PRIVACY_DOCUMENT_VERSION) {
     return { error: "Privacy Policy version mismatch" };
   }
+
+  let username: string | undefined;
+  if (raw.username !== undefined && raw.username !== null && raw.username !== "") {
+    if (typeof raw.username !== "string") return { error: "Invalid username" };
+    username = normalizeUsername(raw.username);
+    if (!isValidUsernameFormat(username)) return { error: "Invalid username" };
+  }
+
   return {
     over18Confirmed: true,
     termsAccepted: true,
     privacyAccepted: true,
     termsDocumentVersion: TERMS_DOCUMENT_VERSION,
     privacyDocumentVersion: PRIVACY_DOCUMENT_VERSION,
+    ...(username ? { username } : {}),
   };
 }
 
@@ -153,7 +165,9 @@ export async function readLegalConsentIntentCookie(): Promise<LegalConsentIntent
       typeof parsed.privacyAccepted !== "boolean" ||
       typeof parsed.termsDocumentVersion !== "string" ||
       typeof parsed.privacyDocumentVersion !== "string" ||
-      typeof parsed.checkedAt !== "string"
+      typeof parsed.checkedAt !== "string" ||
+      (parsed.username !== undefined &&
+        (typeof parsed.username !== "string" || !isValidUsernameFormat(parsed.username)))
     ) {
       return null;
     }

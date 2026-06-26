@@ -3,17 +3,9 @@
 import { usePathname } from "next/navigation";
 import { PublicFooter } from "@/components/public-footer";
 
-/** Routes with app chrome (admin, reader, partner) use their own layout — no marketing footer. */
+/** Hide footer only on the immersive in-book reader shell. */
 function shouldShowPublicFooter(pathname: string): boolean {
-  if (pathname === "/") return false;
-  if (pathname.startsWith("/admin")) return false;
-  if (pathname.startsWith("/partner")) return false;
-  if (pathname.startsWith("/library")) return false;
-  if (pathname.startsWith("/dashboard")) return false;
-  if (pathname.startsWith("/read")) return false;
-  if (pathname.startsWith("/onboarding")) return false;
-  if (pathname.startsWith("/dev")) return false;
-  return true;
+  return !pathname.startsWith("/reader/");
 }
 
 export function ConditionalPublicFooter() {

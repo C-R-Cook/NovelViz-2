@@ -142,15 +142,12 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
   const router = useRouter();
   const reducedMotion = useReducedMotion();
   const [heroIn, setHeroIn] = useState(reducedMotion);
-  const [email, setEmail] = useState("");
-  const [joined, setJoined] = useState(false);
   const [navScrolled, setNavScrolled] = useState(false);
 
   const [problemRef, problemVisible] = useReveal();
   const [howRef, howVisible] = useReveal();
   const [featuresRef, featuresVisible] = useReveal();
   const [galleryRef, galleryVisible] = useReveal();
-  const [ctaRef, ctaVisible] = useReveal();
 
   useEffect(() => {
     if (reducedMotion) {
@@ -181,13 +178,8 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
     [reducedMotion],
   );
 
-  const handleJoin = () => {
-    if (!email.trim()) return;
-    setJoined(true);
-  };
-
   const startHref = isLoggedIn ? "/library" : "/register";
-  const joinBetaHref = isLoggedIn ? "/library" : "/register";
+  const signUpHref = isLoggedIn ? "/library" : "/register";
 
   const exploreGallery = useCallback(() => {
     try {
@@ -227,8 +219,8 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
             <Link href="/login" className="landing-nav-signin">
               Sign In
             </Link>
-            <Link href={joinBetaHref} className="landing-nav-cta">
-              Join Beta →
+            <Link href={signUpHref} className="landing-nav-cta">
+              Sign Up →
             </Link>
           </div>
         </nav>
@@ -414,53 +406,6 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
           </button>
         </div>
       </section>
-
-      <section id="beta" ref={ctaRef} className="landing-section landing-beta-section">
-        <div className={`landing-beta-card${ctaVisible ? " landing-beta-card--visible" : ""}`}>
-          {!reducedMotion ? <DiscoverParticleField count={35} opacity={0.3} linkDistance={90} /> : null}
-          <div className="landing-beta-inner">
-            <p className="landing-beta-kicker">Now in Beta</p>
-            <h2 className="landing-beta-title">Read without fear.</h2>
-            <p className="landing-beta-sub">
-              Join a small group of readers helping shape NovelViz. Free during beta. No credit card.
-            </p>
-
-            {joined ? (
-              <p className="landing-beta-success">✦ You&apos;re on the list. We&apos;ll be in touch.</p>
-            ) : (
-              <div className="landing-beta-form">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-                  placeholder="your@email.com"
-                  className="landing-beta-input"
-                  aria-label="Email for beta access"
-                />
-                <button type="button" className="landing-btn-primary" onClick={handleJoin}>
-                  Join →
-                </button>
-              </div>
-            )}
-
-            <p className="landing-beta-fine">Free to use · Public domain books · No credit card</p>
-          </div>
-        </div>
-      </section>
-
-      <footer className="landing-footer">
-        <div className="landing-footer-brand">
-          <span className="landing-footer-wordmark">NOVELVIZ</span>
-          <span className="landing-footer-copy">© 2026</span>
-        </div>
-        <nav className="landing-footer-links" aria-label="Footer">
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/contact">Contact</Link>
-        </nav>
-        <p className="landing-footer-tagline">Built for readers, by a reader.</p>
-      </footer>
     </div>
   );
 }

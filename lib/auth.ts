@@ -77,6 +77,7 @@ async function ensureDbUserForClerk(clerkUserId: string): Promise<DbUserForSessi
     first_name: clerkUser.firstName,
     last_name: clerkUser.lastName,
   });
+  const clerkUsername = clerkUser.username?.trim().toLowerCase() ?? null;
   const signupDay = new Date().getDate();
   const anchorDay = Math.min(signupDay, 28);
 
@@ -86,6 +87,7 @@ async function ensureDbUserForClerk(clerkUserId: string): Promise<DbUserForSessi
       clerkId: clerkUserId,
       email,
       name,
+      ...(clerkUsername ? { username: clerkUsername } : {}),
       usagePeriodAnchor: anchorDay,
     },
     update: {

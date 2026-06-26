@@ -1,10 +1,11 @@
 import { assertCanSelfDelete, AccountEnforcementError } from "@/lib/account-enforcement";
 import { parseUserAgeRange } from "@/lib/age-range";
 import { getCurrentUser } from "@/lib/auth";
+import { syncClerkUsername } from "@/lib/clerk-user-sync";
 import { DeleteUserError, deleteUserCompletely } from "@/lib/delete-user";
 import { parseDisplayName } from "@/lib/display-name";
 import { prisma } from "@/lib/prisma";
-import { isValidUsernameFormat } from "@/lib/username";
+import { isValidUsernameFormat, normalizeUsername } from "@/lib/username";
 import { AgeRange, BookGenre, Gender } from "@db";
 import { NextResponse } from "next/server";
 
@@ -75,7 +76,7 @@ export async function PATCH(request: Request) {
     if (typeof b.username !== "string") {
       return NextResponse.json({ error: "Invalid username" }, { status: 400 });
     }
-    const un = b.username.trim().toLowerCase();
+    const un = normalizeUsername(b.username);
     if (!isValidUsernameFormat(un)) {
       return NextResponse.json({ error: "Invalid username" }, { status: 400 });
     }
@@ -139,6 +140,13 @@ export async function PATCH(request: Request) {
   }
 
   try {
+    const previous = data.username
+      ? await prisma.user.findUnique({
+          where: { id: session.id },
+          select: { username: true },
+        })
+      : null;
+
     const updated = await prisma.user.update({
       where: { id: session.id },
       data,
@@ -157,6 +165,15 @@ export async function PATCH(request: Request) {
         createdAt: true,
       },
     });
+
+    if (data.username && data.username !== previous?.username?.trim().toLowerCase()) {
+      try {
+        await syncClerkUsername(session.clerkId, data.username);
+      } catch (err) {
+        console.error("[api/account] clerk username sync failed", err);
+      }
+    }
+
     return NextResponse.json(updated);
   } catch {
     return NextResponse.json({ error: "User not found" }, { status: 404 });

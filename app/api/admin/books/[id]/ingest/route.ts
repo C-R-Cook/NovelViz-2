@@ -1,6 +1,6 @@
 import { pickBestDescription } from "@/lib/book-description";
 import { getCurrentUser } from "@/lib/auth";
-import cloudinary from "@/lib/cloudinary";
+import cloudinary, { cloudinaryCoverUserFolder } from "@/lib/cloudinary";
 import {
   chunkText,
   embedChunks,
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
           const mime = sniffImageMimeType(coverBuf);
           const dataUri = `data:${mime};base64,${coverBuf.toString("base64")}`;
           const result = await cloudinary.uploader.upload(dataUri, {
-            folder: "novelviz/covers",
+            folder: cloudinaryCoverUserFolder(),
             public_id: bookId,
             overwrite: true,
             transformation: [{ width: 400, height: 600, crop: "fit" }],

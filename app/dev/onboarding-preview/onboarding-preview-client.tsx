@@ -127,7 +127,7 @@ export function OnboardingPreviewClient({ initialPlans, creditPack }: Props) {
           <PlanClient initialPlans={initialPlans} creditPack={creditPack} previewMode />
         ) : null}
         {current.id === "preferences" ? (
-          <PreferencesClient initialName="" initialUsername="" legacyGenresOnly={false} previewMode />
+          <PreferencesClient initialName="" showUsernameField previewMode />
         ) : null}
       </div>
     </div>

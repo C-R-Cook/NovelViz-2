@@ -240,15 +240,6 @@ export function CustomEmailSignIn() {
       <div className="register-flow__panel">
         {step === "form" ? (
           <>
-            <GoogleOAuthButton
-              label="Continue with Google"
-              busy={oauthBusy}
-              disabled={!isLoaded}
-              onClick={() => void handleGoogleSignIn()}
-            />
-
-            <AuthOAuthDivider />
-
             <form onSubmit={(e) => void handleSignIn(e)} className="space-y-4">
               <label className="block text-sm">
                 <span className="text-text-secondary">Email</span>
@@ -301,6 +292,15 @@ export function CustomEmailSignIn() {
                 {busy ? "Signing in…" : "Sign in"}
               </button>
             </form>
+
+            <AuthOAuthDivider />
+
+            <GoogleOAuthButton
+              label="Continue with Google"
+              busy={oauthBusy}
+              disabled={!isLoaded}
+              onClick={() => void handleGoogleSignIn()}
+            />
           </>
         ) : null}
 

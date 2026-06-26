@@ -36,14 +36,12 @@ export default async function OnboardingPreferencesPage() {
     redirect("/onboarding/plan");
   }
 
-  const initialUsername = profile.username?.trim() ?? "";
   const initialName = profile.name?.trim() ?? "";
 
   return (
     <PreferencesClient
       initialName={initialName}
-      initialUsername={initialUsername}
-      legacyGenresOnly={Boolean(initialUsername)}
+      showUsernameField={!profile.username?.trim()}
     />
   );
 }

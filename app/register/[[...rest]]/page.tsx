@@ -1,4 +1,4 @@
-import { RegisterWithConsent } from "@/components/auth/register-with-consent";
+import { CustomEmailSignUp } from "@/components/auth/custom-email-sign-up";
 import { ensureCurrentUser } from "@/lib/auth";
 import { resolvePostAuthRedirect } from "@/lib/session-profile";
 import { auth } from "@clerk/nextjs/server";
@@ -16,7 +16,7 @@ export default async function RegisterPage() {
 
   return (
     <div className="register-page bg-bg-base">
-      <RegisterWithConsent />
+      <CustomEmailSignUp />
     </div>
   );
 }

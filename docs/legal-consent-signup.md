@@ -44,20 +44,23 @@ For a custom Clerk sign-up UI (`useSignUp()`), you could pass a `legalAccepted` 
 
 ### 1. Register page (`/register`)
 
-Before the Clerk sign-up widget is usable, the user must check two agreement controls (18+ and combined Terms + Privacy):
+The user completes a **custom email/password form** (Clerk `useSignUp()` in the background — no embedded Clerk widget):
 
-- Confirm 18+
-- Agree to Terms of Service and Privacy Policy (opens `/terms` and `/privacy` in new tabs)
+- Email and password fields (always editable)
+- Consent checkboxes below the password (18+ and combined Terms + Privacy)
+- **Create account** disabled until all fields are valid and both consents are checked
 
-When both are checked, the client **awaits** `POST /api/legal-consent-intent`, which stores a short-lived httpOnly cookie (`legal_consent_intent`, 15 minutes). The Clerk widget stays **disabled** until that cookie is saved successfully. This is **UX gating on our page** — Clerk itself does not enforce it.
+After email verification, the client calls **`POST /api/legal-consent`** while authenticated and redirects to **`/onboarding/plan`**. The intent cookie is **not** used on this happy path.
 
-**Implementation:** [`components/auth/register-with-consent.tsx`](../components/auth/register-with-consent.tsx), [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx), [`app/api/legal-consent-intent/route.ts`](../app/api/legal-consent-intent/route.ts)
+**Implementation:** [`components/auth/custom-email-sign-up.tsx`](../components/auth/custom-email-sign-up.tsx), [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx)
 
-### 2. Authoritative DB write (`/auth/after`)
+### 2. Authoritative DB write
 
-After Clerk creates the account and the DB user is provisioned, **`/auth/after`** applies the intent cookie via `tryApplyLegalConsentIntent()` and writes **server-side timestamps** to the database. On the normal sign-up path the user is **not** asked to check the boxes again — they go straight to onboarding.
+**Email sign-up:** `POST /api/legal-consent` immediately after verification (before onboarding).
 
-**Implementation:** [`app/auth/after/page.tsx`](../app/auth/after/page.tsx), [`lib/legal-consent.ts`](../lib/legal-consent.ts) (`tryApplyLegalConsentIntent`, `recordLegalConsent`)
+**Sign-in / fallback:** **`/auth/after`** may apply the intent cookie via `tryApplyLegalConsentIntent()`, or send the user to **`/auth/consent`** if consent is still missing.
+
+**Implementation:** [`app/auth/after/page.tsx`](../app/auth/after/page.tsx), [`lib/legal-consent.ts`](../lib/legal-consent.ts) (`recordLegalConsent`, `tryApplyLegalConsentIntent`)
 
 ### 3. Fallback consent page (`/auth/consent`)
 
@@ -199,7 +202,8 @@ Not implemented today; consider if legal counsel asks for a stronger audit trail
 | Intent cookie API | [`app/api/legal-consent-intent/route.ts`](../app/api/legal-consent-intent/route.ts) |
 | Consent API | [`app/api/legal-consent/route.ts`](../app/api/legal-consent/route.ts) |
 | Checkbox UI (shared) | [`components/auth/sign-up-legal-consent.tsx`](../components/auth/sign-up-legal-consent.tsx) |
-| Register page wrapper | [`components/auth/register-with-consent.tsx`](../components/auth/register-with-consent.tsx) |
+| Register form (custom Clerk flow) | [`components/auth/custom-email-sign-up.tsx`](../components/auth/custom-email-sign-up.tsx) |
+| Session provisioning poll | [`app/api/auth/session-ready/route.ts`](../app/api/auth/session-ready/route.ts) |
 | Post-auth consent page | [`app/auth/consent/`](../app/auth/consent/) |
 | Post-Clerk routing | [`app/auth/after/page.tsx`](../app/auth/after/page.tsx) |
 | Prisma migration | [`prisma/migrations/20260624120000_user_legal_consent/`](../prisma/migrations/20260624120000_user_legal_consent/) |

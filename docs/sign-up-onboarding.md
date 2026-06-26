@@ -25,17 +25,19 @@ Sign-up is handled in **separate steps across multiple routes**, not a single in
 ### Step 1 — Create account (`/register`)
 
 - The user opens **Sign up** from marketing pages, gallery guest prompts, or `/register` directly.
-- Clerk’s themed sign-up widget collects credentials and verifies the account (exact fields depend on Clerk dashboard settings).
+- A single NovelViz form collects **email**, **password**, and required **legal agreements** (18+, Terms, Privacy) in conventional order — all fields are editable immediately; **Create account** stays disabled until everything is valid.
+- After submit, the user enters the **email verification code** on the same page (Clerk sends the code; no embedded Clerk widget).
+- Once verified, consent is saved to the database and the user goes straight to **`/onboarding/plan`** (no `/auth/consent` detour on the happy path).
 - Legacy URL `/sign-up` redirects to `/register`.
 - If someone already signed in visits `/register`, they are sent to the appropriate next step (onboarding or library), not shown sign-up again.
 
-**After successful Clerk sign-up**, Clerk redirects to `/auth/after`.
+**Sign-in** still uses Clerk’s widget at `/login` and routes through `/auth/after`.
 
 ### Step 2 — Setting up account (`/auth/after`)
 
-- A short **“Setting up your account…”** screen appears with the infinity loading animation while the app ensures a database user exists.
-- This step exists because Clerk authentication can complete **before** the NovelViz `User` row is ready (webhook latency or cold start).
-- The page polls by reloading until provisioning succeeds (up to ~14 seconds), then redirects automatically.
+- Used primarily after **sign-in** at `/login` (and as a fallback if provisioning is slow).
+- A short **“Setting up your account…”** screen appears while the app ensures a database user exists.
+- The page polls `GET /api/auth/session-ready` (no full-page reload loop) until provisioning succeeds, then redirects automatically.
 - If provisioning takes too long, the user sees a link to try signing in again at `/login`.
 
 ### Step 3 — Choose your plan (`/onboarding/plan`)

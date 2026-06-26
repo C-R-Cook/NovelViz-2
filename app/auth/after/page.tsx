@@ -19,7 +19,10 @@ export default async function AuthAfterPage() {
 
   let consent = await findLegalConsentForSession(session);
   if (!consent || !userHasRequiredLegalConsent(consent)) {
-    await tryApplyLegalConsentIntent(session.id);
+    const applied = await tryApplyLegalConsentIntent(session.id);
+    if (!applied) {
+      console.warn("[auth/after] legal consent intent was not applied", { userId: session.id });
+    }
     consent = await findLegalConsentForSession(session);
   }
 

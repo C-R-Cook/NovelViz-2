@@ -20,6 +20,9 @@ export default async function AuthAfterPage() {
 
   let consent = await findLegalConsentForSession(session);
   if (!consent || !userHasRequiredLegalConsent(consent)) {
+    // Read username from intent before consent application clears the bridge cookie.
+    await tryApplyRegisterUsernameFromIntent(session.id, session.clerkId);
+
     const applied = await tryApplyLegalConsentIntent(session.id);
     if (!applied) {
       console.warn("[auth/after] legal consent intent was not applied", { userId: session.id });

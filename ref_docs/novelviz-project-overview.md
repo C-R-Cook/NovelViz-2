@@ -10,6 +10,8 @@ Every AI response is strictly limited to content from chapters the user has alre
 
 **Users never read books on the site.** They tell NovelViz what they own in the real world. NovelViz provides the intelligence layer on top of that, avoiding ebook licensing complexity entirely.
 
+**Launch status (2026):** NovelViz is open for general sign-up (no longer marketed as a closed beta). Production runs on Vercel + Neon **production** branch; local development uses a separate Neon **development** branch. See [Production launch handoff](../docs/production-launch-handoff.md) for the full operator guide from the beta-to-launch transition.
+
 ---
 
 ## Business Model
@@ -54,10 +56,10 @@ Users describe a scene, character, or moment. The system:
 4. Generates the image via fal.ai
 
 ### Public Gallery
-Community showcase of AI-generated images. Images are spoiler-blurred for viewers who haven't reached the chapter the image was generated at. Three carousels: From Your Library, Trending Now, Discover.
+Community showcase of AI-generated images (Imagine). Images are spoiler-blurred for viewers who haven't reached the chapter the image was generated at. Stored in Cloudinary under `novelviz/{env}/gallery/` and tracked in `GeneratedImage`. See [Gallery system](../docs/gallery-system.md).
 
 ### Discover Page
-Browseable book catalogue with featured carousel, genre filter pills, and a searchable browse section. Books are served with real cover images extracted from their EPUBs.
+Browseable book catalogue at `/discover` with featured carousel, genre filter pills, and a searchable browse section. Only books with `status: published` appear. Covers come from EPUB ingest, Open Library, manual upload, or Cover AI.
 
 ### Partner Dashboard
 Partners see engagement stats for their books: reader counts, queries, image generations, age range and genre breakdowns, chapter engagement heatmaps — all rendered as interactive charts.
@@ -76,15 +78,31 @@ Partners upload books → system ingests EPUB → partner reviews chapters → p
 **Tailwind CSS** with a custom CSS design token system. All colours are defined as CSS custom properties (`var(--accent)`, `var(--bg-surface)` etc) enabling palette switching. Five palettes available in development: Midnight Library, Gothic Noir, Candlelight, Moonlight Silver, Crimson.
 
 ### Authentication
-**Clerk** — handles sign up, sign in, and user webhooks. A `user.created` webhook syncs new Clerk users to the Neon database. In local development, a mock user system bypasses Clerk entirely (three separate DB records per role). Clerk is wired in for production via `lib/auth.ts`.
+**Clerk** — sign up, sign in, and user webhooks. A `user.created` webhook syncs new Clerk users to the Neon database. Production and preview use real Clerk sessions via `lib/auth.ts`. In local development, a **dev role switcher** can impersonate seeded users without signing in and out of Clerk.
+
+Registration is a NovelViz-owned flow at `/register` (email, password, legal consent, verification code). Sign-in uses Clerk at `/login`. See [Sign-up and onboarding](../docs/sign-up-onboarding.md) and [Authentication workflow](../docs/auth-workflow.md).
 
 ### Database
 **Neon PostgreSQL** (serverless) with the **pgvector** extension for storing and querying 1536-dimension embedding vectors. Accessed via **Prisma 7** ORM.
 
+**Two branches:** production (live site) and development (local dev, seed, Gutenberg CLI). Never point `.env.local` at production. See [Database environments](../docs/database-environments.md).
+
 Prisma client is generated to `app/generated/prisma` and imported via the `@db` TypeScript path alias. Seeding uses `tsx` (not ts-node) for ESM compatibility.
 
 ### Image Storage
-**Cloudinary** — stores book cover images. Covers are automatically extracted from EPUB files during ingestion and uploaded to Cloudinary under `novelviz/covers/[bookId]`. All covers are transformed to a consistent 2:3 portrait ratio using `crop: "fit"`.
+**Cloudinary** — shared account for dev and production, separated by **folder prefix** under `novelviz/`:
+
+```text
+novelviz/
+  dev/   … local dev and Vercel Preview uploads
+  prod/  … Vercel Production uploads
+    gallery/{imageId}           ← Imagine (scene images)
+    covers/user/{bookId}        ← EPUB ingest, manual upload, Open Library
+    covers/ai/{bookId}          ← Cover AI commit
+    cover-drafts/{bookId}/{uuid}
+```
+
+Legacy flat paths (`novelviz/gallery/`, `novelviz/covers/`) may still exist for older assets; new uploads use env-prefixed paths. Configuration: `lib/cloudinary.ts`. Operator scripts: [Production launch handoff](../docs/production-launch-handoff.md).
 
 ### AI Providers
 - **OpenAI** (`text-embedding-3-small`) — text embeddings for semantic search
@@ -103,13 +121,15 @@ See `NOVELVIZ_AI_SYSTEMS.md` for full AI architecture detail.
 ### Route Groups
 ```
 app/
-├── (public)/         → Unauthenticated routes
-│   ├── books/        → /books (Discover page)
+├── (marketing)/      → Landing page (/) — guests see marketing nav; logged-in users see app Nav
+├── (public)/         → Authenticated or guest public app chrome (Nav + main)
+│   ├── discover/     → /discover (catalogue)
 │   ├── gallery/      → /gallery
 │   ├── faq/          → /faq
 │   ├── contact/      → /contact
 │   ├── privacy/      → /privacy
-│   └── terms/        → /terms
+│   ├── terms/        → /terms
+│   └── acceptable-use/
 │
 ├── (reader)/
 │   └── (app)/        → Authenticated reader routes (onboarding gate applied)
@@ -128,8 +148,13 @@ app/
 │   ├── books/        → /admin/books, /admin/books/[id]
 │   └── requests/     → /admin/requests
 │
+├── register/         → /register (NovelViz sign-up form)
+├── login/            → /login (Clerk sign-in)
+│
 └── api/              → API route handlers
 ```
+
+**Root layout** (`app/layout.tsx`) wraps all routes with theme hydration, optional dev role switcher, and a **shared footer** (`components/public-footer.tsx`) on every page except immersive `/reader/*`.
 
 ### Key Architectural Decisions
 
@@ -146,6 +171,8 @@ app/
 **Design tokens** — all colours use CSS custom properties rather than hardcoded Tailwind classes. This enables palette switching and ensures consistency across the entire UI.
 
 **Dev role switcher** — a floating dev-only widget allows switching between six dev user accounts (two readers, two partners, one admin) without logging in and out. Each dev user is a real database record with independent library, progress, and image history.
+
+**Discover vs environment** — Discover search shows all **published** books on whichever database `DATABASE_URL` points at. Production and development catalogues diverge unless explicitly synced (see Operations below). Featured scoring affects carousel order, not search eligibility.
 
 ---
 
@@ -221,7 +248,7 @@ app/
 Books are ingested from EPUB files by admin or partner users. The pipeline:
 
 1. **Upload** — EPUB file uploaded via admin/partner book detail page
-2. **Cover extraction** — cover image extracted from EPUB manifest and uploaded to Cloudinary
+2. **Cover extraction** — cover image extracted from EPUB manifest and uploaded to Cloudinary (`novelviz/{env}/covers/user/{bookId}`)
 3. **Genre detection** — Gutenberg subject tags mapped to `BookGenre` enum via OpenAI GPT-4o-mini
 4. **Chapter parsing** — `toc.ncx` navMap read for exact chapter anchors; HTML split at anchor points; Gutenberg boilerplate filtered automatically
 5. **Chunking** — each chapter split into ~500 token chunks with ~50 token overlap
@@ -229,6 +256,42 @@ Books are ingested from EPUB files by admin or partner users. The pipeline:
 7. **Status update** — book status set to `ready_for_review`
 
 After ingestion, admin can review chapters via the Chapter Manager (merge, delete, rename). If chapters are edited, Finalise re-runs the chunking and embedding pipeline.
+
+---
+
+## Operations & production
+
+Day-to-day operator tasks (Neon branches, promoting catalogue, Cloudinary cleanup) are documented in depth here:
+
+| Document | Purpose |
+|----------|---------|
+| [Database environments](../docs/database-environments.md) | Neon branches, Vercel env vars, `.env.local`, Cloudinary folder summary |
+| [Production launch handoff](../docs/production-launch-handoff.md) | Beta→launch work: promote dev catalogue to prod, gallery cleanup, footer/sign-up, troubleshooting |
+| [Gutenberg import](../docs/gutenberg-import.md) | Bulk public-domain ingest on dev |
+| [Gallery system](../docs/gallery-system.md) | Imagine uploads, public gallery, spoiler gating |
+
+### Promoting catalogue dev → prod
+
+Script: `scripts/promote-catalogue-dev-to-prod.ts`
+
+Copies books owned by `dev_user_admin` on the **development** Neon branch to **production** (metadata, chapters, chunk embeddings, Cloudinary covers → `novelviz/prod/covers/…`). Does **not** copy user-generated gallery images (`GeneratedImage`).
+
+```bash
+SOURCE_DATABASE_URL="..." TARGET_DATABASE_URL="..." \
+  npx tsx scripts/promote-catalogue-dev-to-prod.ts --dry-run
+
+SOURCE_DATABASE_URL="..." TARGET_DATABASE_URL="..." \
+  npx tsx scripts/promote-catalogue-dev-to-prod.ts --apply --retry-failed
+```
+
+### Gallery / Cloudinary maintenance
+
+| Script | Use when |
+|--------|----------|
+| `scripts/cleanup-gallery-images.ts` | Wipe test Imagine images from Cloudinary **and** `GeneratedImage` rows together |
+| `scripts/cloudinary-reorganize-assets.ts` | Rename legacy `novelviz/gallery/` paths into `novelviz/prod/…` and update DB URLs |
+
+Always `--dry-run` before `--apply`. Point `DATABASE_URL` at the branch you intend to modify.
 
 ---
 
@@ -244,26 +307,43 @@ After ingestion, admin can review chapters via the Chapter Manager (merge, delet
 
 ### Environment Variables
 ```
-DATABASE_URL                        # Neon pooled connection string
-DIRECT_URL                          # Neon direct connection (required for migrations)
+DATABASE_URL                        # Neon pooled connection string (dev branch locally)
+DIRECT_URL                          # Neon direct connection (migrations, long scripts)
+SOURCE_DATABASE_URL / TARGET_DATABASE_URL  # promote-catalogue script only
 CLERK_SECRET_KEY                    # Clerk server-side key
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY   # Clerk client-side key
 CLERK_WEBHOOK_SECRET                # Clerk webhook signing secret
 ANTHROPIC_API_KEY                   # Anthropic API key
 ANTHROPIC_MODEL                     # e.g. claude-sonnet-4-5
 OPENAI_API_KEY                      # OpenAI API key
-CLOUDINARY_URL                      # Cloudinary connection URL
+CLOUDINARY_URL                      # cloudinary://key:secret@cloud_name (or split CLOUDINARY_* keys)
+NOVELVIZ_CLOUDINARY_ENV             # Optional: dev | prod override for upload folder
 FAL_API_KEY                         # fal.ai API key
+BETA_MODE                           # Optional: true = show usage, skip limit enforcement
 ```
+
+### Documentation index
+
+| Area | Doc |
+|------|-----|
+| This overview | `ref_docs/novelviz-project-overview.md` |
+| AI architecture | `NOVELVIZ_AI_SYSTEMS.md` |
+| Cursor session context | `CURSOR.md` |
+| Environments & Cloudinary | `docs/database-environments.md` |
+| Launch / ops handoff | `docs/production-launch-handoff.md` |
+| Auth & sign-up | `docs/auth-workflow.md`, `docs/sign-up-onboarding.md` |
+| Gallery | `docs/gallery-system.md` |
+| Cover AI | `docs/book-cover-ai-generation.md` |
 
 ---
 
 ## Known Limitations and Carry-Forward Items
 
-### Must resolve before production launch
-- **Clerk auth not wired** — `lib/auth.ts` uses mock dev users locally. Wire `auth()` from `@clerk/nextjs/server` before go-live. TODO comment is in place.
-- **Neon free tier limits** — 0.5GB storage. Upgrade to Launch plan ($5/month) before beta to remove hard limits.
-- **`prisma migrate dev` shadow DB issue** — use `npx prisma migrate deploy` for applying new migrations locally. Baseline migration applied but shadow DB replay still fails.
+### Production operations
+- **Dev vs prod catalogue drift** — development and production Neon branches are independent. Use `promote-catalogue-dev-to-prod` or re-ingest on prod; verify `Book.status = published` for Discover visibility.
+- **Legacy Cloudinary paths** — pre-launch assets may still live under `novelviz/gallery/` or flat `novelviz/covers/`. New code writes to `novelviz/{dev|prod}/…`. Use reorganize or cleanup scripts (see [Production launch handoff](../docs/production-launch-handoff.md)).
+- **Neon storage** — monitor branch size; large catalogues with embeddings consume storage quickly.
+- **`prisma migrate dev` shadow DB issue** — use `npx prisma migrate deploy` for applying new migrations locally when shadow DB replay fails.
 
 ### Planned features (V2)
 - **Entity extraction** — characters, locations, objects extracted per chapter during ingestion to improve image generation accuracy and character consistency
@@ -277,5 +357,6 @@ FAL_API_KEY                         # fal.ai API key
 
 ### Known edge cases
 - EPUB uploads >4.5MB hit Vercel's function payload limit — use no-images EPUB versions from Gutenberg. Future fix: direct browser-to-Cloudinary upload.
-- fal.ai image URLs are temporary CDN URLs and may expire. Long-term fix: re-upload generated images to Cloudinary.
+- Imagine images are uploaded to Cloudinary after fal.ai generation (`/api/imagine` → `novelviz/{env}/gallery/`). Legacy rows may still reference old URLs until cleaned up.
 - Character age/appearance inconsistency in image generation — a character described as a child early in a book may generate child images even at later chapters if early descriptions dominate the retrieved chunks.
+- Re-ingesting a **published** book via admin ingest can reset status to `pending_review`, hiding it from Discover until re-approved.

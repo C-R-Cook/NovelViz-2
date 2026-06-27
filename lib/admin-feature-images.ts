@@ -4,7 +4,7 @@ import type { FeatureRequestStatus, Prisma } from "@db";
 export const ADMIN_FEATURE_IMAGES_PAGE_SIZE = 24;
 export const ADMIN_FEATURE_IMAGES_TAKE_MAX = 100;
 
-export type AdminFeatureImagesFilter = "featured" | "all" | "book";
+export type AdminFeatureImagesFilter = "featured" | "all" | "book" | "deidentified";
 
 export type AdminFeatureImageRow = {
   id: string;
@@ -19,6 +19,8 @@ export type AdminFeatureImageRow = {
   bookAuthor: string;
   bookCoverImageUrl: string | null;
   username: string;
+  formerUsername: string | null;
+  deidentifiedAtMs: number | null;
   featureRequest: { id: string; status: FeatureRequestStatus } | null;
 };
 
@@ -30,6 +32,8 @@ const imageSelect = {
   createdAt: true,
   isFeatured: true,
   isPublic: true,
+  formerUsername: true,
+  deidentifiedAt: true,
   book: { select: { id: true, title: true, author: true, coverImageUrl: true } },
   user: { select: { username: true, name: true } },
   featureRequest: { select: { id: true, status: true } },
@@ -51,12 +55,14 @@ function mapImageRow(img: ImageRow): AdminFeatureImageRow {
     bookAuthor: img.book.author,
     bookCoverImageUrl: img.book.coverImageUrl,
     username: img.user.username ?? img.user.name ?? "",
+    formerUsername: img.formerUsername,
+    deidentifiedAtMs: img.deidentifiedAt?.getTime() ?? null,
     featureRequest: img.featureRequest,
   };
 }
 
 export function parseAdminFeatureImagesFilter(raw: string | null): AdminFeatureImagesFilter {
-  if (raw === "featured" || raw === "book") return raw;
+  if (raw === "featured" || raw === "book" || raw === "deidentified") return raw;
   return "all";
 }
 
@@ -79,13 +85,20 @@ export async function queryAdminFeatureImagesPage(args: {
   const where: Prisma.GeneratedImageWhereInput =
     args.filter === "featured"
       ? { isFeatured: true }
-      : args.filter === "book" && args.bookId
-        ? { bookId: args.bookId }
-        : { isFeatured: false };
+      : args.filter === "deidentified"
+        ? { deidentifiedAt: { not: null } }
+        : args.filter === "book" && args.bookId
+          ? { bookId: args.bookId }
+          : { isFeatured: false };
+
+  const orderBy: Prisma.GeneratedImageOrderByWithRelationInput =
+    args.filter === "deidentified"
+      ? { deidentifiedAt: "desc" }
+      : { createdAt: "desc" };
 
   const rows = await prisma.generatedImage.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy,
     skip,
     take: take + 1,
     select: imageSelect,

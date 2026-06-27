@@ -81,10 +81,12 @@ function AdminFeatureImageCard({
   image,
   busy,
   onToggleFeatured,
+  onToggleVisibility,
 }: {
   image: AdminFeatureImageRow;
   busy: boolean;
   onToggleFeatured: (imageId: string, nextFeatured: boolean) => void;
+  onToggleVisibility?: (imageId: string, nextPublic: boolean) => void;
 }) {
   return (
     <li className="flex flex-col overflow-hidden rounded-lg border border-border/80 bg-bg-base/60">
@@ -109,6 +111,11 @@ function AdminFeatureImageCard({
         <p className="text-[10px] text-text-muted">
           @{image.username} · Ch. {image.chapterNumberAtTime}
         </p>
+        {image.formerUsername ? (
+          <p className="text-[10px] text-text-muted">
+            Was @{image.formerUsername}
+          </p>
+        ) : null}
         <p className="line-clamp-2 text-[10px] text-text-secondary">{truncate(image.userPrompt, 120)}</p>
         <FeatureStatusBadges
           isFeatured={image.isFeatured}
@@ -117,6 +124,27 @@ function AdminFeatureImageCard({
         />
         <ImageTimestamp ms={image.createdAtMs} />
         <div className="mt-auto flex flex-wrap justify-end gap-2 pt-1">
+          {onToggleVisibility ? (
+            image.isPublic ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onToggleVisibility(image.id, false)}
+                className="rounded-md border border-border px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-primary transition hover:bg-bg-surface disabled:opacity-50"
+              >
+                {busy ? "…" : "Make private"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onToggleVisibility(image.id, true)}
+                className="rounded-md bg-accent-muted px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-accent-text ring-1 ring-accent/35 transition hover:bg-accent/30 disabled:opacity-50"
+              >
+                {busy ? "…" : "Make public"}
+              </button>
+            )
+          ) : null}
           {image.isFeatured ? (
             <button
               type="button"
@@ -158,6 +186,7 @@ function ImageGridSection({
   onLoadMore,
   busyImageId,
   onToggleFeatured,
+  onToggleVisibility,
   emptyMessage,
   sectionId,
   showHeader = true,
@@ -171,6 +200,7 @@ function ImageGridSection({
   onLoadMore?: () => void;
   busyImageId: string | null;
   onToggleFeatured: (imageId: string, nextFeatured: boolean) => void;
+  onToggleVisibility?: (imageId: string, nextPublic: boolean) => void;
   emptyMessage: string;
   sectionId: string;
   showHeader?: boolean;
@@ -200,6 +230,7 @@ function ImageGridSection({
                 image={img}
                 busy={busyImageId === img.id}
                 onToggleFeatured={onToggleFeatured}
+                onToggleVisibility={onToggleVisibility}
               />
             ))}
           </ul>
@@ -251,6 +282,12 @@ export function FeatureImagesAdmin({
   const [allLoading, setAllLoading] = useState(true);
   const [loadingMoreAll, setLoadingMoreAll] = useState(false);
 
+  const [deidentifiedImages, setDeidentifiedImages] = useState<AdminFeatureImageRow[]>([]);
+  const [deidentifiedHasMore, setDeidentifiedHasMore] = useState(false);
+  const [deidentifiedSkip, setDeidentifiedSkip] = useState(0);
+  const [deidentifiedLoading, setDeidentifiedLoading] = useState(true);
+  const [loadingMoreDeidentified, setLoadingMoreDeidentified] = useState(false);
+
   const [bookQuery, setBookQuery] = useState("");
   const [bookResults, setBookResults] = useState<AdminBookRow[]>([]);
   const [bookSearchLoading, setBookSearchLoading] = useState(false);
@@ -271,7 +308,7 @@ export function FeatureImagesAdmin({
   }, [initialFeatured, initialFeaturedHasMore]);
 
   const fetchImages = useCallback(
-    async (filter: "featured" | "all" | "book", skip: number, bookId?: string) => {
+    async (filter: "featured" | "all" | "book" | "deidentified", skip: number, bookId?: string) => {
       const params = new URLSearchParams({
         filter,
         skip: String(skip),
@@ -310,6 +347,28 @@ export function FeatureImagesAdmin({
     [allSkip, fetchImages],
   );
 
+  const loadDeidentifiedImages = useCallback(
+    async (reset: boolean) => {
+      if (reset) {
+        setDeidentifiedLoading(true);
+        setDeidentifiedSkip(0);
+      } else {
+        setLoadingMoreDeidentified(true);
+      }
+      try {
+        const skip = reset ? 0 : deidentifiedSkip;
+        const data = await fetchImages("deidentified", skip);
+        setDeidentifiedImages((prev) => (reset ? data.images : [...prev, ...data.images]));
+        setDeidentifiedHasMore(data.hasMore);
+        setDeidentifiedSkip(skip + data.images.length);
+      } finally {
+        setDeidentifiedLoading(false);
+        setLoadingMoreDeidentified(false);
+      }
+    },
+    [deidentifiedSkip, fetchImages],
+  );
+
   const loadBookImages = useCallback(
     async (bookId: string, reset: boolean) => {
       if (reset) {
@@ -334,6 +393,7 @@ export function FeatureImagesAdmin({
 
   useEffect(() => {
     void loadAllImages(true);
+    void loadDeidentifiedImages(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load once
   }, []);
 
@@ -476,6 +536,39 @@ export function FeatureImagesAdmin({
     ],
   );
 
+  const onToggleVisibility = useCallback(async (imageId: string, nextPublic: boolean) => {
+    setBusyImageId(imageId);
+    const snap = deidentifiedImages.find((r) => r.id === imageId);
+    setDeidentifiedImages((rows) =>
+      rows.map((r) => (r.id === imageId ? { ...r, isPublic: nextPublic } : r)),
+    );
+    try {
+      const res = await fetch(`/api/admin/images/${imageId}/visibility`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPublic: nextPublic }),
+      });
+      if (!res.ok) {
+        const j = (await res.json()) as { error?: string };
+        window.alert(j.error ?? "Update failed");
+        if (snap) {
+          setDeidentifiedImages((rows) =>
+            rows.map((r) => (r.id === imageId ? snap : r)),
+          );
+        }
+        return;
+      }
+      const data = (await res.json()) as { image: { id: string; isPublic: boolean } };
+      setDeidentifiedImages((rows) =>
+        rows.map((r) =>
+          r.id === imageId ? { ...r, isPublic: data.image.isPublic } : r,
+        ),
+      );
+    } finally {
+      setBusyImageId(null);
+    }
+  }, [deidentifiedImages]);
+
   const loadMoreFeatured = useCallback(async () => {
     setLoadingMoreFeatured(true);
     try {
@@ -521,6 +614,21 @@ export function FeatureImagesAdmin({
         busyImageId={busyImageId}
         onToggleFeatured={(id, next) => void onToggleFeatured(id, next)}
         emptyMessage="No featured images yet."
+      />
+
+      <ImageGridSection
+        sectionId="deidentified-images-heading"
+        title="De-identified"
+        description="Images retained after account deletion, owned by @NovelViz. Make public to show them in the gallery again."
+        images={deidentifiedImages}
+        loading={deidentifiedLoading}
+        hasMore={deidentifiedHasMore}
+        loadingMore={loadingMoreDeidentified}
+        onLoadMore={() => void loadDeidentifiedImages(false)}
+        busyImageId={busyImageId}
+        onToggleFeatured={(id, next) => void onToggleFeatured(id, next)}
+        onToggleVisibility={(id, next) => void onToggleVisibility(id, next)}
+        emptyMessage="No de-identified images yet."
       />
 
       <ImageGridSection

@@ -111,7 +111,6 @@ export function CustomEmailSignUp() {
         return;
       }
 
-      await signUp.create({ username: normalizedUsername });
       await signUp.authenticateWithRedirect({
         strategy: "oauth_google",
         redirectUrl: AUTH_SSO_CALLBACK_PATH,
@@ -212,20 +211,6 @@ export function CustomEmailSignUp() {
 
         {step === "form" ? (
           <>
-            <GoogleOAuthButton
-              label="Continue with Google"
-              busy={oauthBusy}
-              disabled={!isLoaded || !consentComplete || !usernameReady}
-              onClick={() => void handleGoogleSignUp()}
-            />
-            {!consentComplete || !usernameReady ? (
-              <p className="mt-2 text-center text-xs text-text-muted">
-                Choose an available username and accept the agreements below to use Google sign-up.
-              </p>
-            ) : null}
-
-            <AuthOAuthDivider />
-
             <form onSubmit={(e) => void handleCreateAccount(e)} className="space-y-4">
               <label className="block text-sm">
                 <span className="text-text-secondary">Email</span>
@@ -283,6 +268,20 @@ export function CustomEmailSignUp() {
                 {busy ? "Creating account…" : "Create account"}
               </button>
             </form>
+
+            <AuthOAuthDivider />
+
+            <GoogleOAuthButton
+              label="Continue with Google"
+              busy={oauthBusy}
+              disabled={!isLoaded || !consentComplete || !usernameReady}
+              onClick={() => void handleGoogleSignUp()}
+            />
+            {!consentComplete || !usernameReady ? (
+              <p className="mt-2 text-center text-xs text-text-muted">
+                Choose an available username and accept the agreements below to use Google sign-up.
+              </p>
+            ) : null}
           </>
         ) : (
           <form onSubmit={(e) => void handleVerify(e)} className="space-y-4">

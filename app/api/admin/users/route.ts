@@ -21,15 +21,18 @@ export async function GET(request: Request) {
   const order = url.searchParams.get("order") === "asc" ? "asc" : "desc";
   const sortField = SORT_FIELDS.has(sort) ? sort : "createdAt";
 
-  const where: Prisma.UserWhereInput = search
-    ? {
-        OR: [
-          { email: { contains: search, mode: "insensitive" } },
-          { username: { contains: search, mode: "insensitive" } },
-          { name: { contains: search, mode: "insensitive" } },
-        ],
-      }
-    : {};
+  const where: Prisma.UserWhereInput = {
+    isSystemUser: false,
+    ...(search
+      ? {
+          OR: [
+            { email: { contains: search, mode: "insensitive" } },
+            { username: { contains: search, mode: "insensitive" } },
+            { name: { contains: search, mode: "insensitive" } },
+          ],
+        }
+      : {}),
+  };
 
   const [total, rows] = await Promise.all([
     prisma.user.count({ where }),

@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { ensureNovelVizTombstoneUser } from "@/lib/system-users";
 import { devLegalConsentUpdate } from "@/lib/legal-consent";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { BookGenre, BookStatus, PrismaClient, UserRole } from "@db";
@@ -308,6 +309,7 @@ async function seedDraculaChaptersAndReaderProgress() {
 }
 
 async function seed() {
+  await ensureNovelVizTombstoneUser();
   await seedDevUser();
   await seedDevRoleUsers();
 

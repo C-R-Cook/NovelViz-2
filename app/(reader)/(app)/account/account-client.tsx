@@ -598,7 +598,8 @@ export function AccountPageClient({
           ) : (
             <>
               <p className="mt-2 text-sm text-text-secondary">
-                Permanently delete your NovelViz account and associated reading data.
+                Permanently delete your NovelViz account. Personal data is removed; public gallery
+              images you created may be retained under @NovelViz.
               </p>
               <button
                 type="button"
@@ -632,7 +633,9 @@ export function AccountPageClient({
               Delete account?
             </h3>
             <p className="mt-3 text-sm leading-relaxed text-text-secondary">
-              Are you sure? This will permanently delete your account and all your data. This cannot be undone.
+              Are you sure? This will permanently delete your account and personal reading data.
+              Gallery images you created may be kept and shown as @NovelViz; your comments will be
+              removed. This cannot be undone.
             </p>
             {creditBalance > 0 ? (
               <p className="mt-3 text-sm leading-relaxed text-amber-400/90">

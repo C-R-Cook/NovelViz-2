@@ -199,7 +199,7 @@ const SECTIONS: FAQSection[] = [
       },
       {
         q: "How do I delete my account?",
-        a: "You can delete your account from your account settings page. This permanently removes all your data.",
+        a: "You can delete your account from your account settings page. This removes your personal data and sign-in access. Gallery images you created may be retained and shown as @NovelViz; your comments are removed.",
       },
       {
         q: "Is NovelViz free?",

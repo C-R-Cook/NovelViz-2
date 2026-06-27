@@ -86,7 +86,7 @@ function buildReaderPlanCards(
       ],
       cta: isPremium ? "Coming Soon" : tier === "free" ? "Start for free" : "Choose Standard",
       ctaStyle: isPremium ? "disabled" : "ghost",
-      ribbon: isPremium ? "COMING SOON" : null,
+      ribbon: isPremium ? "COMING SOON" : tier === "standard" ? "Popular" : null,
       disabled: isPremium,
     };
   });
@@ -304,7 +304,6 @@ export function PlanClient({
   return (
     <div className="onboarding-plan">
       <header className="onboarding-plan__header">
-        <span className="onboarding-plan__eyebrow">Choose your plan</span>
         <h1 className="onboarding-plan__headline">How would you like to read?</h1>
       </header>
 
@@ -320,11 +319,6 @@ export function PlanClient({
           />
         ))}
       </div>
-
-      <p className="onboarding-plan__footer-note">
-        During beta all accounts access Standard features at no charge. After beta, accounts revert
-        to the Free tier — you can upgrade anytime.
-      </p>
 
       {error ? (
         <p className="onboarding-plan__error" role="alert">

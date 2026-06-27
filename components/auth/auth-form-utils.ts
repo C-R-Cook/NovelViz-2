@@ -50,6 +50,7 @@ export function formatSignUpIncompleteMessage(signUp: SignUpCompletionState): st
 }
 
 type SignUpUpdatable = SignUpCompletionState & {
+  createdSessionId?: string | null;
   update: (params: {
     legalAccepted?: boolean;
     username?: string;

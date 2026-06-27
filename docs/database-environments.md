@@ -263,3 +263,5 @@ SOURCE_DATABASE_URL="..." TARGET_DATABASE_URL="..." \
 
 Recommended order: deploy app → `promote-catalogue-dev-to-prod --apply` → `cloudinary-reorganize-assets --apply` if any legacy URLs remain on prod.
 
+For full context (creative decisions, troubleshooting, gallery cleanup), see [Production launch handoff](./production-launch-handoff.md).
+

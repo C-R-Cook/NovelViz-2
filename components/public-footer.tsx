@@ -14,9 +14,10 @@ const FOOTER_LINKS = [
 export function PublicFooter() {
   return (
     <footer className="mt-auto shrink-0 border-t border-border bg-bg-surface/95 py-8 text-text-muted">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-5 px-4 sm:px-6">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 sm:px-6">
+        <p className="text-xs text-text-muted">© 2026 NovelViz. All rights reserved.</p>
         <nav
-          className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2"
           aria-label="Footer"
         >
           {FOOTER_LINKS.map((link, index) => (
@@ -32,10 +33,6 @@ export function PublicFooter() {
             </span>
           ))}
         </nav>
-        <div className="flex flex-col items-center gap-1 text-center">
-          <p className="text-xs text-text-muted">© 2026 NovelViz. All rights reserved.</p>
-          <p className="text-xs italic text-text-muted/80">Built for readers, by a reader.</p>
-        </div>
       </div>
     </footer>
   );

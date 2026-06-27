@@ -596,21 +596,8 @@
   background: linear-gradient(to right, color-mix(in srgb, var(--accent) 32%, transparent), transparent);
 }
 
-.discover-concept-drag-hint {
-  flex-shrink: 0;
-  font-family: ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  color: var(--text-muted);
-}
-
 .discover-concept-shelf-row {
-  cursor: grab;
   user-select: none;
-}
-
-.discover-concept-shelf-row.discover-featured-scroller--dragging {
-  cursor: grabbing;
 }
 
 @keyframes discover-shelf-card-enter {

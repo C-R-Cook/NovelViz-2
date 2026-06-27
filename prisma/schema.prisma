@@ -342,6 +342,9 @@ model User {
   termsDocumentVersion   String?
   privacyDocumentVersion String?
 
+  /// Non-login system account (e.g. tombstone owner for de-identified gallery content).
+  isSystemUser Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -686,6 +689,10 @@ model GeneratedImage {
   completionTokens    Int?
   embeddingTokens     Int?
   subjectTokens         Int?
+  /// Set when ownership transfers to the NovelViz tombstone user on account deletion.
+  deidentifiedAt DateTime?
+  /// Gallery username of the deleted account at transfer time (admin audit).
+  formerUsername String?
 
   user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   book           Book            @relation(fields: [bookId], references: [id], onDelete: Cascade)
@@ -698,6 +705,7 @@ model GeneratedImage {
   @@index([userId, bookId])
   @@index([isPublic])
   @@index([isFeatured, isPublic])
+  @@index([deidentifiedAt])
 }
 
 model Comment {

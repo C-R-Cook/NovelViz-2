@@ -195,7 +195,11 @@ export async function DELETE() {
     }
     if (err instanceof DeleteUserError) {
       const status =
-        err.code === "not_found" ? 404 : err.code === "last_admin" ? 403 : 400;
+        err.code === "not_found"
+          ? 404
+          : err.code === "last_admin" || err.code === "system_user"
+            ? 403
+            : 400;
       return NextResponse.json({ error: err.message }, { status });
     }
     console.error("[api/account] DELETE failed", err);

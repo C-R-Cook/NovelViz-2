@@ -6,7 +6,6 @@ import { BookRequestModal } from "@/components/book-request-modal";
 import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import type { DiscoverCatalogueBook } from "@/lib/discover-catalogue";
-import { DISCOVER_DEFAULT_PALETTE } from "@/lib/discover-genre-palette";
 import { GENRE_OPTIONS, formatGenre } from "@/lib/genre";
 import type { BookGenre } from "@db";
 import { MessageCircle } from "lucide-react";
@@ -14,7 +13,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { BookLibraryActions } from "./book-library-actions";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties } from "react";
 
 type ApiResponse = {
   books: DiscoverCatalogueBook[];
@@ -99,67 +98,10 @@ function zIndexFromDistance(distance: number): number {
   return 20;
 }
 
-/** Featured shelf: tilt / lift / neighbour lean (fine pointer + motion only). */
-function shelfFeaturedCardTransform({
-  index,
-  isSelected,
-  hovered,
-  finePointer,
-  reducedMotion,
-  shelfHoverIndex,
-}: {
-  index: number;
-  isSelected: boolean;
-  hovered: boolean;
-  finePointer: boolean;
-  reducedMotion: boolean;
-  shelfHoverIndex: number | null;
-}): string {
-  if (reducedMotion) {
-    if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
-    return "translateY(0) rotate(0deg) scale(1)";
-  }
-  if (!finePointer) {
-    if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
-    return "translateY(0) rotate(0deg) scale(1)";
-  }
-  if (isSelected) return "translateY(-18px) rotate(0deg) scale(1.05)";
-  if (hovered) return "translateY(-14px) rotate(0deg) scale(1.03)";
-  const position = index + 1;
-  let tilt = position % 2 === 1 ? -1.5 : 1.5;
-  if (shelfHoverIndex !== null && Math.abs(index - shelfHoverIndex) === 1) {
-    if (index < shelfHoverIndex) tilt = Math.min(2, tilt + 0.5);
-    else tilt = Math.max(-2, tilt - 0.5);
-  }
-  return `translateY(0) rotate(${tilt}deg) scale(1)`;
-}
-
-function computeDepthStyle(
-  index: number,
-  activeIndex: number,
-  variant: "featured" | "browse",
-): CSSProperties {
+function computeDepthStyle(index: number, activeIndex: number): CSSProperties {
   const offset = index - activeIndex;
   const direction = offset < 0 ? 1 : -1;
   const distance = Math.abs(offset);
-
-  const featured = {
-    adjacentScale: 0.85,
-    adjacentRotate: 12,
-    adjacentOpacity: 0.85,
-    outerScale: 0.7,
-    outerRotate: 20,
-    outerOpacity: 0.7,
-  };
-  const browse = {
-    adjacentScale: 0.88,
-    adjacentRotate: 8,
-    adjacentOpacity: 0.88,
-    outerScale: 0.76,
-    outerRotate: 14,
-    outerOpacity: 0.76,
-  };
-  const d = variant === "featured" ? featured : browse;
 
   if (distance === 0) {
     return {
@@ -173,9 +115,9 @@ function computeDepthStyle(
   }
 
   const isAdjacent = distance === 1;
-  const scale = isAdjacent ? d.adjacentScale : d.outerScale;
-  const rotate = direction * (isAdjacent ? d.adjacentRotate : d.outerRotate);
-  const opacity = isAdjacent ? d.adjacentOpacity : d.outerOpacity;
+  const scale = isAdjacent ? 0.88 : 0.76;
+  const rotate = direction * (isAdjacent ? 8 : 14);
+  const opacity = isAdjacent ? 0.88 : 0.76;
 
   return {
     transform: `scale(${scale}) rotateY(${rotate}deg)`,
@@ -187,113 +129,84 @@ function computeDepthStyle(
   };
 }
 
-function ShelfFeaturedCard({
+function FeaturedCarouselCard({
   book,
   index,
+  activeIndex,
   isSelected,
-  reducedMotion,
+  isLast,
   finePointer,
-  shelfHoverIndex,
-  onShelfHoverIndex,
+  reducedMotion,
   onSelect,
 }: {
   book: DiscoverCatalogueBook;
   index: number;
+  activeIndex: number;
   isSelected: boolean;
-  reducedMotion: boolean;
+  isLast: boolean;
   finePointer: boolean;
-  shelfHoverIndex: number | null;
-  onShelfHoverIndex: (i: number | null) => void;
+  reducedMotion: boolean;
   onSelect: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
-  const transform = shelfFeaturedCardTransform({
-    index,
-    isSelected,
-    hovered,
-    finePointer,
-    reducedMotion,
-    shelfHoverIndex,
-  });
-
-  const zIndex = isSelected ? 30 : hovered ? 20 : 1;
+  const distance = Math.abs(index - activeIndex);
+  const depthStyle = computeDepthStyle(index, activeIndex);
 
   return (
     <button
       type="button"
-      data-featured-active={isSelected ? "true" : "false"}
       onClick={onSelect}
-      onMouseEnter={() => {
-        setHovered(true);
-        onShelfHoverIndex(index);
-      }}
-      onMouseLeave={() => {
-        setHovered(false);
-        onShelfHoverIndex(null);
-      }}
-      className={`discover-shelf-card shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
-        isSelected ? "discover-shelf-card--active" : ""
-      } ${hovered && !isSelected && finePointer ? "discover-shelf-card--hover" : ""} ${reducedMotion ? "discover-shelf-card--reduced-motion" : ""} ${!reducedMotion ? "discover-shelf-card-enter" : ""}`}
-      style={{
-        ...(!reducedMotion ? { animationDelay: `${index * 50}ms` } : {}),
-        transform,
-        zIndex,
-      }}
+      aria-pressed={isSelected}
+      className={`group relative block min-h-[240px] w-[160px] shrink-0 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+        !isLast ? "mr-[-20px]" : ""
+      } ${finePointer && !reducedMotion ? "hover:!z-[85] focus-visible:!z-[85]" : ""}`}
+      style={{ position: "relative", zIndex: zIndexFromDistance(distance) }}
     >
-      <div className="discover-shelf-card-inner relative aspect-[2/3] w-full overflow-hidden rounded">
-        {book.coverImageUrl ? (
-          <Image
-            src={book.coverImageUrl}
-            alt=""
-            fill
-            className={`object-cover transition-transform duration-500 ease-out ${
-              finePointer && !reducedMotion && hovered && !isSelected ? "scale-[1.06]" : "scale-100"
-            }`}
-            sizes="200px"
-            priority={index < 2}
-          />
-        ) : (
-          <div
-            className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center"
-            style={{ background: DISCOVER_DEFAULT_PALETTE.glow }}
-          >
-            <div className="mb-2 text-[11px] uppercase tracking-[0.2em] text-white/40">
-              {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
-            </div>
-            <div className="font-serif text-base leading-snug text-white">{book.title}</div>
-          </div>
-        )}
+      <div
+        data-carousel-card
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-0 z-0"
+        style={{ width: BROWSE_CAROUSEL_CARD_W, height: (BROWSE_CAROUSEL_CARD_W * 3) / 2 }}
+      />
+      <article
+        data-featured-card
+        className="relative z-10 aspect-[2/3] w-[160px] min-w-[160px] overflow-visible"
+        style={depthStyle}
+      >
         <div
-          className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent transition-opacity duration-300 ${
-            hovered || isSelected ? "opacity-100" : "opacity-70"
-          }`}
-        />
-        <div
-          className={`pointer-events-none absolute inset-x-0 bottom-0 p-3 transition-all duration-300 ${
-            hovered || isSelected ? "translate-y-0 opacity-100" : "translate-y-1 opacity-60"
+          className={`absolute inset-0 origin-center scale-100 overflow-hidden rounded-xl border-0 bg-transparent shadow-none will-change-transform ${
+            isSelected ? "ring-2 ring-accent/80 ring-offset-2 ring-offset-bg-base" : ""
+          } ${
+            finePointer && !reducedMotion
+              ? "transition-[transform,box-shadow] duration-300 ease-out group-hover:scale-[1.05] group-hover:shadow-xl group-hover:shadow-bg-overlay/40 group-focus-visible:scale-[1.05] group-focus-visible:shadow-xl group-focus-visible:shadow-bg-overlay/40"
+              : finePointer && reducedMotion
+                ? "transition-shadow duration-300 ease-out"
+                : "transition-transform duration-200 ease-out active:scale-[0.99]"
           }`}
         >
-          <div
-            className="mb-1 font-mono text-[10px] uppercase tracking-[0.15em]"
-            style={{ color: DISCOVER_DEFAULT_PALETTE.accent }}
-          >
-            {book.genre ? formatGenre(book.genre).toUpperCase() : "UNKNOWN"}
+          {book.coverImageUrl ? (
+            <Image
+              src={book.coverImageUrl}
+              alt={book.title}
+              fill
+              className="object-cover"
+              sizes="160px"
+              priority={index < 2}
+            />
+          ) : (
+            <div className="absolute inset-0 bg-bg-raised" />
+          )}
+
+          <div className="absolute right-2 top-2 rounded-full border border-border/70 bg-bg-overlay/65 px-2 py-0.5 text-[10px] font-medium text-text-primary backdrop-blur-sm">
+            {book.genre ? formatGenre(book.genre) : "Unknown"}
           </div>
-          <div className="line-clamp-2 font-serif text-[13px] font-bold leading-tight text-white">{book.title}</div>
+
+          <div className={CAROUSEL_CARD_OVERLAY_GRADIENT} />
+          <div className={CAROUSEL_CARD_TEXT_WRAP}>
+            <p className={CAROUSEL_CARD_TITLE}>{book.title}</p>
+            <p className={CAROUSEL_CARD_AUTHOR}>{book.author}</p>
+          </div>
         </div>
-        {isSelected ? (
-          <span
-            className="discover-shelf-gem"
-            style={{
-              background: DISCOVER_DEFAULT_PALETTE.accent,
-              boxShadow: `0 0 8px ${DISCOVER_DEFAULT_PALETTE.accent}`,
-            }}
-            aria-hidden
-          >
-            ✦
-          </span>
-        ) : null}
-      </div>
+      </article>
     </button>
   );
 }
@@ -320,7 +233,10 @@ export function DiscoverCatalogueClient({
   const featuredScrollerRef = useRef<HTMLDivElement>(null);
   const browseScrollerRef = useRef<HTMLDivElement>(null);
   const [selectedFeaturedIndex, setSelectedFeaturedIndex] = useState(0);
+  const [activeFeatured, setActiveFeatured] = useState(0);
   const [activeBrowse, setActiveBrowse] = useState(0);
+  const [canFeaturedScrollLeft, setCanFeaturedScrollLeft] = useState(false);
+  const [canFeaturedScrollRight, setCanFeaturedScrollRight] = useState(true);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const findActiveCardIndex = useCallback((container: HTMLDivElement | null) => {
@@ -347,19 +263,14 @@ export function DiscoverCatalogueClient({
     setActiveBrowse(findActiveCardIndex(browseScrollerRef.current));
   }, [findActiveCardIndex]);
 
+  const updateActiveFeatured = useCallback(() => {
+    setActiveFeatured(findActiveCardIndex(featuredScrollerRef.current));
+  }, [findActiveCardIndex]);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   const nextCursorRef = useRef<string | null>(null);
   const loadingMoreRef = useRef(false);
   const browseSectionRef = useRef<HTMLElement>(null);
-  const featuredNavBlockUntilRef = useRef(0);
-  const featuredDragRef = useRef<{
-    pointerId: number | null;
-    startX: number;
-    scrollLeft0: number;
-    moved: boolean;
-  }>({ pointerId: null, startX: 0, scrollLeft0: 0, moved: false });
-  const [featuredScrollerDragging, setFeaturedScrollerDragging] = useState(false);
-  const [featuredShelfHoverIndex, setFeaturedShelfHoverIndex] = useState<number | null>(null);
 
   const [visionImages, setVisionImages] = useState<VisionImage[]>([]);
   const [visionsLoading, setVisionsLoading] = useState(false);
@@ -562,6 +473,31 @@ export function DiscoverCatalogueClient({
     setCanScrollRight(el.scrollLeft < max - 2);
   }
 
+  function updateFeaturedScrollState() {
+    const el = featuredScrollerRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setCanFeaturedScrollLeft(el.scrollLeft > 2);
+    setCanFeaturedScrollRight(el.scrollLeft < max - 2);
+  }
+
+  useEffect(() => {
+    updateFeaturedScrollState();
+    updateActiveFeatured();
+    const el = featuredScrollerRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      updateFeaturedScrollState();
+      updateActiveFeatured();
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [featured.length, updateActiveFeatured]);
+
   useEffect(() => {
     updateBrowseScrollState();
     updateActiveBrowse();
@@ -579,61 +515,22 @@ export function DiscoverCatalogueClient({
     };
   }, [browseBooks.length, genre, updateActiveBrowse]);
 
-  const onFeaturedPointerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (!finePointer || reducedMotion) return;
-      if (e.button !== 0) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest(".discover-shelf-card")) return;
-      const el = featuredScrollerRef.current;
-      if (!el) return;
-      featuredDragRef.current = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        scrollLeft0: el.scrollLeft,
-        moved: false,
-      };
-      try {
-        el.setPointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-    },
-    [finePointer, reducedMotion],
-  );
-
-  const onFeaturedPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const d = featuredDragRef.current;
-    if (d.pointerId !== e.pointerId) return;
+  function scrollFeatured(dir: -1 | 1) {
     const el = featuredScrollerRef.current;
     if (!el) return;
-    const dx = e.clientX - d.startX;
-    if (!d.moved && Math.abs(dx) > 6) {
-      d.moved = true;
-      setFeaturedScrollerDragging(true);
-    }
-    if (d.moved) {
-      el.scrollLeft = d.scrollLeft0 - dx * 1.35;
-    }
-  }, []);
+    const card = el.querySelector("[data-featured-card]") as HTMLElement | null;
+    if (!card) return;
+    const gap = parseFloat(getComputedStyle(el).gap || "0");
+    const step = card.getBoundingClientRect().width + gap;
+    el.scrollBy({ left: dir * step * 3, behavior: "smooth" });
+  }
 
-  const endFeaturedDrag = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
-    const d = featuredDragRef.current;
-    if (d.pointerId !== e.pointerId) return;
+  function selectFeaturedIndex(index: number) {
+    setSelectedFeaturedIndex(index);
     const el = featuredScrollerRef.current;
-    if (el) {
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
-      }
-    }
-    if (d.moved) {
-      featuredNavBlockUntilRef.current = Date.now() + 450;
-    }
-    featuredDragRef.current = { pointerId: null, startX: 0, scrollLeft0: 0, moved: false };
-    setFeaturedScrollerDragging(false);
-  }, []);
+    const card = el?.querySelectorAll<HTMLElement>("[data-featured-card]")[index];
+    card?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
 
   function scrollBrowse(dir: -1 | 1) {
     const el = browseScrollerRef.current;
@@ -657,7 +554,6 @@ export function DiscoverCatalogueClient({
   }, [featuredLibrary, selectedBook]);
 
   const showFeatured = featured.length > 0;
-  const centerFeaturedRow = featured.length <= 5;
   const genreEnterDelayMs = showFeatured ? featured.length * 50 + 280 : 100;
 
   const selectedGenreName = genrePills.find((pill) => pill.value === genre)?.label ?? "All";
@@ -681,7 +577,7 @@ export function DiscoverCatalogueClient({
         : "w-full";
     const carouselDepthStyle =
       size === "carousel" && typeof index === "number" && typeof activeIndex === "number"
-        ? computeDepthStyle(index, activeIndex, "browse")
+        ? computeDepthStyle(index, activeIndex)
         : undefined;
     const distanceBrowse =
       size === "carousel" && typeof index === "number" && typeof activeIndex === "number"
@@ -803,39 +699,63 @@ export function DiscoverCatalogueClient({
 
         {!searchActive && showFeatured ? (
           <section className="mb-10 sm:mb-12">
-            <div className="discover-concept-section-head mb-6 px-1 sm:px-0">
-              <h2 className="discover-concept-section-title">Featured titles</h2>
-              <div className="discover-concept-section-line" />
-              {finePointer && !reducedMotion ? (
-                <span className="discover-concept-drag-hint">Drag to explore →</span>
-              ) : null}
+            <div className="discover-concept-visions-head mb-6 flex flex-wrap items-center gap-4 px-1 sm:px-0">
+              <h2 className="discover-concept-section-title m-0 shrink-0">Featured titles</h2>
+              <div className="discover-concept-section-line min-w-[4rem] flex-1" />
             </div>
-            <div
-              ref={featuredScrollerRef}
-              onPointerDownCapture={onFeaturedPointerDown}
-              onPointerMove={onFeaturedPointerMove}
-              onPointerUp={endFeaturedDrag}
-              onPointerCancel={endFeaturedDrag}
-              onPointerLeave={(e) => {
-                if (featuredDragRef.current.pointerId === e.pointerId) endFeaturedDrag(e);
-              }}
-              className={`discover-no-h-scrollbar discover-concept-shelf-row -mx-4 flex items-end gap-6 overflow-x-auto px-6 pb-6 pt-10 sm:mx-0 sm:px-8 ${
-                centerFeaturedRow ? "sm:justify-center" : ""
-              } ${featuredScrollerDragging ? "discover-featured-scroller--dragging" : ""}`}
-            >
-              {featured.map((book, i) => (
-                <ShelfFeaturedCard
-                  key={book.id}
-                  book={book}
-                  index={i}
-                  isSelected={i === selectedFeaturedIndex}
-                  reducedMotion={reducedMotion}
-                  finePointer={finePointer}
-                  shelfHoverIndex={featuredShelfHoverIndex}
-                  onShelfHoverIndex={setFeaturedShelfHoverIndex}
-                  onSelect={() => setSelectedFeaturedIndex(i)}
-                />
-              ))}
+            <div className="relative">
+              <div
+                ref={featuredScrollerRef}
+                className="discover-no-h-scrollbar relative flex gap-0 overflow-x-auto py-10 pb-4 pr-4"
+                style={{
+                  perspective: "1000px",
+                  transformStyle: "preserve-3d",
+                  position: "relative",
+                }}
+              >
+                {featured.map((book, i) => (
+                  <FeaturedCarouselCard
+                    key={book.id}
+                    book={book}
+                    index={i}
+                    activeIndex={activeFeatured}
+                    isSelected={i === selectedFeaturedIndex}
+                    isLast={i === featured.length - 1}
+                    finePointer={finePointer}
+                    reducedMotion={reducedMotion}
+                    onSelect={() => selectFeaturedIndex(i)}
+                  />
+                ))}
+              </div>
+
+              <div className="pointer-events-none absolute inset-y-0 left-0 hidden items-center md:flex">
+                {canFeaturedScrollLeft ? (
+                  <button
+                    type="button"
+                    className="pointer-events-auto ml-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-bg-surface/80 text-text-primary transition duration-200 ease-out hover:bg-bg-raised"
+                    onClick={() => scrollFeatured(-1)}
+                    aria-label="Scroll featured titles left"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
+              <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center justify-end md:flex">
+                {canFeaturedScrollRight ? (
+                  <button
+                    type="button"
+                    className="pointer-events-auto mr-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-bg-surface/80 text-text-primary transition duration-200 ease-out hover:bg-bg-raised"
+                    onClick={() => scrollFeatured(1)}
+                    aria-label="Scroll featured titles right"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {selectedBook ? (

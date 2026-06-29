@@ -2,6 +2,7 @@
 
 import { NotificationsBell } from "@/components/notifications-bell";
 import { ThemeSwitcher } from "@/components/theme-switcher";
+import { AUTH_SIGNUP_LOGIN_DISABLED } from "@/lib/auth-ui-gates";
 import { signOutFromApp } from "@/lib/sign-out-client";
 import { useAuth, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
@@ -207,6 +208,14 @@ export function NavChrome({
                 isProduction={isProduction}
               />
             </>
+          ) : AUTH_SIGNUP_LOGIN_DISABLED ? (
+            <span
+              className={`${signInClass} cursor-not-allowed opacity-50`}
+              aria-disabled="true"
+              title="Sign-in is temporarily unavailable"
+            >
+              Sign In
+            </span>
           ) : (
             <Link href="/login" className={signInClass} onClick={() => setMenuOpen(false)}>
               Sign In

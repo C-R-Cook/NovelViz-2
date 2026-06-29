@@ -2,6 +2,7 @@
 
 import { DiscoverParticleField } from "@/components/discover-particle-field";
 import { ImageThumbnailBottomBar } from "@/components/image-thumbnail-bottom-bar";
+import { AUTH_SIGNUP_LOGIN_DISABLED } from "@/lib/auth-ui-gates";
 import type { FeaturedImageCard } from "@/lib/featured-image-selection";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -216,12 +217,33 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
           </div>
 
           <div className="landing-nav-actions">
-            <Link href="/login" className="landing-nav-signin">
-              Sign In
-            </Link>
-            <Link href={signUpHref} className="landing-nav-cta">
-              Sign Up →
-            </Link>
+            {AUTH_SIGNUP_LOGIN_DISABLED ? (
+              <>
+                <span
+                  className="landing-nav-signin cursor-not-allowed opacity-50"
+                  aria-disabled="true"
+                  title="Sign-in is temporarily unavailable"
+                >
+                  Sign In
+                </span>
+                <span
+                  className="landing-nav-cta cursor-not-allowed opacity-50"
+                  aria-disabled="true"
+                  title="Sign-up is temporarily unavailable"
+                >
+                  Sign Up →
+                </span>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="landing-nav-signin">
+                  Sign In
+                </Link>
+                <Link href={signUpHref} className="landing-nav-cta">
+                  Sign Up →
+                </Link>
+              </>
+            )}
           </div>
         </nav>
       ) : null}
@@ -250,9 +272,19 @@ export function LandingClient({ isLoggedIn, featuredImages }: LandingClientProps
             Browse Books
           </Link>
           {!isLoggedIn ? (
-            <Link href="/login" className="landing-btn-secondary landing-btn-signin">
-              Sign In
-            </Link>
+            AUTH_SIGNUP_LOGIN_DISABLED ? (
+              <span
+                className="landing-btn-secondary landing-btn-signin cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                title="Sign-in is temporarily unavailable"
+              >
+                Sign In
+              </span>
+            ) : (
+              <Link href="/login" className="landing-btn-secondary landing-btn-signin">
+                Sign In
+              </Link>
+            )
           ) : null}
         </div>
 

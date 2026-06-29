@@ -1,6 +1,12 @@
 import anthropic from "@/lib/anthropic";
 import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  CONTENT_TEST_QA_ANSWER,
+  getSupplierBlockReason,
+  isSupplierBlocked,
+  logSupplierSkipped,
+} from "@/lib/content-test-mode";
 import { embedChunksWithTokenUsage } from "@/lib/ingestion";
 import { prisma } from "@/lib/prisma";
 import { aiFailureResponse } from "@/lib/ai-service-failure";
@@ -142,8 +148,13 @@ export async function POST(request: Request) {
 
   const currentChapterNumber = progress.currentChapterNumber;
 
+  let contentTestStubbed = false;
+
   let embeddingVec: number[];
   let embeddingTokens = 0;
+  if (isSupplierBlocked("openai")) {
+    contentTestStubbed = true;
+  }
   try {
     const { embeddings, embeddingTokens: et } = await embedChunksWithTokenUsage([questionText]);
     embeddingTokens = et;
@@ -202,43 +213,52 @@ My question: ${questionText}`;
   let responseText = "";
   let promptTokens = 0;
   let completionTokens = 0;
-  try {
-    const candidates = getAnthropicModelCandidates();
-    let lastErr: unknown = null;
+  if (isSupplierBlocked("anthropic")) {
+    const reason = getSupplierBlockReason("anthropic")!;
+    logSupplierSkipped("anthropic", reason);
+    contentTestStubbed = true;
+    responseText = CONTENT_TEST_QA_ANSWER;
+    promptTokens = 0;
+    completionTokens = 0;
+  } else {
+    try {
+      const candidates = getAnthropicModelCandidates();
+      let lastErr: unknown = null;
 
-    for (const model of candidates) {
-      try {
-        const message = await anthropic.messages.create({
-          model,
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMessage }],
-        });
-        promptTokens = message.usage?.input_tokens ?? 0;
-        completionTokens = message.usage?.output_tokens ?? 0;
-        const first = message.content[0];
-        responseText =
-          first && first.type === "text" ? first.text : "No text response from the model.";
-        lastErr = null;
-        break;
-      } catch (err) {
-        const maybeType = (err as { type?: string } | undefined)?.type;
-        const maybeStatus = (err as { status?: number } | undefined)?.status;
-        lastErr = err;
-        // Try next configured model only for model-not-found style failures.
-        if (maybeType === "not_found_error" || maybeStatus === 404) {
-          continue;
+      for (const model of candidates) {
+        try {
+          const message = await anthropic.messages.create({
+            model,
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: [{ role: "user", content: userMessage }],
+          });
+          promptTokens = message.usage?.input_tokens ?? 0;
+          completionTokens = message.usage?.output_tokens ?? 0;
+          const first = message.content[0];
+          responseText =
+            first && first.type === "text" ? first.text : "No text response from the model.";
+          lastErr = null;
+          break;
+        } catch (err) {
+          const maybeType = (err as { type?: string } | undefined)?.type;
+          const maybeStatus = (err as { status?: number } | undefined)?.status;
+          lastErr = err;
+          // Try next configured model only for model-not-found style failures.
+          if (maybeType === "not_found_error" || maybeStatus === 404) {
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
-    }
 
-    if (lastErr) {
-      throw lastErr;
+      if (lastErr) {
+        throw lastErr;
+      }
+    } catch (e) {
+      console.error("[api/query POST] Anthropic error", e);
+      return aiFailureResponse(dbUser.id, "/api/query", bookId, e);
     }
-  } catch (e) {
-    console.error("[api/query POST] Anthropic error", e);
-    return aiFailureResponse(dbUser.id, "/api/query", bookId, e);
   }
 
   if (responseText === "") {
@@ -264,5 +284,9 @@ My question: ${questionText}`;
     console.error("[api/query POST] consumeUsageAfterSuccess error", err);
   }
 
-  return NextResponse.json({ questionText, responseText });
+  return NextResponse.json({
+    questionText,
+    responseText,
+    ...(contentTestStubbed ? { contentTestStubbed: true } : {}),
+  });
 }

@@ -5,6 +5,12 @@ import {
 } from "@/lib/cover-ai-fal";
 import { assembleCoverAiPrompt } from "@/lib/cover-ai-prompt";
 import {
+  CONTENT_TEST_PLACEHOLDER_IMAGE_URL,
+  getSupplierBlockReason,
+  isSupplierBlocked,
+  logSupplierSkipped,
+} from "@/lib/content-test-mode";
+import {
   canAccessBookCoverAi,
   resolveCoverAiQuotaExempt,
 } from "@/lib/cover-ai-access";
@@ -129,46 +135,54 @@ export async function POST(request: Request, context: RouteContext) {
 
   }
 
-  let falUrl: string;
-  try {
-    const resolved = buildCoverAiFalInputForCustomEndpoint(
-      modelEntry.falEndpoint,
-      prompt,
-      modelEntry.inputProfile,
-    );
-    const result = await fal.subscribe(resolved.endpoint, { input: resolved.input });
-    const nested = (result as { data?: unknown }).data;
-    const url =
-      extractCoverAiFalImageUrl(result) ??
-      (nested ? extractCoverAiFalImageUrl(nested) : null) ??
-      extractCoverAiFalImageUrl((nested as { data?: unknown })?.data);
-    if (!url) {
-      console.error("[cover-ai generate] unexpected fal response", result);
-      return NextResponse.json({ error: "Image generation returned no URL" }, { status: 502 });
-    }
-    falUrl = url;
-  } catch (e) {
-    console.error("[cover-ai generate] fal error", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Image generation failed" },
-      { status: 502 },
-    );
-  }
-
   const draftLeaf = randomUUID();
   let publicId: string;
   let secureUrl: string;
-  try {
-    const uploaded = await uploadCoverDraftFromUrl({
-      bookId,
-      draftLeaf,
-      imageUrl: falUrl,
-    });
-    publicId = uploaded.publicId;
-    secureUrl = uploaded.secureUrl;
-  } catch (e) {
-    console.error("[cover-ai generate] Cloudinary error", e);
-    return NextResponse.json({ error: "Image storage failed" }, { status: 502 });
+
+  if (isSupplierBlocked("fal")) {
+    const reason = getSupplierBlockReason("fal")!;
+    logSupplierSkipped("fal", reason);
+    publicId = `content-test/${draftLeaf}`;
+    secureUrl = CONTENT_TEST_PLACEHOLDER_IMAGE_URL;
+  } else {
+    let falUrl: string;
+    try {
+      const resolved = buildCoverAiFalInputForCustomEndpoint(
+        modelEntry.falEndpoint,
+        prompt,
+        modelEntry.inputProfile,
+      );
+      const result = await fal.subscribe(resolved.endpoint, { input: resolved.input });
+      const nested = (result as { data?: unknown }).data;
+      const url =
+        extractCoverAiFalImageUrl(result) ??
+        (nested ? extractCoverAiFalImageUrl(nested) : null) ??
+        extractCoverAiFalImageUrl((nested as { data?: unknown })?.data);
+      if (!url) {
+        console.error("[cover-ai generate] unexpected fal response", result);
+        return NextResponse.json({ error: "Image generation returned no URL" }, { status: 502 });
+      }
+      falUrl = url;
+    } catch (e) {
+      console.error("[cover-ai generate] fal error", e);
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Image generation failed" },
+        { status: 502 },
+      );
+    }
+
+    try {
+      const uploaded = await uploadCoverDraftFromUrl({
+        bookId,
+        draftLeaf,
+        imageUrl: falUrl,
+      });
+      publicId = uploaded.publicId;
+      secureUrl = uploaded.secureUrl;
+    } catch (e) {
+      console.error("[cover-ai generate] Cloudinary error", e);
+      return NextResponse.json({ error: "Image storage failed" }, { status: 502 });
+    }
   }
 
   let remainingAttempts: number | null = null;

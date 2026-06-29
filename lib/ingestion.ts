@@ -1,3 +1,10 @@
+import {
+  getSupplierBlockReason,
+  isSupplierBlocked,
+  logSupplierSkipped,
+  zeroEmbeddingTokens,
+  zeroEmbeddings,
+} from "@/lib/content-test-mode";
 import { prisma } from "@/lib/prisma";
 import type { BookGenre, Prisma } from "@db";
 import { XMLParser } from "fast-xml-parser";
@@ -1138,6 +1145,15 @@ export async function embedChunksWithTokenUsage(chunks: string[]): Promise<{
 }> {
   if (chunks.length === 0) {
     return { embeddings: [], embeddingTokens: 0 };
+  }
+
+  // CONTENT_TEST also blocks real Gutenberg ingestion embeddings — unset CONTENT_TEST
+  // before running real local ingestion, or embeddings will silently be zero vectors
+  // (see console log).
+  if (isSupplierBlocked("openai")) {
+    const reason = getSupplierBlockReason("openai")!;
+    logSupplierSkipped("openai", reason);
+    return { embeddings: zeroEmbeddings(chunks.length), embeddingTokens: zeroEmbeddingTokens() };
   }
 
   const openai = getOpenAI();

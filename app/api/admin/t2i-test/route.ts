@@ -1,4 +1,11 @@
 import fal from "@/lib/fal";
+import { absoluteAppUrl } from "@/lib/admin-email";
+import {
+  CONTENT_TEST_PLACEHOLDER_IMAGE_URL,
+  getSupplierBlockReason,
+  isSupplierBlocked,
+  logSupplierSkipped,
+} from "@/lib/content-test-mode";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getT2iOutputRoot, sanitizePathSegment, safeJoinUnderRoot } from "@/lib/t2i-local-output";
@@ -95,41 +102,47 @@ export async function POST(request: Request) {
 
   const t0 = Date.now();
   let falUrl: string;
-  try {
-    const result = await fal.subscribe(modelEndpoint, {
-      input: isGrokImagine
-        ? {
-            prompt,
-            num_images: 1,
-            aspect_ratio: grokAspectRatioFromTesterImageSize(imageSize),
-            resolution: "1k",
-            output_format: "jpeg",
-          }
-        : {
-            prompt,
-            image_size: falImageSize,
-            num_images: 1,
-          },
-    });
+  if (isSupplierBlocked("fal")) {
+    const reason = getSupplierBlockReason("fal")!;
+    logSupplierSkipped("fal", reason);
+    falUrl = absoluteAppUrl(CONTENT_TEST_PLACEHOLDER_IMAGE_URL);
+  } else {
+    try {
+      const result = await fal.subscribe(modelEndpoint, {
+        input: isGrokImagine
+          ? {
+              prompt,
+              num_images: 1,
+              aspect_ratio: grokAspectRatioFromTesterImageSize(imageSize),
+              resolution: "1k",
+              output_format: "jpeg",
+            }
+          : {
+              prompt,
+              image_size: falImageSize,
+              num_images: 1,
+            },
+      });
 
-    type FalImagePayload = {
-      images?: Array<{ url?: string }>;
-      data?: { images?: Array<{ url?: string }> };
-    };
-    const r = result as FalImagePayload;
-    const imageUrl = r.images?.[0]?.url || r.data?.images?.[0]?.url || null;
+      type FalImagePayload = {
+        images?: Array<{ url?: string }>;
+        data?: { images?: Array<{ url?: string }> };
+      };
+      const r = result as FalImagePayload;
+      const imageUrl = r.images?.[0]?.url || r.data?.images?.[0]?.url || null;
 
-    if (typeof imageUrl !== "string" || imageUrl === "") {
-      console.error(LOG_PREFIX, "could not extract image URL; full result:", JSON.stringify(result));
-      return NextResponse.json({ error: "Could not extract image URL from fal response" }, { status: 502 });
+      if (typeof imageUrl !== "string" || imageUrl === "") {
+        console.error(LOG_PREFIX, "could not extract image URL; full result:", JSON.stringify(result));
+        return NextResponse.json({ error: "Could not extract image URL from fal response" }, { status: 502 });
+      }
+      falUrl = imageUrl;
+    } catch (e) {
+      console.error(LOG_PREFIX, "fal error", e);
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Image generation failed" },
+        { status: 502 },
+      );
     }
-    falUrl = imageUrl;
-  } catch (e) {
-    console.error(LOG_PREFIX, "fal error", e);
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Image generation failed" },
-      { status: 502 },
-    );
   }
 
   const genTimeMs = Date.now() - t0;

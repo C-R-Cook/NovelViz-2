@@ -1,5 +1,13 @@
 import { uploadFalImageUrlToCloudinary } from "@/lib/upload-prepared-image-to-cloudinary";
 import { cloudinaryGalleryFolder } from "@/lib/cloudinary";
+import {
+  CONTENT_TEST_ENRICHED_PROMPT,
+  CONTENT_TEST_PLACEHOLDER_IMAGE_URL,
+  CONTENT_TEST_SUBJECT,
+  getSupplierBlockReason,
+  isSupplierBlocked,
+  logSupplierSkipped,
+} from "@/lib/content-test-mode";
 import fal from "@/lib/fal";
 import { accountEnforcementApiGuard } from "@/lib/account-status-routing";
 import { getAnthropicTextResponse } from "@/lib/anthropic-text";
@@ -179,6 +187,8 @@ export async function POST(request: Request) {
 
   const currentChapterNumber = progress.currentChapterNumber;
 
+  let contentTestStubbed = false;
+
   const subjectExtractionSystemPrompt = `Extract the primary visual subject from this image request.
 The subject is WHO or WHAT the image is primarily about.
 
@@ -203,17 +213,25 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
 
   let extractedSubject = "";
   let subjectTokens = 0;
-  try {
-    const subjectMessage = await getAnthropicTextResponse(
-      subjectExtractionSystemPrompt,
-      userPrompt,
-      60,
-    );
-    extractedSubject = subjectMessage.text;
-    subjectTokens = subjectMessage.promptTokens + subjectMessage.completionTokens;
-  } catch (e) {
-    console.error("[api/imagine POST] subject extraction", e);
-    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+  if (isSupplierBlocked("anthropic")) {
+    const reason = getSupplierBlockReason("anthropic")!;
+    logSupplierSkipped("anthropic", reason);
+    contentTestStubbed = true;
+    extractedSubject = CONTENT_TEST_SUBJECT;
+    subjectTokens = 0;
+  } else {
+    try {
+      const subjectMessage = await getAnthropicTextResponse(
+        subjectExtractionSystemPrompt,
+        userPrompt,
+        60,
+      );
+      extractedSubject = subjectMessage.text;
+      subjectTokens = subjectMessage.promptTokens + subjectMessage.completionTokens;
+    } catch (e) {
+      console.error("[api/imagine POST] subject extraction", e);
+      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+    }
   }
 
   const normalizedSubject = extractedSubject.trim();
@@ -232,6 +250,9 @@ Return ONLY the subject as a short noun phrase. Nothing else.`;
   let promptEmbeddingVec: number[];
   let subjectEmbeddingVec: number[];
   let embeddingTokens = 0;
+  if (isSupplierBlocked("openai")) {
+    contentTestStubbed = true;
+  }
   try {
     const { embeddings, embeddingTokens: embTok } = await embedChunksWithTokenUsage([
       userPrompt,
@@ -337,14 +358,23 @@ Reader's request: ${userPrompt}`;
   let enrichedPrompt = "";
   let promptTokens = 0;
   let completionTokens = 0;
-  try {
-    const enrichMessage = await getAnthropicTextResponse(systemPrompt, userMessage, 300);
-    enrichedPrompt = enrichMessage.text;
-    promptTokens = enrichMessage.promptTokens;
-    completionTokens = enrichMessage.completionTokens;
-  } catch (e) {
-    console.error("[api/imagine POST] Anthropic error", e);
-    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+  if (isSupplierBlocked("anthropic")) {
+    const reason = getSupplierBlockReason("anthropic")!;
+    logSupplierSkipped("anthropic", reason);
+    contentTestStubbed = true;
+    enrichedPrompt = CONTENT_TEST_ENRICHED_PROMPT;
+    promptTokens = 0;
+    completionTokens = 0;
+  } else {
+    try {
+      const enrichMessage = await getAnthropicTextResponse(systemPrompt, userMessage, 300);
+      enrichedPrompt = enrichMessage.text;
+      promptTokens = enrichMessage.promptTokens;
+      completionTokens = enrichMessage.completionTokens;
+    } catch (e) {
+      console.error("[api/imagine POST] Anthropic error", e);
+      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+    }
   }
 
   if (!enrichedPrompt) {
@@ -353,37 +383,48 @@ Reader's request: ${userPrompt}`;
 
   let imageUrl: string;
   let modelStored: string;
-  try {
+  let finalImageUrl: string;
+  const generatedImageId = randomUUID();
+
+  if (isSupplierBlocked("fal")) {
+    const reason = getSupplierBlockReason("fal")!;
+    logSupplierSkipped("fal", reason);
+    contentTestStubbed = true;
     const resolved = resolveImagineFal(dbUser.role, body.falImagineModel, enrichedPrompt);
     modelStored = resolved.modelStored;
-    const result = await fal.subscribe(resolved.endpoint, { input: resolved.input });
-    const url =
-      extractFalImageUrl(result) ??
-      extractFalImageUrl((result as { data?: unknown }).data) ??
-      extractFalImageUrl((result as { data?: { data?: unknown } }).data?.data);
-    if (!url) {
-      console.error("[api/imagine POST] unexpected fal response", result);
-      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, new Error("No image URL"));
+    imageUrl = CONTENT_TEST_PLACEHOLDER_IMAGE_URL;
+    finalImageUrl = CONTENT_TEST_PLACEHOLDER_IMAGE_URL;
+  } else {
+    try {
+      const resolved = resolveImagineFal(dbUser.role, body.falImagineModel, enrichedPrompt);
+      modelStored = resolved.modelStored;
+      const result = await fal.subscribe(resolved.endpoint, { input: resolved.input });
+      const url =
+        extractFalImageUrl(result) ??
+        extractFalImageUrl((result as { data?: unknown }).data) ??
+        extractFalImageUrl((result as { data?: { data?: unknown } }).data?.data);
+      if (!url) {
+        console.error("[api/imagine POST] unexpected fal response", result);
+        return aiFailureResponse(dbUser.id, "/api/imagine", bookId, new Error("No image URL"));
+      }
+      imageUrl = url;
+    } catch (e) {
+      console.error("[api/imagine POST] fal error", e);
+      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
     }
-    imageUrl = url;
-  } catch (e) {
-    console.error("[api/imagine POST] fal error", e);
-    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
-  }
 
-  const generatedImageId = randomUUID();
-  let finalImageUrl: string;
-  try {
-    const uploaded = await uploadFalImageUrlToCloudinary({
-      imageUrl,
-      folder: cloudinaryGalleryFolder(),
-      publicId: generatedImageId,
-      overwrite: false,
-    });
-    finalImageUrl = uploaded.secureUrl;
-  } catch (e) {
-    console.error("[api/imagine POST] cloudinary upload", e);
-    return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+    try {
+      const uploaded = await uploadFalImageUrlToCloudinary({
+        imageUrl,
+        folder: cloudinaryGalleryFolder(),
+        publicId: generatedImageId,
+        overwrite: false,
+      });
+      finalImageUrl = uploaded.secureUrl;
+    } catch (e) {
+      console.error("[api/imagine POST] cloudinary upload", e);
+      return aiFailureResponse(dbUser.id, "/api/imagine", bookId, e);
+    }
   }
 
   const created = await prisma.generatedImage.create({
@@ -433,5 +474,6 @@ Reader's request: ${userPrompt}`;
       chapterNumberAtTime: created.chapterNumberAtTime,
       createdAt: created.createdAt.toISOString(),
     },
+    ...(contentTestStubbed ? { contentTestStubbed: true } : {}),
   });
 }

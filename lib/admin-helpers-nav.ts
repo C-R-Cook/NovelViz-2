@@ -67,6 +67,13 @@ export const ADMIN_DEVELOPER_TOOLS_LINKS: readonly AdminNavLink[] = [
     icon: "◻",
     hint: "fal.ai model comparison (local output)",
   },
+  {
+    id: "admin-content-test-tool",
+    href: "/admin/content-test-tool",
+    label: "Content test tool",
+    icon: "🛡",
+    hint: "Exercise CONTENT_TEST guards on query & imagine",
+  },
 ] as const;
 
 export function isGutenbergImportPathActive(pathname: string): boolean {
